@@ -1,7 +1,8 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { siteSettings, heroSlides } from "./schema";
+import { siteSettings, heroSlides, user, account } from "./schema";
 import { v4 as uuid } from "uuid";
+import { hashPassword } from "better-auth/password";
 
 async function seed() {
     const connection = await mysql.createConnection(
@@ -11,26 +12,40 @@ async function seed() {
 
     console.log("🌱 Seeding database...");
 
-    // 1. Create admin user via better-auth API
+    // 1. Create admin user directly in DB
     console.log("Creating admin user...");
     try {
-        const res = await fetch(`${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/auth/sign-up/email`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: "Admin",
-                email: "admin@abkciraya.com",
-                password: "admin123",
-            }),
+        const userId = uuid();
+        const hashedPassword = await hashPassword("admin123");
+        const now = new Date();
+
+        await db.insert(user).values({
+            id: userId,
+            name: "Admin",
+            email: "admin@abkciraya.com",
+            emailVerified: false,
+            createdAt: now,
+            updatedAt: now,
         });
-        if (res.ok) {
-            console.log("✅ Admin user created: admin@abkciraya.com / admin123");
+
+        await db.insert(account).values({
+            id: uuid(),
+            accountId: userId,
+            providerId: "credential",
+            userId: userId,
+            password: hashedPassword,
+            createdAt: now,
+            updatedAt: now,
+        });
+
+        console.log("✅ Admin user created: admin@abkciraya.com / admin123");
+    } catch (err: unknown) {
+        const mysqlErr = err as { code?: string };
+        if (mysqlErr.code === "ER_DUP_ENTRY") {
+            console.log("⚠️ Admin user already exists, skipping.");
         } else {
-            const t = await res.text();
-            console.log("⚠️ Admin user may already exist:", t);
+            throw err;
         }
-    } catch {
-        console.log("⚠️ Could not create admin user via API (server may not be running). Create manually.");
     }
 
     // 2. Default site settings
