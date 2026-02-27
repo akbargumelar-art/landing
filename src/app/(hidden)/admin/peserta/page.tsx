@@ -12,12 +12,13 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage,
+    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage, Calendar,
 } from "lucide-react";
 
 interface Submission {
     id: string;
     status: string;
+    period: string;
     submittedAt: string;
     form: {
         title: string;
@@ -43,6 +44,8 @@ export default function PesertaPage() {
     const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [editingPeriod, setEditingPeriod] = useState("");
+    const [savingPeriod, setSavingPeriod] = useState(false);
 
     const fetchSubmissions = () => {
         const params = new URLSearchParams();
@@ -81,6 +84,22 @@ export default function PesertaPage() {
         }
     };
 
+    const updatePeriod = async (id: string, period: string) => {
+        setSavingPeriod(true);
+        await fetch(`/api/admin/submissions/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ period }),
+        });
+        setSubmissions((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, period } : s))
+        );
+        if (selectedSubmission?.id === id) {
+            setSelectedSubmission({ ...selectedSubmission, period });
+        }
+        setSavingPeriod(false);
+    };
+
     const handleExport = async () => {
         setExporting(true);
         const params = new URLSearchParams();
@@ -111,6 +130,9 @@ export default function PesertaPage() {
         const firstText = sub.values.find((v) => v.field.fieldType === "text" && v.value);
         return firstText?.value || sub.id.slice(0, 8);
     };
+
+    // Collect unique periods from existing submissions for autocomplete
+    const existingPeriods = [...new Set(submissions.map(s => s.period).filter(Boolean))].sort();
 
     if (loading && submissions.length === 0) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
@@ -155,6 +177,7 @@ export default function PesertaPage() {
                                 <TableHead className="w-[50px]">No</TableHead>
                                 <TableHead>Nama / ID</TableHead>
                                 <TableHead>Program</TableHead>
+                                <TableHead>Periode</TableHead>
                                 <TableHead>Tanggal</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
@@ -162,17 +185,27 @@ export default function PesertaPage() {
                         </TableHeader>
                         <TableBody>
                             {submissions.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Belum ada data peserta</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Belum ada data peserta</TableCell></TableRow>
                             ) : submissions.map((sub, i) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="text-sm">{i + 1}</TableCell>
                                     <TableCell className="font-medium text-sm">{getPreviewValue(sub)}</TableCell>
                                     <TableCell className="text-sm">{sub.form.program.title}</TableCell>
+                                    <TableCell className="text-sm">
+                                        {sub.period ? (
+                                            <Badge variant="outline" className="text-xs font-normal">
+                                                <Calendar className="h-3 w-3 mr-1" />
+                                                {sub.period}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">Belum diatur</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-sm">{new Date(sub.submittedAt).toLocaleDateString("id-ID")}</TableCell>
                                     <TableCell>{getStatusBadge(sub.status)}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-1">
-                                            <button onClick={() => setSelectedSubmission(sub)} className="p-2 rounded-lg hover:bg-muted cursor-pointer"><Eye className="h-4 w-4" /></button>
+                                            <button onClick={() => { setSelectedSubmission(sub); setEditingPeriod(sub.period || ""); }} className="p-2 rounded-lg hover:bg-muted cursor-pointer"><Eye className="h-4 w-4" /></button>
                                             <button onClick={() => updateStatus(sub.id, "approved")} className="p-2 rounded-lg hover:bg-green-50 text-green-600 cursor-pointer" title="Approve"><CheckCircle className="h-4 w-4" /></button>
                                             <button onClick={() => updateStatus(sub.id, "rejected")} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer" title="Reject"><XCircle className="h-4 w-4" /></button>
                                         </div>
@@ -195,6 +228,39 @@ export default function PesertaPage() {
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-muted-foreground">{selectedSubmission.form.program.title}</p>
                                 {getStatusBadge(selectedSubmission.status)}
+                            </div>
+
+                            {/* Period Editor */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                <label className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" /> Periode Program
+                                </label>
+                                <div className="flex gap-2 mt-2">
+                                    <Input
+                                        value={editingPeriod}
+                                        onChange={(e) => setEditingPeriod(e.target.value)}
+                                        placeholder="Contoh: Periode Januari 2026"
+                                        className="flex-1 bg-white text-sm"
+                                        list="period-suggestions"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        disabled={savingPeriod}
+                                        onClick={() => updatePeriod(selectedSubmission.id, editingPeriod)}
+                                        className="cursor-pointer"
+                                    >
+                                        {savingPeriod ? <Loader2 className="h-4 w-4 animate-spin" /> : "Simpan"}
+                                    </Button>
+                                </div>
+                                {/* Autocomplete suggestions from existing periods */}
+                                <datalist id="period-suggestions">
+                                    {existingPeriods.map((p) => (
+                                        <option key={p} value={p} />
+                                    ))}
+                                </datalist>
+                                {selectedSubmission.period && (
+                                    <p className="text-xs text-blue-600 mt-1">Saat ini: {selectedSubmission.period}</p>
+                                )}
                             </div>
 
                             <div className="space-y-3">
