@@ -21,6 +21,8 @@ const navLinks = [
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [open, setOpen] = useState(false);
+    const [logoUrl, setLogoUrl] = useState("");
+    const [siteName, setSiteName] = useState("Agrabudi Komunika");
     const pathname = usePathname();
 
     useEffect(() => {
@@ -30,6 +32,24 @@ export function Navbar() {
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
+
+    useEffect(() => {
+        fetch("/api/public/settings")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.logo_url) setLogoUrl(data.logo_url);
+                if (data.site_name) setSiteName(data.site_name);
+            })
+            .catch(() => { });
+    }, []);
+
+    const LogoIcon = () => (
+        <div className="w-9 h-9 bg-gradient-to-br from-red-600 to-red-500 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-red-200">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+    );
 
     return (
         <header
@@ -43,13 +63,13 @@ export function Navbar() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-3 group">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-gradient-to-br from-red-600 to-red-500 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-red-200">
-                                <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                </svg>
-                            </div>
+                            {logoUrl ? (
+                                <img src={logoUrl} alt={siteName} className="h-9 w-auto object-contain rounded-lg" />
+                            ) : (
+                                <LogoIcon />
+                            )}
                             <span className="text-base md:text-lg font-extrabold text-foreground tracking-tight uppercase">
-                                Agrabudi Komunika
+                                {siteName}
                             </span>
                         </div>
                     </Link>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { DynamicFavicon } from "@/components/dynamic-favicon";
 
 export const metadata: Metadata = {
     title: "ABK Ciraya - Telkomsel Authorized Partner",
@@ -45,6 +46,7 @@ export default function RootLayout({
                     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
                     rel="stylesheet"
                 />
+                <DynamicFavicon />
             </head>
             <body className="min-h-screen">{children}</body>
         </html>
