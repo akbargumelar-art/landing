@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,18 @@ const DEFAULT_FORM_ELEMENTS: FormElement[] = [
 ];
 
 export default function FormUndianPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        }>
+            <FormUndianContent />
+        </Suspense>
+    );
+}
+
+function FormUndianContent() {
     const searchParams = useSearchParams();
     const formId = searchParams.get("id");
 
@@ -420,10 +432,10 @@ export default function FormUndianPage() {
                                                     onDragOver={(e) => handleDrag(e, el.id)}
                                                     onDrop={(e) => handleDrop(e, el.id)}
                                                     className={`relative rounded-lg border-2 border-dashed p-4 text-center transition-all duration-200 ${dragActiveId === el.id
-                                                            ? "border-primary bg-primary/5"
-                                                            : errors[el.id]
-                                                                ? "border-red-300 bg-red-50"
-                                                                : "border-gray-200 hover:border-primary/50"
+                                                        ? "border-primary bg-primary/5"
+                                                        : errors[el.id]
+                                                            ? "border-red-300 bg-red-50"
+                                                            : "border-gray-200 hover:border-primary/50"
                                                         }`}
                                                 >
                                                     {files[el.id] ? (
