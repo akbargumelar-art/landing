@@ -3,6 +3,11 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { v4 as uuid } from "uuid";
 
+// Increase body size limit for file uploads (default is 1MB)
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+
 export async function POST(request: Request) {
     try {
         const formData = await request.formData();
@@ -43,8 +48,9 @@ export async function POST(request: Request) {
         const url = `/uploads/${filename}`;
 
         return NextResponse.json({ success: true, url, filename });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("Upload error:", error);
-        return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+        const msg = error instanceof Error ? error.message : "Upload failed";
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
