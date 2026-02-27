@@ -71,7 +71,7 @@ export async function POST(
                 const bytes = await rawValue.arrayBuffer();
                 await writeFile(filepath, Buffer.from(bytes));
 
-                filePath = `/uploads/submissions/${filename}`;
+                filePath = `/api/public/uploads/submissions/${filename}`;
                 value = rawValue.name;
             } else if (typeof rawValue === "string") {
                 value = rawValue;
