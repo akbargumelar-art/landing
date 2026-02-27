@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
 import mysql from "mysql2/promise";
 import { siteSettings, heroSlides, programs, user, account, dynamicForms, formFields, formSubmissions, submissionValues, winners } from "./schema";
 import { v4 as uuid } from "uuid";
@@ -266,8 +267,7 @@ async function seed() {
                     for (const w of periodWinners) {
                         // Find a matching submission for this winner
                         const subs = await db.select().from(formSubmissions).where(
-                            // just grab any submission in that period
-                            // In a real system you'd link by participant
+                            eq(formSubmissions.period, period)
                         ) as { id: string; period: string }[];
                         const matchingSub = subs.find(s => s.period === period);
                         if (!matchingSub) continue;
