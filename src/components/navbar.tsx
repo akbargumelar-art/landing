@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,9 @@ export function Navbar() {
                     <Link href="/" className="flex items-center gap-3 group">
                         <div className="flex items-center gap-3">
                             {logoUrl ? (
-                                <img src={logoUrl} alt={siteName} className="h-9 w-auto object-contain rounded-lg" />
+                                <div className="relative h-9 w-24">
+                                    <Image src={logoUrl} alt={siteName} fill className="object-contain rounded-lg" />
+                                </div>
                             ) : (
                                 <LogoIcon />
                             )}

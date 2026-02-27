@@ -15,6 +15,7 @@ import {
     Type, AlignLeft, Hash, Mail, Phone, ChevronDown, CircleDot, CheckSquare,
     CalendarIcon, Upload, ImageIcon, Minus, Columns2, Eye, Settings2, X,
 } from "lucide-react";
+import { formFields } from "@/db/schema";
 
 // ---- Types ----
 type ElementType =
@@ -162,27 +163,27 @@ export default function FormBuilderPage() {
             const data = await res.json();
             if (data.fields && data.fields.length > 0) {
                 // Map the DB fields back to the FormElement structure
-                const updatedElements = data.fields.map((f: any) => ({
+                const updatedElements = data.fields.map((f: typeof formFields.$inferSelect) => ({
                     id: f.id,
-                    type: f.fieldType || f.type,
+                    type: f.fieldType,
                     label: f.label,
                     placeholder: f.placeholder,
                     hintText: f.hintText,
                     isRequired: f.isRequired,
-                    content: f.content || f.placeholder,
+                    content: f.placeholder,
                     options: typeof f.options === 'string' ? JSON.parse(f.options) : f.options,
                     colSpan: 1
                 }));
                 // We also need to restore colSpan from formSchema if possible
                 try {
                     const schema = JSON.parse(form.formSchema || "[]");
-                    updatedElements.forEach((el: any) => {
-                        const match = schema.find((s: any) => s.id === el.id);
+                    updatedElements.forEach((el: Record<string, unknown>) => {
+                        const match = schema.find((s: { id: string, colSpan: number }) => s.id === el.id);
                         if (match) el.colSpan = match.colSpan || 1;
                     });
-                } catch (e) { }
+                } catch { }
 
-                setElements(updatedElements);
+                setElements(updatedElements as FormElement[]);
             } else {
                 const schema = JSON.parse(form.formSchema || "[]");
                 setElements(schema.length > 0 ? schema : []);

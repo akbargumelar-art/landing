@@ -11,8 +11,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
     Plus, Pencil, Trash2, Loader2, Save, GripVertical, ArrowUp, ArrowDown, Eye, EyeOff,
-    Image, Upload, LayoutGrid, Building2,
+    Upload, LayoutGrid, Building2,
 } from "lucide-react";
+import Image from "next/image";
 
 interface HeroSlide {
     id: string;
@@ -214,7 +215,7 @@ export default function BerandaPage() {
             {/* Hero Slides */}
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2"><Image className="h-5 w-5" /> Banner Hero</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">Banner Hero</CardTitle>
                     <Button size="sm" onClick={openAdd} className="cursor-pointer"><Plus className="mr-1 h-4 w-4" /> Tambah Banner</Button>
                 </CardHeader>
                 <CardContent>
@@ -230,7 +231,9 @@ export default function BerandaPage() {
                                         <button onClick={() => moveSlide(index, "down")} disabled={index === slides.length - 1} className="p-1 rounded hover:bg-muted disabled:opacity-30 cursor-pointer"><ArrowDown className="h-3 w-3" /></button>
                                     </div>
                                     {slide.imageUrl ? (
-                                        <img src={slide.imageUrl} alt="" className="w-20 h-12 rounded-lg object-cover shrink-0" />
+                                        <div className="relative w-20 h-12 rounded-lg overflow-hidden shrink-0">
+                                            <Image src={slide.imageUrl} alt="" fill className="object-cover" />
+                                        </div>
                                     ) : (
                                         <div className={`w-20 h-12 rounded-lg bg-gradient-to-r ${slide.bgColor} shrink-0`} />
                                     )}
@@ -264,9 +267,9 @@ export default function BerandaPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {quickCards.map((card, i) => (
                             <div key={i} onClick={() => openEditCard(i)} className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-white hover:border-red-200 hover:bg-red-50/30 transition-colors cursor-pointer group">
-                                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-sm`}>
+                                <div className={`w-12 h-12 relative rounded-2xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-sm overflow-hidden`}>
                                     {card.icon.startsWith("/") || card.icon.startsWith("http") ? (
-                                        <img src={card.icon} alt="" className="w-7 h-7 object-contain" />
+                                        <Image src={card.icon} alt="" fill className="object-contain p-2" />
                                     ) : (
                                         <span className="text-xl">{card.icon}</span>
                                     )}
@@ -302,7 +305,7 @@ export default function BerandaPage() {
                                 <div key={i} className="rounded-xl border overflow-hidden bg-white hover:border-red-200 transition-colors group relative">
                                     <div className="relative h-36 overflow-hidden cursor-pointer" onClick={() => openEditOffice(i)}>
                                         {office.image ? (
-                                            <img src={office.image} alt={office.label} className="w-full h-full object-cover" />
+                                            <Image src={office.image} alt={office.label} fill className="object-cover" />
                                         ) : (
                                             <div className="w-full h-full bg-gray-100 flex items-center justify-center text-muted-foreground">
                                                 <Upload className="h-8 w-8 opacity-30" />
@@ -394,7 +397,11 @@ export default function BerandaPage() {
                                     <button onClick={() => setEditSlide({ ...editSlide, imageUrl: "" })} className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"><Trash2 className="h-4 w-4" /></button>
                                 )}
                             </div>
-                            {editSlide.imageUrl && <img src={editSlide.imageUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg border" />}
+                            {editSlide.imageUrl && (
+                                <div className="relative w-full h-32 rounded-lg border overflow-hidden">
+                                    <Image src={editSlide.imageUrl} alt="Preview" fill className="object-cover" />
+                                </div>
+                            )}
                             <p className="text-xs text-muted-foreground">Jika gambar diupload, digunakan sebagai background. Jika tidak, warna gradient dipakai.</p>
                         </div>
                         <div className="space-y-2">
@@ -439,9 +446,9 @@ export default function BerandaPage() {
                                 </label>
                             </div>
                             <div className="flex items-center gap-3">
-                                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${editCard.color} flex items-center justify-center`}>
+                                <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${editCard.color} flex items-center justify-center overflow-hidden`}>
                                     {editCard.icon.startsWith("/") || editCard.icon.startsWith("http") ? (
-                                        <img src={editCard.icon} alt="" className="w-7 h-7 object-contain" />
+                                        <Image src={editCard.icon} alt="" fill className="object-contain p-2" />
                                     ) : (
                                         <span className="text-xl">{editCard.icon}</span>
                                     )}
@@ -493,7 +500,11 @@ export default function BerandaPage() {
                                     <button onClick={() => setEditOffice({ ...editOffice, image: "" })} className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"><Trash2 className="h-4 w-4" /></button>
                                 )}
                             </div>
-                            {editOffice.image && <img src={editOffice.image} alt="Preview" className="w-full h-32 object-cover rounded-lg border" />}
+                            {editOffice.image && (
+                                <div className="relative w-full h-32 rounded-lg border overflow-hidden">
+                                    <Image src={editOffice.image} alt="Preview" fill className="object-cover" />
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label>Alamat Lengkap</Label>

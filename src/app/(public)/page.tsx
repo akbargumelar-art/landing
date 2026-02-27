@@ -314,26 +314,28 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
     );
 }
 
-function LokasiKantor() {
-    const defaultOffices = [
-        {
-            city: "CIREBON",
-            label: "Kantor Pusat Cirebon",
-            image: "/images/office-cirebon.png",
-            address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
-            phone: "+62 851-6882-2280",
-            mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
-        },
-        {
-            city: "KUNINGAN",
-            label: "Kantor Cabang Kuningan",
-            image: "/images/office-kuningan.png",
-            address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
-            phone: "+62 851-6882-2280",
-            mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
-        },
-    ];
+import Image from "next/image";
 
+const defaultOffices = [
+    {
+        city: "CIREBON",
+        label: "Kantor Pusat Cirebon",
+        image: "/images/office-cirebon.png",
+        address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
+        phone: "+62 851-6882-2280",
+        mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
+    },
+    {
+        city: "KUNINGAN",
+        label: "Kantor Cabang Kuningan",
+        image: "/images/office-kuningan.png",
+        address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
+        phone: "+62 851-6882-2280",
+        mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
+    },
+];
+
+function LokasiKantor() {
     const [offices, setOffices] = useState(defaultOffices);
 
     useEffect(() => {
@@ -379,10 +381,11 @@ function LokasiKantor() {
                         >
                             {/* Photo */}
                             <div className="relative h-56 overflow-hidden">
-                                <img
+                                <Image
                                     src={office.image}
                                     alt={office.label}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                    fill
+                                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                                 <div className="absolute top-3 left-3">

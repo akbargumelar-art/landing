@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, CheckCircle, Loader2, X } from "lucide-react";
+import { Upload, CheckCircle, Loader2, X, ArrowLeft } from "lucide-react";
 
 // ---- Types ----
 interface FormElement {
@@ -24,7 +25,7 @@ interface FormData {
     title: string;
     description: string;
     formSchema: string;
-    program?: { id: string; title: string } | null;
+    program?: { id: string; title: string; slug: string } | null;
 }
 
 // ---- Defaults (fallback when no formId provided) ----

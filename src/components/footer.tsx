@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 
 const quickLinks = [
@@ -97,7 +98,9 @@ export function Footer() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
                             {logoUrl ? (
-                                <img src={logoUrl} alt={siteName} className="h-9 w-auto object-contain rounded-lg" />
+                                <div className="relative h-9 w-24">
+                                    <Image src={logoUrl} alt={siteName} fill className="object-contain rounded-lg" />
+                                </div>
                             ) : (
                                 <div className="w-9 h-9 bg-red-600 rounded-xl flex items-center justify-center">
                                     <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">

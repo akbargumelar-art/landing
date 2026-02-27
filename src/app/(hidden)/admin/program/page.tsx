@@ -11,6 +11,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload, ImageIcon } from "lucide-react";
+import Image from "next/image";
 
 interface Program {
     id: string;
@@ -169,7 +170,9 @@ export default function ProgramPage() {
                             <CardContent className="p-4 flex items-center gap-4">
                                 {/* Thumbnail */}
                                 {program.thumbnail ? (
-                                    <img src={program.thumbnail} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                                    <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                                        <Image src={program.thumbnail} alt="" fill className="object-cover" />
+                                    </div>
                                 ) : (
                                     <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 shrink-0 flex items-center justify-center">
                                         <span className="text-white font-bold text-lg">{program.title.charAt(0)}</span>
@@ -244,7 +247,9 @@ export default function ProgramPage() {
                                 )}
                             </div>
                             {editProgram.thumbnail ? (
-                                <img src={editProgram.thumbnail} alt="Thumbnail" className="w-full h-40 object-cover rounded-lg border" />
+                                <div className="relative w-full h-40 rounded-lg border overflow-hidden">
+                                    <Image src={editProgram.thumbnail} alt="Thumbnail" fill className="object-cover" />
+                                </div>
                             ) : (
                                 <div className="w-full h-24 rounded-lg border-2 border-dashed flex items-center justify-center text-muted-foreground">
                                     <ImageIcon className="h-8 w-8 opacity-30" />
@@ -276,8 +281,8 @@ export default function ProgramPage() {
                             {galleryImages.length > 0 && (
                                 <div className="grid grid-cols-4 gap-2">
                                     {galleryImages.map((img, i) => (
-                                        <div key={i} className="relative group">
-                                            <img src={img} alt="" className="w-full h-20 object-cover rounded-lg border" />
+                                        <div key={i} className="relative group w-full h-20 rounded-lg border overflow-hidden">
+                                            <Image src={img} alt="" fill className="object-cover" />
                                             <button
                                                 onClick={() => setGalleryImages(galleryImages.filter((_, j) => j !== i))}
                                                 className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"

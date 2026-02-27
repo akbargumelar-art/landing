@@ -14,6 +14,7 @@ import {
 import {
     CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage, Calendar,
 } from "lucide-react";
+import Image from "next/image";
 
 interface Submission {
     id: string;
@@ -299,7 +300,9 @@ export default function PesertaPage() {
                 <DialogContent className="sm:max-w-2xl p-2">
                     <DialogTitle className="sr-only">Preview Gambar</DialogTitle>
                     {lightboxImage && (
-                        <img src={lightboxImage} alt="Bukti" className="w-full h-auto rounded-lg" />
+                        <div className="relative w-full h-[80vh]">
+                            <Image src={lightboxImage} alt="Bukti" fill className="object-contain rounded-lg" />
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>

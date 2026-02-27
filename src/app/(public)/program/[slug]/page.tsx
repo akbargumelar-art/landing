@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -353,7 +354,7 @@ export default function ProgramDetailPage() {
                                             {/* Photo / Placeholder */}
                                             <div className="h-48 bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 relative overflow-hidden flex items-center justify-center">
                                                 {winner.photoUrl ? (
-                                                    <img src={winner.photoUrl} alt={winner.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                    <Image src={winner.photoUrl} alt={winner.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 ) : (
                                                     <div className="flex flex-col items-center gap-2">
                                                         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-100 to-orange-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -396,9 +397,9 @@ export default function ProgramDetailPage() {
                     <DialogTitle className="sr-only">Detail Pemenang</DialogTitle>
                     {selectedWinner && (
                         <div className="text-center py-4">
-                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center mx-auto mb-4">
+                            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center mx-auto mb-4 overflow-hidden">
                                 {selectedWinner.photoUrl ? (
-                                    <img src={selectedWinner.photoUrl} alt={selectedWinner.name} className="w-full h-full object-cover rounded-full" />
+                                    <Image src={selectedWinner.photoUrl} alt={selectedWinner.name} fill className="object-cover" />
                                 ) : (
                                     <Trophy className="h-12 w-12 text-primary" />
                                 )}

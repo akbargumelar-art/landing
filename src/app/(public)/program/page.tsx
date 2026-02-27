@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Calendar, Users, UserCheck } from "lucide-react";
@@ -106,10 +107,11 @@ export default function ProgramPage() {
                                 >
                                     <div className="h-48 relative overflow-hidden">
                                         {program.thumbnail ? (
-                                            <img
+                                            <Image
                                                 src={program.thumbnail}
                                                 alt={program.title}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                fill
+                                                className="object-cover group-hover:scale-105 transition-transform duration-500"
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-gradient-to-br from-red-500 via-red-600 to-orange-500 relative">
