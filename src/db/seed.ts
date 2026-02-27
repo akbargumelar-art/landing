@@ -2,7 +2,13 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { siteSettings, heroSlides, user, account } from "./schema";
 import { v4 as uuid } from "uuid";
-import { hashPassword } from "better-auth/password";
+import { scryptSync, randomBytes } from "crypto";
+
+function hashPassword(password: string): string {
+    const salt = randomBytes(16).toString("hex");
+    const derivedKey = scryptSync(password, salt, 64, { N: 16384, r: 16, p: 1 });
+    return `${salt}:${derivedKey.toString("hex")}`;
+}
 
 async function seed() {
     const connection = await mysql.createConnection(
@@ -16,7 +22,7 @@ async function seed() {
     console.log("Creating admin user...");
     try {
         const userId = uuid();
-        const hashedPassword = await hashPassword("admin123");
+        const hashedPassword = hashPassword("admin123");
         const now = new Date();
 
         await db.insert(user).values({

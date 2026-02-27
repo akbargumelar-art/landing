@@ -23,7 +23,7 @@ git pull origin "$BRANCH"
 # 2. Install / update dependencies
 echo ""
 echo "[2/5] 📦 Install dependencies..."
-npm install
+npm install --legacy-peer-deps
 
 # 3. Sinkronisasi schema database
 echo ""
