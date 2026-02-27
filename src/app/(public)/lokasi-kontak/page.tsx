@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -9,35 +11,26 @@ import {
     MessageCircle,
     Instagram,
     Facebook,
+    Loader2,
 } from "lucide-react";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-    title: "Lokasi & Kontak - ABK Ciraya",
-    description:
-        "Temukan lokasi kantor ABK Ciraya di Cirebon dan Kuningan. Hubungi kami melalui WhatsApp, Instagram, atau Facebook.",
-};
-
-const offices = [
+// Fallback defaults
+const defaultOffices = [
     {
         city: "Kantor Pusat Cirebon",
-        address:
-            "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
-        mapUrl:
-            "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
+        address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
+        mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
         gradient: "from-red-500 via-red-600 to-orange-500",
     },
     {
         city: "Kantor Kuningan",
-        address:
-            "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
-        mapUrl:
-            "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
+        address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
+        mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
         gradient: "from-red-600 via-red-500 to-red-700",
     },
 ];
 
-const contacts = [
+const defaultContacts = [
     {
         icon: MessageCircle,
         label: "WhatsApp",
@@ -61,7 +54,79 @@ const contacts = [
     },
 ];
 
+interface OfficeData {
+    city: string;
+    label: string;
+    address: string;
+    phone: string;
+    mapUrl: string;
+}
+
 export default function LokasiKontakPage() {
+    const [settings, setSettings] = useState<Record<string, string>>({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch("/api/public/settings")
+            .then((r) => r.json())
+            .then((data) => {
+                setSettings(data);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    }, []);
+
+    // Build contacts from settings with fallback
+    const contacts = [
+        {
+            icon: MessageCircle,
+            label: "WhatsApp",
+            value: settings.whatsapp || defaultContacts[0].value,
+            href: settings.whatsapp_url || defaultContacts[0].href,
+            color: "bg-green-500",
+        },
+        {
+            icon: Instagram,
+            label: "Instagram",
+            value: settings.instagram_handle || defaultContacts[1].value,
+            href: settings.instagram_url || defaultContacts[1].href,
+            color: "bg-gradient-to-br from-pink-500 to-orange-500",
+        },
+        {
+            icon: Facebook,
+            label: "Facebook",
+            value: settings.facebook_name || defaultContacts[2].value,
+            href: settings.facebook_url || defaultContacts[2].href,
+            color: "bg-blue-600",
+        },
+    ];
+
+    const whatsappCTA = settings.whatsapp_url || defaultContacts[0].href;
+
+    // Parse office_data from settings, or use defaults
+    let offices = defaultOffices;
+    if (settings.office_data) {
+        try {
+            const parsed: OfficeData[] = JSON.parse(settings.office_data);
+            if (parsed.length > 0) {
+                offices = parsed.map((o, i) => ({
+                    city: o.label || o.city || `Kantor ${i + 1}`,
+                    address: o.address,
+                    mapUrl: o.mapUrl,
+                    gradient: i % 2 === 0 ? "from-red-500 via-red-600 to-orange-500" : "from-red-600 via-red-500 to-red-700",
+                }));
+            }
+        } catch { /* use defaults */ }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen">
             {/* Header */}
@@ -109,10 +174,7 @@ export default function LokasiKontakPage() {
                                 key={index}
                                 className="overflow-hidden border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                             >
-                                <div
-                                    className={`h-44 bg-gradient-to-br ${office.gradient} relative overflow-hidden`}
-                                >
-                                    {/* Decorative */}
+                                <div className={`h-44 bg-gradient-to-br ${office.gradient} relative overflow-hidden`}>
                                     <div className="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full" />
                                     <div className="absolute -bottom-2 -left-2 w-14 h-14 bg-white/10 rounded-full" />
                                     <div className="absolute inset-0 flex items-center justify-center">
@@ -128,11 +190,7 @@ export default function LokasiKontakPage() {
                                     <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                                         {office.address}
                                     </p>
-                                    <a
-                                        href={office.mapUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
+                                    <a href={office.mapUrl} target="_blank" rel="noopener noreferrer">
                                         <Button variant="outline" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
                                             <MapPin className="mr-2 h-4 w-4" />
                                             Lihat di Google Maps
@@ -171,9 +229,7 @@ export default function LokasiKontakPage() {
                             >
                                 <Card className="border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
                                     <CardContent className="p-6 text-center">
-                                        <div
-                                            className={`w-14 h-14 rounded-2xl ${contact.color} flex items-center justify-center mx-auto mb-4 shadow-lg`}
-                                        >
+                                        <div className={`w-14 h-14 rounded-2xl ${contact.color} flex items-center justify-center mx-auto mb-4 shadow-lg`}>
                                             <contact.icon className="h-7 w-7 text-white" />
                                         </div>
                                         <h3 className="font-bold text-foreground mb-1">
@@ -190,11 +246,7 @@ export default function LokasiKontakPage() {
 
                     {/* WhatsApp CTA */}
                     <div className="mt-12 text-center">
-                        <a
-                            href="https://wa.me/6285168822280"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
+                        <a href={whatsappCTA} target="_blank" rel="noopener noreferrer">
                             <Button
                                 size="lg"
                                 className="btn-pill bg-green-600 hover:bg-green-700 text-white shadow-xl text-base font-bold px-10 h-auto py-3 hover:shadow-2xl transition-all duration-300 cursor-pointer"

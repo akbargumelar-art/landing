@@ -119,6 +119,18 @@ async function seed() {
         { key: "stats_areas", value: "3", type: "text" },
         { key: "stats_partners", value: "55+", type: "text" },
         { key: "stats_outlets", value: "Ribuan", type: "text" },
+        { key: "whatsapp", value: "+62 851-6882-2280", type: "text" },
+        { key: "whatsapp_url", value: "https://wa.me/6285168822280", type: "text" },
+        { key: "instagram_url", value: "https://www.instagram.com/agrabudikomunika", type: "text" },
+        { key: "instagram_handle", value: "@agrabudikomunika", type: "text" },
+        { key: "facebook_url", value: "https://tsel.id/fbciraya", type: "text" },
+        { key: "facebook_name", value: "ABK Ciraya", type: "text" },
+        {
+            key: "office_data", value: JSON.stringify([
+                { city: "CIREBON", label: "Kantor Pusat Cirebon", address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132", phone: "+62 851-6882-2280", mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon" },
+                { city: "KUNINGAN", label: "Kantor Cabang Kuningan", address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512", phone: "+62 851-6882-2280", mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan" },
+            ]), type: "json"
+        },
     ];
 
     for (const setting of defaultSettings) {

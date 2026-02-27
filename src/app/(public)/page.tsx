@@ -315,7 +315,7 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
 }
 
 function LokasiKantor() {
-    const offices = [
+    const defaultOffices = [
         {
             city: "CIREBON",
             label: "Kantor Pusat Cirebon",
@@ -333,6 +333,31 @@ function LokasiKantor() {
             mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
         },
     ];
+
+    const [offices, setOffices] = useState(defaultOffices);
+
+    useEffect(() => {
+        fetch("/api/public/settings")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.office_data) {
+                    try {
+                        const parsed = JSON.parse(data.office_data);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setOffices(parsed.map((o: { city?: string; label?: string; address?: string; phone?: string; mapUrl?: string }, i: number) => ({
+                                city: o.city || defaultOffices[i]?.city || `KANTOR ${i + 1}`,
+                                label: o.label || defaultOffices[i]?.label || `Kantor ${i + 1}`,
+                                image: defaultOffices[i]?.image || "/images/office-default.png",
+                                address: o.address || "",
+                                phone: o.phone || data.footer_phone || defaultOffices[0].phone,
+                                mapUrl: o.mapUrl || "",
+                            })));
+                        }
+                    } catch { /* use defaults */ }
+                }
+            })
+            .catch(() => { });
+    }, []);
 
     return (
         <section className="py-20 bg-gray-50/80">

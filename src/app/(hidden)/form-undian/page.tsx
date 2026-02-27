@@ -1,77 +1,131 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, CheckCircle, Loader2, X } from "lucide-react";
 
-interface OutletOption {
+// ---- Types ----
+interface FormElement {
     id: string;
-    name: string;
-    city: string;
+    type: string;
+    label: string;
+    placeholder: string;
+    hintText: string;
+    isRequired: boolean;
+    content: string;
+    options: string[];
+    colSpan: 1 | 2;
 }
 
+interface FormData {
+    id: string;
+    title: string;
+    description: string;
+    formSchema: string;
+    program?: { id: string; title: string } | null;
+}
+
+// ---- Defaults (fallback when no formId provided) ----
+const DEFAULT_FORM_ELEMENTS: FormElement[] = [
+    { id: "nama", type: "text", label: "Nama Lengkap", placeholder: "Masukkan nama lengkap", hintText: "", isRequired: true, content: "", options: [], colSpan: 2 },
+    { id: "nomor", type: "phone", label: "Nomor Telkomsel", placeholder: "08xxxxxxxxxx", hintText: "", isRequired: true, content: "", options: [], colSpan: 2 },
+    { id: "outlet", type: "text", label: "Nama Mitra Outlet", placeholder: "Masukkan nama outlet", hintText: "", isRequired: true, content: "", options: [], colSpan: 2 },
+    { id: "bukti", type: "file", label: "Bukti Pembelian", placeholder: "", hintText: "", isRequired: true, content: "", options: [], colSpan: 2 },
+];
+
 export default function FormUndianPage() {
-    const [formData, setFormData] = useState({
-        nama: "",
-        nomor: "",
-        outlet: "",
-    });
-    const [file, setFile] = useState<File | null>(null);
-    const [dragActive, setDragActive] = useState(false);
+    const searchParams = useSearchParams();
+    const formId = searchParams.get("id");
+
+    const [formInfo, setFormInfo] = useState<FormData | null>(null);
+    const [elements, setElements] = useState<FormElement[]>([]);
+    const [values, setValues] = useState<Record<string, string>>({});
+    const [files, setFiles] = useState<Record<string, File | null>>({});
+    const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [outlets, setOutlets] = useState<OutletOption[]>([]);
+    const [submitError, setSubmitError] = useState("");
+    const [settings, setSettings] = useState<Record<string, string>>({});
 
-    // Fetch outlets from database
+    // Fetch site settings (logo, name)
     useEffect(() => {
-        fetch("/api/public/outlets")
+        fetch("/api/public/settings")
             .then((r) => r.json())
-            .then((data) => setOutlets(data))
+            .then((data) => setSettings(data))
             .catch(() => { });
     }, []);
 
-    const handleDrag = useCallback((e: React.DragEvent) => {
+    // Fetch form schema
+    useEffect(() => {
+        if (formId) {
+            fetch(`/api/forms/${formId}`)
+                .then((r) => {
+                    if (!r.ok) throw new Error("Not found");
+                    return r.json();
+                })
+                .then((data: FormData) => {
+                    setFormInfo(data);
+                    try {
+                        const schema = JSON.parse(data.formSchema || "[]");
+                        setElements(schema.length > 0 ? schema : DEFAULT_FORM_ELEMENTS);
+                    } catch {
+                        setElements(DEFAULT_FORM_ELEMENTS);
+                    }
+                    setIsLoading(false);
+                })
+                .catch(() => {
+                    setElements(DEFAULT_FORM_ELEMENTS);
+                    setIsLoading(false);
+                });
+        } else {
+            setElements(DEFAULT_FORM_ELEMENTS);
+            setIsLoading(false);
+        }
+    }, [formId]);
+
+    const setValue = (id: string, value: string) => {
+        setValues((prev) => ({ ...prev, [id]: value }));
+    };
+
+    const setFile = (id: string, file: File | null) => {
+        setFiles((prev) => ({ ...prev, [id]: file }));
+    };
+
+    const handleDrag = useCallback((e: React.DragEvent, id: string) => {
         e.preventDefault();
         e.stopPropagation();
         if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
+            setDragActiveId(id);
         } else if (e.type === "dragleave") {
-            setDragActive(false);
+            setDragActiveId(null);
         }
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
+    const handleDrop = useCallback((e: React.DragEvent, id: string) => {
         e.preventDefault();
         e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setFile(e.dataTransfer.files[0]);
+        setDragActiveId(null);
+        if (e.dataTransfer.files?.[0]) {
+            setFile(id, e.dataTransfer.files[0]);
         }
     }, []);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        if (!formData.nama.trim()) newErrors.nama = "Nama lengkap wajib diisi";
-        if (!formData.nomor.trim()) {
-            newErrors.nomor = "Nomor Telkomsel wajib diisi";
-        } else if (!formData.nomor.startsWith("08")) {
-            newErrors.nomor = "Nomor harus diawali dengan 08";
-        } else if (formData.nomor.length < 10 || formData.nomor.length > 13) {
-            newErrors.nomor = "Nomor harus 10-13 digit";
+        for (const el of elements) {
+            if (el.type === "heading" || el.type === "paragraph" || el.type === "image" || el.type === "divider") continue;
+            if (el.isRequired) {
+                if (el.type === "file") {
+                    if (!files[el.id]) newErrors[el.id] = `${el.label} wajib diupload`;
+                } else {
+                    if (!values[el.id]?.trim()) newErrors[el.id] = `${el.label} wajib diisi`;
+                }
+            }
         }
-        if (!formData.outlet.trim())
-            newErrors.outlet = "Nama mitra outlet wajib diisi";
-        if (!file) newErrors.file = "Bukti pembelian wajib diupload";
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -81,11 +135,49 @@ export default function FormUndianPage() {
         if (!validate()) return;
 
         setIsSubmitting(true);
-        // Simulate API call
-        await new Promise((r) => setTimeout(r, 2000));
+        setSubmitError("");
+
+        if (formId) {
+            // Dynamic form submit
+            const fd = new FormData();
+            for (const el of elements) {
+                if (el.type === "heading" || el.type === "paragraph" || el.type === "image" || el.type === "divider") continue;
+                if (el.type === "file") {
+                    if (files[el.id]) fd.append(`field_${el.id}`, files[el.id]!);
+                } else {
+                    fd.append(`field_${el.id}`, values[el.id] || "");
+                }
+            }
+            try {
+                const res = await fetch(`/api/forms/${formId}/submit`, { method: "POST", body: fd });
+                const data = await res.json();
+                if (res.ok) {
+                    setIsSuccess(true);
+                } else {
+                    setSubmitError(data.error || "Gagal mengirim data");
+                }
+            } catch {
+                setSubmitError("Terjadi kesalahan jaringan");
+            }
+        } else {
+            // Legacy/fallback — just simulate
+            await new Promise((r) => setTimeout(r, 2000));
+            setIsSuccess(true);
+        }
+
         setIsSubmitting(false);
-        setIsSuccess(true);
     };
+
+    const siteName = settings.site_name || "ABK Ciraya";
+    const logoUrl = settings.logo_url || "";
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     if (isSuccess) {
         return (
@@ -105,11 +197,12 @@ export default function FormUndianPage() {
                         <Button
                             onClick={() => {
                                 setIsSuccess(false);
-                                setFormData({ nama: "", nomor: "", outlet: "" });
-                                setFile(null);
+                                setValues({});
+                                setFiles({});
+                                setErrors({});
                             }}
                             variant="outline"
-                            className="w-full"
+                            className="w-full cursor-pointer"
                         >
                             Daftar Lagi
                         </Button>
@@ -121,144 +214,271 @@ export default function FormUndianPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-lg">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
-                        <span className="text-white font-bold text-xl">A</span>
-                    </div>
-                    <h1 className="text-xl font-bold text-foreground">ABK Ciraya</h1>
+                    {logoUrl ? (
+                        <img src={logoUrl} alt={siteName} className="h-12 w-auto mx-auto mb-3 rounded-lg" />
+                    ) : (
+                        <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                            <span className="text-white font-bold text-xl">A</span>
+                        </div>
+                    )}
+                    <h1 className="text-xl font-bold text-foreground">{siteName}</h1>
                     <p className="text-sm text-muted-foreground">
-                        Formulir Pendaftaran Undian
+                        {formInfo?.title || "Formulir Pendaftaran Undian"}
                     </p>
                 </div>
 
                 <Card className="border-0 shadow-2xl">
-                    <CardHeader>
-                        <CardTitle className="text-lg">Isi Data Anda</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                    {formInfo?.description && (
+                        <CardHeader>
+                            <CardTitle className="text-lg">{formInfo.description}</CardTitle>
+                        </CardHeader>
+                    )}
+                    <CardContent className={formInfo?.description ? "" : "pt-6"}>
                         <form onSubmit={handleSubmit} className="space-y-5">
-                            {/* Nama */}
-                            <div className="space-y-2">
-                                <Label htmlFor="nama">Nama Lengkap</Label>
-                                <Input
-                                    id="nama"
-                                    placeholder="Masukkan nama lengkap"
-                                    value={formData.nama}
-                                    onChange={(e) =>
-                                        setFormData((prev) => ({ ...prev, nama: e.target.value }))
-                                    }
-                                    className={errors.nama ? "border-red-500" : ""}
-                                />
-                                {errors.nama && (
-                                    <p className="text-xs text-red-500">{errors.nama}</p>
-                                )}
-                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                                {elements.map((el) => (
+                                    <div key={el.id} className={el.colSpan === 2 ? "col-span-2" : "col-span-1"}>
+                                        {/* Static elements */}
+                                        {el.type === "heading" && <h3 className="text-lg font-bold text-foreground">{el.content || el.label}</h3>}
+                                        {el.type === "paragraph" && <p className="text-sm text-muted-foreground">{el.content}</p>}
+                                        {el.type === "divider" && <hr className="border-gray-200 my-2" />}
+                                        {el.type === "image" && el.content && <img src={el.content} alt="" className="w-full rounded-lg" />}
 
-                            {/* Nomor */}
-                            <div className="space-y-2">
-                                <Label htmlFor="nomor">Nomor Telkomsel</Label>
-                                <Input
-                                    id="nomor"
-                                    type="tel"
-                                    placeholder="08xxxxxxxxxx"
-                                    value={formData.nomor}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/\D/g, "");
-                                        setFormData((prev) => ({ ...prev, nomor: val }));
-                                    }}
-                                    className={errors.nomor ? "border-red-500" : ""}
-                                />
-                                {errors.nomor && (
-                                    <p className="text-xs text-red-500">{errors.nomor}</p>
-                                )}
-                            </div>
-
-                            {/* Outlet */}
-                            <div className="space-y-2">
-                                <Label htmlFor="outlet">Nama Mitra Outlet</Label>
-                                <select
-                                    id="outlet"
-                                    value={formData.outlet}
-                                    onChange={(e) =>
-                                        setFormData((prev) => ({ ...prev, outlet: e.target.value }))
-                                    }
-                                    className={`flex h-10 w-full rounded-lg border bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors duration-200 ${errors.outlet ? "border-red-500" : "border-input"
-                                        }`}
-                                >
-                                    <option value="">Pilih outlet...</option>
-                                    {outlets.map((outlet) => (
-                                        <option key={outlet.id} value={outlet.name}>
-                                            {outlet.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.outlet && (
-                                    <p className="text-xs text-red-500">{errors.outlet}</p>
-                                )}
-                            </div>
-
-                            {/* File Upload */}
-                            <div className="space-y-2">
-                                <Label>Bukti Pembelian</Label>
-                                <div
-                                    onDragEnter={handleDrag}
-                                    onDragLeave={handleDrag}
-                                    onDragOver={handleDrag}
-                                    onDrop={handleDrop}
-                                    className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-all duration-200 ${dragActive
-                                        ? "border-primary bg-primary/5"
-                                        : errors.file
-                                            ? "border-red-300 bg-red-50"
-                                            : "border-border hover:border-primary/50"
-                                        }`}
-                                >
-                                    {file ? (
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="h-5 w-5 text-green-600" />
-                                                <span className="text-sm text-foreground truncate max-w-[200px]">
-                                                    {file.name}
-                                                </span>
+                                        {/* Text */}
+                                        {el.type === "text" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder={el.placeholder}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setFile(null)}
-                                                className="text-muted-foreground hover:text-foreground cursor-pointer"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                                            <p className="text-sm text-muted-foreground mb-1">
-                                                Drag & drop foto bukti pembelian
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                atau{" "}
-                                                <label className="text-primary cursor-pointer hover:underline">
-                                                    pilih file
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={handleFileChange}
-                                                    />
-                                                </label>
-                                            </p>
-                                        </>
-                                    )}
-                                </div>
-                                {errors.file && (
-                                    <p className="text-xs text-red-500">{errors.file}</p>
-                                )}
+                                        )}
+
+                                        {/* Textarea */}
+                                        {el.type === "textarea" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <textarea
+                                                    placeholder={el.placeholder}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    rows={3}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Number */}
+                                        {el.type === "number" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="number"
+                                                    placeholder={el.placeholder}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Email */}
+                                        {el.type === "email" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="email"
+                                                    placeholder={el.placeholder || "email@contoh.com"}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Phone */}
+                                        {el.type === "phone" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="tel"
+                                                    placeholder={el.placeholder || "08xxxxxxxxxx"}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/\D/g, "");
+                                                        setValue(el.id, val);
+                                                    }}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Dropdown */}
+                                        {el.type === "dropdown" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <select
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                >
+                                                    <option value="">{el.placeholder || "Pilih..."}</option>
+                                                    {el.options.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                                                </select>
+                                                {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Radio */}
+                                        {el.type === "radio" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <div className="space-y-1.5">
+                                                    {el.options.map((opt, i) => (
+                                                        <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                            <input
+                                                                type="radio"
+                                                                name={`radio_${el.id}`}
+                                                                value={opt}
+                                                                checked={values[el.id] === opt}
+                                                                onChange={(e) => setValue(el.id, e.target.value)}
+                                                            />
+                                                            {opt}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Checkbox */}
+                                        {el.type === "checkbox" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <div className="space-y-1.5">
+                                                    {el.options.map((opt, i) => (
+                                                        <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                value={opt}
+                                                                checked={(values[el.id] || "").split("||").includes(opt)}
+                                                                onChange={(e) => {
+                                                                    const current = (values[el.id] || "").split("||").filter(Boolean);
+                                                                    if (e.target.checked) {
+                                                                        current.push(opt);
+                                                                    } else {
+                                                                        const idx = current.indexOf(opt);
+                                                                        if (idx >= 0) current.splice(idx, 1);
+                                                                    }
+                                                                    setValue(el.id, current.join("||"));
+                                                                }}
+                                                            />
+                                                            {opt}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* Date */}
+                                        {el.type === "date" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="date"
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
+                                        {/* File Upload */}
+                                        {el.type === "file" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <div
+                                                    onDragEnter={(e) => handleDrag(e, el.id)}
+                                                    onDragLeave={(e) => handleDrag(e, el.id)}
+                                                    onDragOver={(e) => handleDrag(e, el.id)}
+                                                    onDrop={(e) => handleDrop(e, el.id)}
+                                                    className={`relative rounded-lg border-2 border-dashed p-4 text-center transition-all duration-200 ${dragActiveId === el.id
+                                                            ? "border-primary bg-primary/5"
+                                                            : errors[el.id]
+                                                                ? "border-red-300 bg-red-50"
+                                                                : "border-gray-200 hover:border-primary/50"
+                                                        }`}
+                                                >
+                                                    {files[el.id] ? (
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                                                <span className="text-sm text-foreground truncate max-w-[200px]">
+                                                                    {files[el.id]!.name}
+                                                                </span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setFile(el.id, null)}
+                                                                className="text-muted-foreground hover:text-foreground cursor-pointer"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
+                                                            <p className="text-sm text-muted-foreground">
+                                                                Drag & drop atau{" "}
+                                                                <label className="text-primary cursor-pointer hover:underline">
+                                                                    pilih file
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*,.pdf,.doc,.docx"
+                                                                        className="hidden"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.files?.[0]) setFile(el.id, e.target.files[0]);
+                                                                        }}
+                                                                    />
+                                                                </label>
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
+
+                            {submitError && (
+                                <div className="p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200">
+                                    {submitError}
+                                </div>
+                            )}
 
                             <Button
                                 type="submit"
-                                className="w-full"
+                                className="w-full cursor-pointer"
                                 size="lg"
                                 disabled={isSubmitting}
                             >

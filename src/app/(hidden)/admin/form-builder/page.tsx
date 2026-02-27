@@ -441,18 +441,23 @@ function PropertiesPanel({ element, onChange, onClose }: {
                         <Label className="text-xs">URL Gambar / Upload</Label>
                         <div className="flex gap-2">
                             <Input value={element.content} onChange={(e) => onChange({ content: e.target.value })} placeholder="https://..." className="flex-1" />
-                            <label className="px-3 py-2 border rounded-md cursor-pointer hover:bg-muted text-sm flex items-center gap-1">
-                                <Upload className="h-3 w-3" />
-                                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                    const file = e.target.files?.[0];
+                            <button type="button" className="px-3 py-2 border rounded-md cursor-pointer hover:bg-muted text-sm flex items-center gap-1" onClick={() => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "image/*";
+                                input.onchange = async (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
                                     if (!file) return;
                                     const fd = new FormData();
                                     fd.append("file", file);
                                     const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
                                     const data = await res.json();
                                     if (data.url) onChange({ content: data.url });
-                                }} />
-                            </label>
+                                };
+                                input.click();
+                            }}>
+                                <Upload className="h-3 w-3" />
+                            </button>
                         </div>
                         {element.content && <img src={element.content} alt="" className="w-full h-24 object-cover rounded border" />}
                     </div>
@@ -530,39 +535,39 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                 {el.type === "text" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="text" placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" disabled />
+                                        <input type="text" placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" />
                                         {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
                                     </div>
                                 )}
                                 {el.type === "textarea" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <textarea placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" rows={3} disabled />
+                                        <textarea placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" rows={3} />
                                         {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
                                     </div>
                                 )}
                                 {el.type === "number" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="number" placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" disabled />
+                                        <input type="number" placeholder={el.placeholder} className="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 )}
                                 {el.type === "email" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="email" placeholder={el.placeholder || "email@contoh.com"} className="w-full px-3 py-2 border rounded-lg text-sm" disabled />
+                                        <input type="email" placeholder={el.placeholder || "email@contoh.com"} className="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 )}
                                 {el.type === "phone" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="tel" placeholder={el.placeholder || "08xxxxxxxxxx"} className="w-full px-3 py-2 border rounded-lg text-sm" disabled />
+                                        <input type="tel" placeholder={el.placeholder || "08xxxxxxxxxx"} className="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 )}
                                 {el.type === "dropdown" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <select className="w-full px-3 py-2 border rounded-lg text-sm" disabled>
+                                        <select className="w-full px-3 py-2 border rounded-lg text-sm">
                                             <option>{el.placeholder || "Pilih..."}</option>
                                             {el.options.map((opt, i) => <option key={i}>{opt}</option>)}
                                         </select>
@@ -573,7 +578,7 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
                                         <div className="space-y-1">
                                             {el.options.map((opt, i) => (
-                                                <label key={i} className="flex items-center gap-2 text-sm"><input type="radio" disabled name={el.id} /> {opt}</label>
+                                                <label key={i} className="flex items-center gap-2 text-sm"><input type="radio" name={el.id} /> {opt}</label>
                                             ))}
                                         </div>
                                     </div>
@@ -583,7 +588,7 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
                                         <div className="space-y-1">
                                             {el.options.map((opt, i) => (
-                                                <label key={i} className="flex items-center gap-2 text-sm"><input type="checkbox" disabled /> {opt}</label>
+                                                <label key={i} className="flex items-center gap-2 text-sm"><input type="checkbox" /> {opt}</label>
                                             ))}
                                         </div>
                                     </div>
@@ -591,7 +596,7 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                 {el.type === "date" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm" disabled />
+                                        <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 )}
                                 {el.type === "file" && (
