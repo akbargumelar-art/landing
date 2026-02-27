@@ -153,15 +153,43 @@ export default function FormBuilderPage() {
         }).catch(() => setLoading(false));
     }, []);
 
-    const selectForm = useCallback((form: DynamicForm) => {
+    const selectForm = useCallback(async (form: DynamicForm) => {
         setSelectedForm(form);
         setSelectedElementId(null);
         setPreviewMode(false);
         try {
+            const res = await fetch(`/api/admin/forms/${form.id}`);
+            const data = await res.json();
+            if (data.fields && data.fields.length > 0) {
+                // Map the DB fields back to the FormElement structure
+                const updatedElements = data.fields.map((f: any) => ({
+                    id: f.id,
+                    type: f.fieldType || f.type,
+                    label: f.label,
+                    placeholder: f.placeholder,
+                    hintText: f.hintText,
+                    isRequired: f.isRequired,
+                    content: f.content || f.placeholder,
+                    options: typeof f.options === 'string' ? JSON.parse(f.options) : f.options,
+                    colSpan: 1
+                }));
+                // We also need to restore colSpan from formSchema if possible
+                try {
+                    const schema = JSON.parse(form.formSchema || "[]");
+                    updatedElements.forEach((el: any) => {
+                        const match = schema.find((s: any) => s.id === el.id);
+                        if (match) el.colSpan = match.colSpan || 1;
+                    });
+                } catch (e) { }
+
+                setElements(updatedElements);
+            } else {
+                const schema = JSON.parse(form.formSchema || "[]");
+                setElements(schema.length > 0 ? schema : []);
+            }
+        } catch {
             const schema = JSON.parse(form.formSchema || "[]");
             setElements(schema.length > 0 ? schema : []);
-        } catch {
-            setElements([]);
         }
     }, []);
 

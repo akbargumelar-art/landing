@@ -226,7 +226,18 @@ function FormUndianContent() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg">
+            <div className="w-full max-w-lg relative">
+                {formInfo?.program?.slug && (
+                    <div className="absolute -top-12 left-0">
+                        <Link href={`/program/${formInfo.program.slug}`}>
+                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground cursor-pointer -ml-2">
+                                <ArrowLeft className="h-4 w-4 mr-1" />
+                                Kembali ke {formInfo?.program?.title || "Program"}
+                            </Button>
+                        </Link>
+                    </div>
+                )}
+
                 {/* Logo */}
                 <div className="text-center mb-8">
                     {logoUrl ? (

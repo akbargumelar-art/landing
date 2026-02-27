@@ -60,14 +60,14 @@ interface ParticipantGroup {
 
 function maskName(name: string): string {
     if (!name) return "***";
-    if (name.length <= 3) return "***";
-    return name.slice(0, name.length - 3) + "***";
+    if (name.length <= 3) return name + "***";
+    return name.substring(0, 3) + "*".repeat(name.length - 3);
 }
 
 function maskPhone(phone: string): string {
     if (!phone) return "***";
-    if (phone.length <= 3) return "***";
-    return phone.slice(0, phone.length - 3) + "***";
+    if (phone.length <= 3) return phone + "***";
+    return phone.substring(0, 3) + "*".repeat(phone.length - 3);
 }
 
 export default function ProgramDetailPage() {
@@ -266,7 +266,7 @@ export default function ProgramDetailPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-extrabold text-foreground">Daftar Peserta</h2>
-                                    <p className="text-sm text-muted-foreground">{totalParticipants} peserta telah mendaftar</p>
+                                    <p className="text-sm text-muted-foreground">{totalParticipants} peserta telah mendaftar (Hanya menampilkan 3 nama terbawah)</p>
                                 </div>
                             </div>
 
@@ -290,7 +290,7 @@ export default function ProgramDetailPage() {
                             {/* Participant Grid */}
                             {participantGroups[activePeriodParticipants] && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {participantGroups[activePeriodParticipants].participants.map((participant, index) => (
+                                    {participantGroups[activePeriodParticipants].participants.slice(0, 3).map((participant, index) => (
                                         <div
                                             key={index}
                                             className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
