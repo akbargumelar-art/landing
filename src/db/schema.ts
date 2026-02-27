@@ -127,6 +127,7 @@ export const formFields = mysqlTable("form_fields", {
 export const formSubmissions = mysqlTable("form_submissions", {
     id: varchar("id", { length: 36 }).primaryKey(),
     formId: varchar("form_id", { length: 36 }).notNull().references(() => dynamicForms.id, { onDelete: "cascade" }),
+    period: varchar("period", { length: 100 }).notNull().default(""),
     status: varchar("status", { length: 50 }).notNull().default("pending"),
     submittedAt: datetime("submitted_at").notNull(),
 });
@@ -144,6 +145,10 @@ export const winners = mysqlTable("winners", {
     programId: varchar("program_id", { length: 36 }).notNull().references(() => programs.id, { onDelete: "cascade" }),
     submissionId: varchar("submission_id", { length: 36 }).notNull().unique().references(() => formSubmissions.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    outlet: varchar("outlet", { length: 255 }).notNull().default(""),
+    period: varchar("period", { length: 100 }).notNull().default(""),
+    photoUrl: varchar("photo_url", { length: 500 }).notNull().default(""),
     drawnAt: datetime("drawn_at").notNull(),
 });
 
