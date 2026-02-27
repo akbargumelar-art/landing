@@ -16,7 +16,6 @@ import {
     Gift,
     Shield,
 } from "lucide-react";
-import { heroSlides, programs } from "@/lib/mock-data";
 
 function WaveDivider({ fill = "#ffffff", flip = false }: { fill?: string; flip?: boolean }) {
     return (
@@ -31,16 +30,18 @@ function WaveDivider({ fill = "#ffffff", flip = false }: { fill?: string; flip?:
     );
 }
 
-function HeroCarousel() {
+function HeroCarousel({ slides }: { slides: any[] }) {
     const [current, setCurrent] = useState(0);
 
     const next = useCallback(() => {
-        setCurrent((prev) => (prev + 1) % heroSlides.length);
-    }, []);
+        if (!slides || slides.length === 0) return;
+        setCurrent((prev) => (prev + 1) % slides.length);
+    }, [slides]);
 
     const prev = () => {
+        if (!slides || slides.length === 0) return;
         setCurrent(
-            (prev) => (prev - 1 + heroSlides.length) % heroSlides.length
+            (prev) => (prev - 1 + slides.length) % slides.length
         );
     };
 
@@ -49,10 +50,14 @@ function HeroCarousel() {
         return () => clearInterval(timer);
     }, [next]);
 
+    if (!slides || slides.length === 0) {
+        return <div className="h-[520px] md:h-[620px] bg-red-600 flex items-center justify-center text-white">Loading...</div>;
+    }
+
     return (
         <section className="relative overflow-hidden">
             <div className="relative h-[520px] md:h-[620px]">
-                {heroSlides.map((slide, index) => (
+                {slides.map((slide, index) => (
                     <div
                         key={slide.id}
                         className={`absolute inset-0 transition-all duration-700 ease-in-out ${index === current
@@ -121,7 +126,7 @@ function HeroCarousel() {
 
             {/* Dots */}
             <div className="absolute bottom-16 md:bottom-24 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-                {heroSlides.map((_, index) => (
+                {slides.map((_, index) => (
                     <button
                         key={index}
                         onClick={() => setCurrent(index)}
@@ -229,7 +234,7 @@ function QuickAccessSection() {
     );
 }
 
-function ProgramPreview() {
+function ProgramPreview({ programs }: { programs: any[] }) {
     return (
         <section className="py-20 bg-white relative">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -462,12 +467,29 @@ function MitraSection() {
 }
 
 export default function HomePage() {
+    const [slides, setSlides] = useState<any[]>([]);
+    const [programsList, setProgramsList] = useState<any[]>([]);
+
+    useEffect(() => {
+        fetch("/api/public/hero-slides")
+            .then((res) => res.json())
+            .then((data) => {
+                if (Array.isArray(data)) setSlides(data);
+            });
+
+        fetch("/api/public/programs")
+            .then((res) => res.json())
+            .then((data) => {
+                if (Array.isArray(data)) setProgramsList(data);
+            });
+    }, []);
+
     return (
         <>
-            <HeroCarousel />
+            <HeroCarousel slides={slides} />
             <QuickAccessSection />
             <AboutSection />
-            <ProgramPreview />
+            <ProgramPreview programs={programsList} />
             <LokasiKantor />
             <MitraSection />
         </>

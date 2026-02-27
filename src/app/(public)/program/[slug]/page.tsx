@@ -18,16 +18,47 @@ import {
     ListOrdered,
     Trophy,
 } from "lucide-react";
-import { programs, winners } from "@/lib/mock-data";
 
 export default function ProgramDetailPage() {
     const params = useParams();
     const slug = params.slug as string;
-    const program = programs.find((p) => p.slug === slug);
-    const programWinners = winners.filter(
-        (w) => w.programId === program?.id
-    );
+
+    const [program, setProgram] = useState<any>(null);
+    const [programWinners, setProgramWinners] = useState<any[]>([]);
     const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    React.useEffect(() => {
+        Promise.all([
+            fetch("/api/public/programs").then(res => res.json()),
+            fetch("/api/public/winners").then(res => res.json()).catch(() => []) // fallback if winners endpoint doesn't exist
+        ]).then(([programsData, winnersData]) => {
+            if (Array.isArray(programsData)) {
+                const foundProg = programsData.find((p: any) => p.slug === slug);
+                if (foundProg) {
+                    // DB might store terms and mechanics as JSON strings, so parse them
+                    try {
+                        if (typeof foundProg.terms === "string") foundProg.terms = JSON.parse(foundProg.terms);
+                        if (typeof foundProg.mechanics === "string") foundProg.mechanics = JSON.parse(foundProg.mechanics);
+                    } catch (e) { }
+                    setProgram(foundProg);
+
+                    if (Array.isArray(winnersData)) {
+                        setProgramWinners(winnersData.filter((w: any) => w.programId === foundProg.id));
+                    }
+                }
+            }
+            setIsLoading(false);
+        }).catch(() => setIsLoading(false));
+    }, [slug]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+        );
+    }
 
     if (!program) {
         return (
@@ -107,7 +138,7 @@ export default function ProgramDetailPage() {
                                         </h3>
                                     </div>
                                     <div className="space-y-3">
-                                        {program.mechanics.map((step, index) => (
+                                        {(program.mechanics as string[]).map((step, index) => (
                                             <div key={index} className="flex items-start gap-3">
                                                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shrink-0 mt-0.5">
                                                     <span className="text-xs font-bold text-white">
@@ -135,7 +166,7 @@ export default function ProgramDetailPage() {
                                         </h3>
                                     </div>
                                     <ul className="space-y-3">
-                                        {program.terms.map((term, index) => (
+                                        {(program.terms as string[]).map((term, index) => (
                                             <li
                                                 key={index}
                                                 className="flex items-start gap-2 text-sm text-muted-foreground"

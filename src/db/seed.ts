@@ -1,8 +1,9 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { siteSettings, heroSlides, user, account } from "./schema";
+import { siteSettings, heroSlides, programs, user, account } from "./schema";
 import { v4 as uuid } from "uuid";
 import { scryptSync, randomBytes } from "crypto";
+import { programs as mockPrograms, heroSlides as mockSlides } from "../lib/mock-data";
 
 function hashPassword(password: string): string {
     const salt = randomBytes(16).toString("hex");
@@ -81,23 +82,56 @@ async function seed() {
     }
     console.log("✅ Site settings created");
 
-    // 3. Default hero slide
-    console.log("Creating hero slide...");
+    // 3. Import Hero Slides from Mock Data
+    console.log("Importing hero slides...");
     try {
-        await db.insert(heroSlides).values({
+        await db.delete(heroSlides); // clear existing first
+        const formattedSlides = mockSlides.map((slide, index) => ({
             id: uuid(),
-            title: "Selamat Datang di ABK Ciraya",
-            subtitle: "Program undian dan hadiah terbaik untuk mitra dan pelanggan setia",
-            ctaText: "Lihat Program",
-            ctaLink: "/program",
-            bgColor: "from-red-600 via-red-500 to-orange-500",
-            sortOrder: 0,
+            title: slide.title,
+            subtitle: slide.subtitle,
+            ctaText: slide.cta,
+            ctaLink: slide.ctaLink,
+            bgColor: slide.bgColor,
+            sortOrder: index,
             isActive: true,
             createdAt: new Date(),
-        });
-        console.log("✅ Hero slide created");
-    } catch {
-        console.log("⚠️ Hero slide may already exist");
+        }));
+        await db.insert(heroSlides).values(formattedSlides);
+        console.log("✅ Hero slides imported");
+    } catch (err) {
+        console.log("⚠️ Failed to import hero slides:", err);
+    }
+
+    // 4. Import Programs from Mock Data
+    console.log("Importing programs...");
+    try {
+        // We do not delete programs automatically to avoid dropping user data,
+        // but we'll insert them if the table is empty.
+        const existingPrograms = await db.select().from(programs).limit(1);
+        if (existingPrograms.length === 0) {
+            const formattedPrograms = mockPrograms.map((prog, index) => ({
+                id: prog.id, // using original id to maintain relations if needed later
+                slug: prog.slug,
+                title: prog.title,
+                description: prog.description,
+                thumbnail: prog.thumbnail,
+                category: "pelanggan",
+                period: prog.period,
+                content: prog.content,
+                terms: JSON.stringify(prog.terms),
+                mechanics: JSON.stringify(prog.mechanics),
+                status: "published",
+                sortOrder: index,
+                createdAt: new Date(),
+            }));
+            await db.insert(programs).values(formattedPrograms);
+            console.log("✅ Programs imported from mock data");
+        } else {
+            console.log("⚠️ Programs table already contains data, skipping mock import.");
+        }
+    } catch (err) {
+        console.log("⚠️ Failed to import programs:", err);
     }
 
     console.log("\n🎉 Seed complete!");
