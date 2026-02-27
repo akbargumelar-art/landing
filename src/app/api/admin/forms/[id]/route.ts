@@ -19,7 +19,13 @@ export async function GET(
             .where(eq(programs.id, form.programId));
         const fields = await db.select().from(formFields).where(eq(formFields.formId, id)).orderBy(asc(formFields.sortOrder));
 
-        return NextResponse.json({ ...form, program: program || null, fields });
+        const mappedFields = fields.map((f: typeof formFields.$inferSelect) => ({
+            ...f,
+            type: f.fieldType,
+            content: f.placeholder
+        }));
+
+        return NextResponse.json({ ...form, program: program || null, fields: mappedFields });
     } catch (error) {
         console.error("Form GET error:", error);
         return NextResponse.json({ error: "Server error" }, { status: 500 });

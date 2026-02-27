@@ -216,14 +216,29 @@ export default function FormBuilderPage() {
     const saveForm = async () => {
         if (!selectedForm) return;
         setSaving(true);
-        await fetch(`/api/admin/forms/${selectedForm.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...selectedForm, formSchema: JSON.stringify(elements) }),
-        });
-        setMessage("Form berhasil disimpan!");
-        setSaving(false);
-        setTimeout(() => setMessage(""), 3000);
+        try {
+            // 1. Update dynamicForms table (formSchema JSON)
+            await fetch(`/api/admin/forms/${selectedForm.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...selectedForm, formSchema: JSON.stringify(elements) }),
+            });
+
+            // 2. Sync formFields table
+            await fetch(`/api/admin/forms/${selectedForm.id}/fields`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fields: elements }),
+            });
+
+            setMessage("Form berhasil disimpan!");
+        } catch (error) {
+            console.error(error);
+            setMessage("Gagal menyimpan form!");
+        } finally {
+            setSaving(false);
+            setTimeout(() => setMessage(""), 3000);
+        }
     };
 
     const selectedElement = elements.find((e) => e.id === selectedElementId);

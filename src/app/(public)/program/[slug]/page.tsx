@@ -30,6 +30,7 @@ interface Program {
     content: string;
     terms: string[] | string;
     mechanics: string[] | string;
+    form?: { id: string } | null;
 }
 
 interface Winner {
@@ -228,8 +229,10 @@ export default function ProgramDetailPage() {
                                 <CardContent className="p-6 text-center">
                                     <Badge className="mb-3 btn-pill">Aktif</Badge>
                                     <p className="text-sm text-muted-foreground mb-4">Ikuti program ini sekarang!</p>
-                                    <Link href="/form-undian">
-                                        <Button className="btn-pill w-full font-semibold cursor-pointer">Daftar Sekarang</Button>
+                                    <Link href={program.form?.id ? `/form-undian?id=${program.form.id}` : "#"}>
+                                        <Button className="btn-pill w-full font-semibold cursor-pointer" disabled={!program.form?.id}>
+                                            {program.form?.id ? "Daftar Sekarang" : "Form Belum Tersedia"}
+                                        </Button>
                                     </Link>
                                 </CardContent>
                             </Card>

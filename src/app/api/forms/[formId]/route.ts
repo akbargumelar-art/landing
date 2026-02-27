@@ -28,10 +28,11 @@ export async function GET(
         const fields = await db
             .select({
                 id: formFields.id,
+                type: formFields.fieldType,
                 fieldType: formFields.fieldType,
                 label: formFields.label,
                 placeholder: formFields.placeholder,
-                hintText: formFields.hintText,
+                content: formFields.placeholder, // Re-map back
                 isRequired: formFields.isRequired,
                 options: formFields.options,
                 sortOrder: formFields.sortOrder,

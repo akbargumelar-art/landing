@@ -23,9 +23,9 @@ export async function PUT(
             await db.insert(formFields).values({
                 id: field.id || uuid(),
                 formId,
-                fieldType: field.fieldType,
-                label: field.label,
-                placeholder: field.placeholder || "",
+                fieldType: field.type || "text",
+                label: field.label || "",
+                placeholder: field.content || field.placeholder || "",
                 hintText: field.hintText || "",
                 isRequired: field.isRequired ?? false,
                 options: field.options || "[]",
