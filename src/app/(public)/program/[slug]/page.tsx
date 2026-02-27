@@ -17,36 +17,77 @@ import {
     CheckCircle,
     ListOrdered,
     Trophy,
+    Users,
 } from "lucide-react";
+
+interface Program {
+    id: string;
+    title: string;
+    slug: string;
+    period: string;
+    content: string;
+    terms: string[] | string;
+    mechanics: string[] | string;
+}
+
+interface Winner {
+    id: string;
+    name: string;
+    phone?: string;
+    outlet?: string;
+    week?: string;
+    programId: string;
+}
+
+interface Participant {
+    name: string;
+    phone: string;
+}
+
+function maskName(name: string): string {
+    if (!name) return "***";
+    if (name.length <= 3) return "***";
+    return name.slice(0, name.length - 3) + "***";
+}
+
+function maskPhone(phone: string): string {
+    if (!phone) return "***";
+    if (phone.length <= 3) return "***";
+    return phone.slice(0, phone.length - 3) + "***";
+}
 
 export default function ProgramDetailPage() {
     const params = useParams();
     const slug = params.slug as string;
 
-    const [program, setProgram] = useState<any>(null);
-    const [programWinners, setProgramWinners] = useState<any[]>([]);
+    const [program, setProgram] = useState<Program | null>(null);
+    const [programWinners, setProgramWinners] = useState<Winner[]>([]);
+    const [participants, setParticipants] = useState<Participant[]>([]);
     const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     React.useEffect(() => {
         Promise.all([
             fetch("/api/public/programs").then(res => res.json()),
-            fetch("/api/public/winners").then(res => res.json()).catch(() => []) // fallback if winners endpoint doesn't exist
-        ]).then(([programsData, winnersData]) => {
+            fetch("/api/public/winners").then(res => res.json()).catch(() => []),
+            fetch(`/api/public/programs/${slug}/participants`).then(res => res.json()).catch(() => []),
+        ]).then(([programsData, winnersData, participantsData]) => {
             if (Array.isArray(programsData)) {
-                const foundProg = programsData.find((p: any) => p.slug === slug);
+                const foundProg = programsData.find((p: Program) => p.slug === slug);
                 if (foundProg) {
-                    // DB might store terms and mechanics as JSON strings, so parse them
                     try {
                         if (typeof foundProg.terms === "string") foundProg.terms = JSON.parse(foundProg.terms);
                         if (typeof foundProg.mechanics === "string") foundProg.mechanics = JSON.parse(foundProg.mechanics);
-                    } catch (e) { }
+                    } catch { /* ignore parse errors */ }
                     setProgram(foundProg);
 
                     if (Array.isArray(winnersData)) {
-                        setProgramWinners(winnersData.filter((w: any) => w.programId === foundProg.id));
+                        setProgramWinners(winnersData.filter((w: Winner) => w.programId === foundProg.id));
                     }
                 }
+            }
+            if (Array.isArray(participantsData)) {
+                setParticipants(participantsData);
             }
             setIsLoading(false);
         }).catch(() => setIsLoading(false));
@@ -162,7 +203,7 @@ export default function ProgramDetailPage() {
                                             <CheckCircle className="h-4 w-4 text-primary" />
                                         </div>
                                         <h3 className="text-lg font-bold text-foreground">
-                                            Syarat & Ketentuan
+                                            Syarat &amp; Ketentuan
                                         </h3>
                                     </div>
                                     <ul className="space-y-3">
@@ -192,6 +233,45 @@ export default function ProgramDetailPage() {
                             </Card>
                         </div>
                     </div>
+
+                    {/* Participants List */}
+                    {participants.length > 0 && (
+                        <div className="mt-16">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+                                    <Users className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-extrabold text-foreground">
+                                        Daftar Peserta
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">{participants.length} peserta telah mendaftar</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {participants.map((participant, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center shrink-0">
+                                            <span className="text-sm font-bold text-red-600">
+                                                {participant.name ? participant.name.charAt(0).toUpperCase() : "?"}
+                                            </span>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-foreground truncate">
+                                                {maskName(participant.name)}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground truncate">
+                                                {maskPhone(participant.phone)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Winners Gallery */}
                     {programWinners.length > 0 && (

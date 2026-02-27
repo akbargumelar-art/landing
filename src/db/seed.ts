@@ -7,7 +7,7 @@ import { programs as mockPrograms, heroSlides as mockSlides } from "../lib/mock-
 
 function hashPassword(password: string): string {
     const salt = randomBytes(16).toString("hex");
-    const derivedKey = scryptSync(password, salt, 64, { N: 16384, r: 16, p: 1 });
+    const derivedKey = scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
     return `${salt}:${derivedKey.toString("hex")}`;
 }
 

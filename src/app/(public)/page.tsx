@@ -1,6 +1,25 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+
+interface HeroSlide {
+    id: string;
+    title: string;
+    subtitle: string;
+    cta: string;
+    ctaLink: string;
+    bgColor: string;
+}
+
+interface Program {
+    id: string;
+    slug: string;
+    title: string;
+    description: string;
+    period: string;
+    thumbnail?: string;
+    category: string;
+}
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +49,7 @@ function WaveDivider({ fill = "#ffffff", flip = false }: { fill?: string; flip?:
     );
 }
 
-function HeroCarousel({ slides }: { slides: any[] }) {
+function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     const [current, setCurrent] = useState(0);
 
     const next = useCallback(() => {
@@ -234,7 +253,7 @@ function QuickAccessSection() {
     );
 }
 
-function ProgramPreview({ programs }: { programs: any[] }) {
+function ProgramPreview({ programs }: { programs: Program[] }) {
     return (
         <section className="py-20 bg-white relative">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -467,8 +486,8 @@ function MitraSection() {
 }
 
 export default function HomePage() {
-    const [slides, setSlides] = useState<any[]>([]);
-    const [programsList, setProgramsList] = useState<any[]>([]);
+    const [slides, setSlides] = useState<HeroSlide[]>([]);
+    const [programsList, setProgramsList] = useState<Program[]>([]);
 
     useEffect(() => {
         fetch("/api/public/hero-slides")

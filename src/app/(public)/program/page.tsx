@@ -6,9 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Calendar, Users, UserCheck } from "lucide-react";
 
+interface Program {
+    id: string;
+    slug: string;
+    title: string;
+    description: string;
+    period: string;
+    thumbnail?: string;
+    category: string;
+}
+
 export default function ProgramPage() {
     const [filterCategory, setFilterCategory] = useState("");
-    const [programs, setPrograms] = useState<any[]>([]);
+    const [programs, setPrograms] = useState<Program[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     React.useEffect(() => {
@@ -22,7 +32,7 @@ export default function ProgramPage() {
     }, []);
 
     const filtered = filterCategory
-        ? programs.filter((p) => (p as unknown as { category: string }).category === filterCategory)
+        ? programs.filter((p) => p.category === filterCategory)
         : programs;
 
     return (
@@ -95,9 +105,9 @@ export default function ProgramPage() {
                                     className="overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                                 >
                                     <div className="h-48 relative overflow-hidden">
-                                        {(program as unknown as { thumbnail: string }).thumbnail ? (
+                                        {program.thumbnail ? (
                                             <img
-                                                src={(program as unknown as { thumbnail: string }).thumbnail}
+                                                src={program.thumbnail}
                                                 alt={program.title}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                             />
@@ -118,11 +128,11 @@ export default function ProgramPage() {
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                                         {/* Category Badge */}
                                         <div className="absolute top-3 left-3">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${(program as unknown as { category: string }).category === "mitra"
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${program.category === "mitra"
                                                 ? "bg-orange-500 text-white"
                                                 : "bg-red-600 text-white"
                                                 }`}>
-                                                {(program as unknown as { category: string }).category === "mitra" ? "Mitra Outlet" : "Pelanggan"}
+                                                {program.category === "mitra" ? "Mitra Outlet" : "Pelanggan"}
                                             </span>
                                         </div>
                                     </div>
