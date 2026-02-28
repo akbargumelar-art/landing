@@ -25,11 +25,52 @@ export async function POST(
             return NextResponse.json({ error: "Form not found" }, { status: 404 });
         }
 
-        const fields = await db
+        let fields = await db
             .select()
             .from(formFields)
             .where(eq(formFields.formId, formId))
             .orderBy(asc(formFields.sortOrder));
+
+        // Self-repair formFields if empty (frontend relies on fallback or unsaved JSON schema)
+        if (fields.length === 0) {
+            const schemaStr = form.formSchema || "[]";
+            let formSchemaObj;
+            try {
+                formSchemaObj = JSON.parse(schemaStr);
+            } catch {
+                formSchemaObj = [];
+            }
+
+            const elements = formSchemaObj.length > 0 ? formSchemaObj : [
+                { id: "nama", type: "text", label: "Nama Lengkap", isRequired: true },
+                { id: "nomor", type: "phone", label: "Nomor Telkomsel", isRequired: true },
+                { id: "outlet", type: "text", label: "Nama Mitra Outlet", isRequired: true },
+                { id: "bukti", type: "file", label: "Bukti Pembelian", isRequired: true },
+            ];
+
+            const newFieldsToInsert = [];
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
+                if (el.type === "heading" || el.type === "paragraph" || el.type === "image" || el.type === "divider") continue;
+
+                newFieldsToInsert.push({
+                    id: el.id || uuid(),
+                    formId,
+                    fieldType: el.type || "text",
+                    label: el.label || "",
+                    placeholder: el.placeholder || "",
+                    hintText: el.hintText || "",
+                    isRequired: el.isRequired ?? false,
+                    options: JSON.stringify(el.options || []),
+                    sortOrder: i,
+                });
+            }
+
+            if (newFieldsToInsert.length > 0) {
+                await db.insert(formFields).values(newFieldsToInsert);
+                fields = await db.select().from(formFields).where(eq(formFields.formId, formId)).orderBy(asc(formFields.sortOrder));
+            }
+        }
 
         const formData = await request.formData();
 
@@ -59,7 +100,7 @@ export async function POST(
                 const fLabel = field.label || "";
                 if (/nama|name|lengkap/i.test(fLabel)) {
                     participantName = val;
-                } else if (/wa|whatsapp|hp|phone/i.test(fLabel)) {
+                } else if (/wa|whatsapp|hp|phone|nomor/i.test(fLabel)) {
                     participantPhone = val;
                 }
             }

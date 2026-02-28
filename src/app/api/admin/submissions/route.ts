@@ -50,7 +50,7 @@ export async function GET(request: Request) {
                         fields: true, // we might not need to send all fields if we only care about submitted values, but left here for completeness if frontend uses it
                     },
                 },
-                values: {
+                submissionValues: {
                     with: {
                         field: true,
                     },
@@ -60,8 +60,13 @@ export async function GET(request: Request) {
             orderBy: [desc(formSubmissions.submittedAt)],
         });
 
+        const result: FetchedSubmission[] = dbResult.map(s => ({
+            ...s,
+            values: (s as unknown as { submissionValues: SubValue[] }).submissionValues || [],
+        })) as FetchedSubmission[];
+
         // Apply Filters
-        let filtered = dbResult as unknown as FetchedSubmission[];
+        let filtered = result;
 
         if (status) {
             filtered = filtered.filter((s: FetchedSubmission) => s.status === status);
