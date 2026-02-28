@@ -98,10 +98,10 @@ export async function POST(
             if (!settingsRow) return;
 
             // Parse settings JSON
-            let settingsObj: Record<string, string> = {};
+            const settingsObj: Record<string, string> = {};
             try {
                 const arr = JSON.parse(settingsRow.settingsJson || "[]");
-                arr.forEach((item: any) => {
+                arr.forEach((item: { key: string, value: string }) => {
                     settingsObj[item.key] = item.value;
                 });
             } catch {
