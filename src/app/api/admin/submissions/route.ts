@@ -10,12 +10,26 @@ interface SubValue {
 
 interface FetchedSubmission {
     id: string;
+    period: string;
     status: string;
+    formId: string;
+    submittedAt: Date;
     form: {
-        program: { id: string } | null;
+        id: string;
+        createdAt: Date;
+        title: string;
+        isActive: boolean;
+        description: string;
+        programId: string;
+        formSchema: string;
+        program: {
+            id: string;
+            title: string;
+            slug: string;
+        } | null;
     };
-    values: SubValue[];
-    submissionValues?: SubValue[];
+    submissionValues: SubValue[];
+    values?: SubValue[];
 }
 
 // GET submissions with filters
@@ -65,7 +79,7 @@ export async function GET(request: Request) {
         if (search) {
             const q = search.toLowerCase();
             filtered = filtered.filter((s: FetchedSubmission) =>
-                s.values.some(
+                (s.values || []).some(
                     (v: SubValue) =>
                         v.value.toLowerCase().includes(q) ||
                         (v.field?.label || "").toLowerCase().includes(q)
