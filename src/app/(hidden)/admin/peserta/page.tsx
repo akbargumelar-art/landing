@@ -321,19 +321,35 @@ export default function PesertaPage() {
 
                                                 {/* Jawaban */}
                                                 <div className="text-sm text-gray-900 font-medium">
-                                                    {val.field?.type === 'image' || val.field?.type === 'file' || (typeof val.value === 'string' && val.value.startsWith('/uploads')) ? (
+                                                    {(val.field?.fieldType === 'image' || val.field?.fieldType === 'file' || (typeof val.value === 'string' && val.value.startsWith('/api/public/uploads'))) ? (
                                                         <div className="mt-1">
-                                                            <a
-                                                                href={val.value}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
-                                                            >
-                                                                📄 Lihat File / Gambar
-                                                            </a>
+                                                            {/* Check if it's an image based on the file extension/path */}
+                                                            {typeof val.filePath === 'string' && val.filePath.match(/\.(jpg|jpeg|png|gif|webp)$/i) || (typeof val.value === 'string' && val.value.match(/\.(jpg|jpeg|png|gif|webp)$/i)) ? (
+                                                                <div
+                                                                    className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                                                    onClick={() => setLightboxImage(val.filePath || val.value)}
+                                                                >
+                                                                    <Image
+                                                                        src={val.filePath || val.value}
+                                                                        alt="Lampiran"
+                                                                        fill
+                                                                        className="object-cover"
+                                                                        unoptimized
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <a
+                                                                    href={val.filePath || val.value}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                                                                >
+                                                                    📄 Lihat File
+                                                                </a>
+                                                            )}
                                                         </div>
                                                     ) : (
-                                                        <p className="bg-gray-50 px-3 py-2 rounded border border-gray-200">
+                                                        <p className="bg-gray-50 px-3 py-2 rounded border border-gray-200 mt-1 whitespace-pre-wrap">
                                                             {val.value || '-'}
                                                         </p>
                                                     )}
