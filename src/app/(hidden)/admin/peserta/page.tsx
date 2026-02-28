@@ -306,19 +306,19 @@ export default function PesertaPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 {selectedSubmission.values.map((val) => (
                                     <div key={val.fieldId} className="border-b pb-3 last:border-0">
-                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{val.field?.label || "Unknown Field"}</p>
+                                        <p className="font-bold text-sm text-foreground mb-1">{val.field?.label || "Unknown Field"}</p>
                                         {val.field?.fieldType === "file" && val.filePath ? (
                                             <button onClick={() => setLightboxImage(val.filePath)} className="group cursor-pointer">
                                                 <div className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
                                                     <FileImage className="h-4 w-4" />
-                                                    <span>{val.value || "Lihat file"}</span>
+                                                    <span className="font-normal">{val.value || "Lihat file"}</span>
                                                 </div>
                                             </button>
                                         ) : (
-                                            <p className="text-sm">{val.value || "—"}</p>
+                                            <p className="text-sm font-normal text-foreground">{val.value || "—"}</p>
                                         )}
                                     </div>
                                 ))}

@@ -63,22 +63,26 @@ interface ParticipantGroup {
     participants: Participant[];
 }
 
-function maskName(name: string): string {
-    if (!name) return "Peserta Anonim";
-    if (name.startsWith("Peserta #")) return name;
-    return name
-        .split(" ")
-        .map((word) => {
-            if (word.length <= 3) return word.charAt(0) + "***";
-            return word.substring(0, word.length - 3) + "***";
-        })
-        .join(" ");
-}
+function maskData(text: string, type: 'name' | 'phone'): string {
+    if (!text) return type === 'name' ? "Peserta Anonim" : "-";
 
-function maskPhone(phone: string): string {
-    if (!phone) return "-";
-    if (phone.length <= 3) return phone + "***";
-    return phone.substring(0, phone.length - 3) + "***";
+    // Do not mask default participant ID format (Peserta #ABCDEF)
+    if (text.startsWith("Peserta #")) {
+        return text;
+    }
+
+    if (type === 'name') {
+        return text
+            .split(" ")
+            .map((word) => {
+                if (word.length <= 2) return word + "***";
+                return word.substring(0, 2) + "***";
+            })
+            .join(" ");
+    } else {
+        if (text.length <= 7) return text.substring(0, 4) + "***";
+        return text.substring(0, 4) + "*****" + text.substring(text.length - 3);
+    }
 }
 
 export default function ProgramDetailPage() {
@@ -375,8 +379,7 @@ export default function ProgramDetailPage() {
                             {participantGroups[activePeriodParticipants] && (
                                 <ParticipantList
                                     participants={participantGroups[activePeriodParticipants].participants}
-                                    maskName={maskName}
-                                    maskPhone={maskPhone}
+                                    maskData={maskData}
                                 />
                             )}
                         </div>
@@ -438,7 +441,7 @@ export default function ProgramDetailPage() {
                                                 </div>
                                             </div>
                                             <CardContent className="p-4">
-                                                <p className="font-bold text-foreground text-sm mb-1">{maskName(winner.name)}</p>
+                                                <p className="font-bold text-foreground text-sm mb-1">{maskData(winner.name, 'name')}</p>
                                                 {winner.outlet && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                         <MapPin className="h-3 w-3" />
@@ -448,7 +451,7 @@ export default function ProgramDetailPage() {
                                                 {winner.phone && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                         <Phone className="h-3 w-3" />
-                                                        {maskPhone(winner.phone)}
+                                                        {maskData(winner.phone, 'phone')}
                                                     </p>
                                                 )}
                                             </CardContent>
@@ -474,10 +477,10 @@ export default function ProgramDetailPage() {
                                     <Trophy className="h-12 w-12 text-primary" />
                                 )}
                             </div>
-                            <h3 className="text-xl font-bold text-foreground mb-1">{maskName(selectedWinner.name)}</h3>
+                            <h3 className="text-xl font-bold text-foreground mb-1">{maskData(selectedWinner.name, 'name')}</h3>
                             {selectedWinner.phone && (
                                 <p className="text-sm text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                                    <Phone className="h-3.5 w-3.5" /> {maskPhone(selectedWinner.phone)}
+                                    <Phone className="h-3.5 w-3.5" /> {maskData(selectedWinner.phone, 'phone')}
                                 </p>
                             )}
                             {selectedWinner.outlet && (
@@ -499,10 +502,9 @@ export default function ProgramDetailPage() {
 // ── Participant List with Expand/Collapse ──
 const INITIAL_SHOW = 8;
 
-function ParticipantList({ participants, maskName, maskPhone }: {
+function ParticipantList({ participants, maskData }: {
     participants: { name: string; phone: string }[];
-    maskName: (name: string) => string;
-    maskPhone: (phone: string) => string;
+    maskData: (text: string, type: 'name' | 'phone') => string;
 }) {
     const [expanded, setExpanded] = React.useState(false);
     const showAll = expanded || participants.length <= INITIAL_SHOW;
@@ -523,8 +525,8 @@ function ParticipantList({ participants, maskName, maskPhone }: {
                             </span>
                         </div>
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{maskName(participant.name)}</p>
-                            <p className="text-xs text-muted-foreground truncate">{maskPhone(participant.phone)}</p>
+                            <p className="text-sm font-semibold text-foreground truncate">{maskData(participant.name, 'name')}</p>
+                            <p className="text-xs text-muted-foreground truncate">{maskData(participant.phone, 'phone')}</p>
                         </div>
                     </div>
                 ))}
