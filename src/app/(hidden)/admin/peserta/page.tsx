@@ -128,13 +128,13 @@ export default function PesertaPage() {
     };
 
     const getPreviewValue = (sub: Submission): string => {
-        let nameField = sub.values.find((v) => v.field.fieldType === "name");
-        if (!nameField) nameField = sub.values.find((v) => v.field.label && /nama|name|lengkap|peserta/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
-        if (!nameField) nameField = sub.values.find((v) => v.field.fieldType === "text" && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+        let nameField = sub.values.find((v) => v.field?.fieldType === "name");
+        if (!nameField) nameField = sub.values.find((v) => v.field?.label && /nama|name|lengkap|peserta/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+        if (!nameField) nameField = sub.values.find((v) => v.field?.fieldType === "text" && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
 
-        let phoneField = sub.values.find((v) => v.field.fieldType === "phone");
-        if (!phoneField) phoneField = sub.values.find((v) => v.field.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
-        if (!phoneField) phoneField = sub.values.find((v) => v.field.fieldType === "number");
+        let phoneField = sub.values.find((v) => v.field?.fieldType === "phone");
+        if (!phoneField) phoneField = sub.values.find((v) => v.field?.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
+        if (!phoneField) phoneField = sub.values.find((v) => v.field?.fieldType === "number");
 
         const name = nameField?.value?.trim();
         const phone = phoneField?.value?.trim();
@@ -144,7 +144,7 @@ export default function PesertaPage() {
         if (phone) return `Peserta #${sub.id.slice(0, 6)} - ${phone}`;
 
         // Fallback to first text field
-        const firstText = sub.values.find((v) => v.field.fieldType === "text" && v.value);
+        const firstText = sub.values.find((v) => v.field?.fieldType === "text" && v.value);
         return firstText?.value?.trim() || `Peserta #${sub.id.slice(0, 8)}`;
     };
 
@@ -280,11 +280,22 @@ export default function PesertaPage() {
                                 )}
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl">
+                                <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nomor Registrasi</p>
+                                    <p className="text-sm font-medium">{selectedSubmission.id.slice(0, 8).toUpperCase()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tanggal Daftar</p>
+                                    <p className="text-sm font-medium">{new Date(selectedSubmission.submittedAt).toLocaleString("id-ID")}</p>
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 {selectedSubmission.values.map((val) => (
                                     <div key={val.fieldId} className="border-b pb-3 last:border-0">
-                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{val.field.label}</p>
-                                        {val.field.fieldType === "file" && val.filePath ? (
+                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{val.field?.label || "Unknown Field"}</p>
+                                        {val.field?.fieldType === "file" && val.filePath ? (
                                             <button onClick={() => setLightboxImage(val.filePath)} className="group cursor-pointer">
                                                 <div className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
                                                     <FileImage className="h-4 w-4" />
