@@ -21,7 +21,7 @@ import { formFields } from "@/db/schema";
 // ---- Types ----
 type ElementType =
     | "heading" | "paragraph" | "image" | "divider"
-    | "text" | "textarea" | "number" | "email" | "phone"
+    | "name" | "phone" | "text" | "textarea" | "number" | "email"
     | "dropdown" | "radio" | "checkbox" | "date" | "file";
 
 interface FormElement {
@@ -73,8 +73,8 @@ const newElement = (type: ElementType): FormElement => ({
 function getDefaultLabel(type: ElementType): string {
     const labels: Record<ElementType, string> = {
         heading: "Judul Section", paragraph: "Teks deskripsi", image: "", divider: "",
-        text: "Field Teks", textarea: "Field Teks Panjang", number: "Field Angka",
-        email: "Email", phone: "Nomor HP", dropdown: "Pilihan Dropdown",
+        name: "Nama Lengkap", phone: "Nomor WhatsApp / HP", text: "Field Teks", textarea: "Field Teks Panjang",
+        number: "Field Angka", email: "Email", dropdown: "Pilihan Dropdown",
         radio: "Pilihan Radio", checkbox: "Pilihan Checkbox", date: "Tanggal", file: "Upload File",
     };
     return labels[type];
@@ -85,11 +85,12 @@ const elementIcons: Record<ElementType, React.ReactNode> = {
     paragraph: <AlignLeft className="h-4 w-4" />,
     image: <ImageIcon className="h-4 w-4" />,
     divider: <Minus className="h-4 w-4" />,
+    name: <Type className="h-4 w-4" />,
+    phone: <Phone className="h-4 w-4" />,
     text: <Type className="h-4 w-4" />,
     textarea: <AlignLeft className="h-4 w-4" />,
     number: <Hash className="h-4 w-4" />,
     email: <Mail className="h-4 w-4" />,
-    phone: <Phone className="h-4 w-4" />,
     dropdown: <ChevronDown className="h-4 w-4" />,
     radio: <CircleDot className="h-4 w-4" />,
     checkbox: <CheckSquare className="h-4 w-4" />,
@@ -110,11 +111,12 @@ const elementCategories = [
     {
         title: "Input Fields",
         items: [
+            { type: "name" as ElementType, label: "Nama Lengkap" },
+            { type: "phone" as ElementType, label: "Nomor HP/WA" },
             { type: "text" as ElementType, label: "Short Text" },
             { type: "textarea" as ElementType, label: "Long Text" },
             { type: "number" as ElementType, label: "Number" },
             { type: "email" as ElementType, label: "Email" },
-            { type: "phone" as ElementType, label: "Phone" },
             { type: "dropdown" as ElementType, label: "Dropdown" },
             { type: "radio" as ElementType, label: "Radio" },
             { type: "checkbox" as ElementType, label: "Checkbox" },
@@ -615,6 +617,20 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                         {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
                                     </div>
                                 )}
+                                {el.type === "name" && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                        <input type="text" placeholder={el.placeholder || "Masukkan nama lengkap"} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                                        {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                    </div>
+                                )}
+                                {el.type === "phone" && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                        <input type="tel" placeholder={el.placeholder || "08xxxxxxxxxx"} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                                        {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                    </div>
+                                )}
                                 {el.type === "textarea" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
@@ -632,12 +648,6 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
                                         <input type="email" placeholder={el.placeholder || "email@contoh.com"} className="w-full px-3 py-2 border rounded-lg text-sm" />
-                                    </div>
-                                )}
-                                {el.type === "phone" && (
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <input type="tel" placeholder={el.placeholder || "08xxxxxxxxxx"} className="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 )}
                                 {el.type === "dropdown" && (

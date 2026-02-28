@@ -65,8 +65,13 @@ interface ParticipantGroup {
 
 function maskName(name: string): string {
     if (!name) return "***";
-    if (name.length <= 3) return "***";
-    return name.substring(0, name.length - 3) + "***";
+    return name
+        .split(" ")
+        .map((word) => {
+            if (word.length <= 3) return "***";
+            return word.substring(0, word.length - 3) + "***";
+        })
+        .join(" ");
 }
 
 function maskPhone(phone: string): string {

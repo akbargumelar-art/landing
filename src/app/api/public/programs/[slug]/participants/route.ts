@@ -46,7 +46,7 @@ export async function GET(
             return NextResponse.json([]);
         }
 
-        const formIds = forms.map((f) => f.id);
+        const formIds = forms.map((f: { id: string }) => f.id);
 
         // Get all submissions for these forms
         const allSubmissions: { id: string; period: string }[] = [];
@@ -69,13 +69,16 @@ export async function GET(
             const periodLabel = sub.period || "Tanpa Periode";
 
             const values = await db
-                .select({ value: submissionValues.value, label: formFields.label })
+                .select({ value: submissionValues.value, label: formFields.label, type: formFields.fieldType })
                 .from(submissionValues)
                 .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
                 .where(eq(submissionValues.submissionId, sub.id));
 
-            const nameField = values.find((v) => /nama/i.test(v.label));
-            const phoneField = values.find((v) => /telepon|telp|hp|handphone|nomor/i.test(v.label));
+            let nameField = values.find((v: { type: string | null; label: string | null; value: string | null }) => v.type === "name");
+            if (!nameField) nameField = values.find((v: { type: string | null; label: string | null; value: string | null }) => v.label && /nama/i.test(v.label) && v.type !== "phone" && v.type !== "email");
+
+            let phoneField = values.find((v: { type: string | null; label: string | null; value: string | null }) => v.type === "phone");
+            if (!phoneField) phoneField = values.find((v: { type: string | null; label: string | null; value: string | null }) => v.label && /telepon|telp|hp|handphone|nomor/i.test(v.label));
 
             if (!grouped[periodLabel]) grouped[periodLabel] = [];
             grouped[periodLabel].push({
