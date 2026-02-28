@@ -97,21 +97,16 @@ export async function POST(
             const val = typeof rawValue === "string" ? rawValue.trim() : "";
 
             if (val) {
-                const fLabel = field.label || "";
+                const fLabel = (field.label || "").trim().toLowerCase();
 
-                // Prioritize checking the official field property type 
-                if (field.fieldType === "name") {
+                // EXACT match required: The user tends to reuse the `name` component for other 
+                // textual inputs like 'Kuota' or 'Nama Outlet'. To prevent accidental overrides, 
+                // we ONLY extract the name if the label is precisely "nama lengkap".
+                // Same strict logic applies for the phone number.
+                if (fLabel === "nama lengkap") {
                     participantName = val;
-                } else if (field.fieldType === "phone") {
+                } else if (fLabel === "nomor whatsapp / hp") {
                     participantPhone = val;
-                } else {
-                    // Strict fallback: Must exactly match "Nama Lengkap" or "Nama" to prevent "Nama Outlet"
-                    // from overriding the value if the original field is missing the "name" type
-                    if (/^(nama lengkap|nama)$/i.test(fLabel.trim()) && participantName === "Peserta") {
-                        participantName = val;
-                    } else if (fLabel.trim().toLowerCase() === "nomor whatsapp / hp" && participantPhone === "-") {
-                        participantPhone = val;
-                    }
                 }
             }
         }
