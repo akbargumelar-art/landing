@@ -209,17 +209,17 @@ export default function PengaturanPage() {
                         <div className="space-y-2">
                             <Label>Endpoint API URL (POST)</Label>
                             <Input
-                                value={settings.wa_api_url || ""}
-                                onChange={(e) => updateSetting("wa_api_url", e.target.value)}
-                                placeholder="Contoh: https://api.fonnte.com/send"
+                                value={settings.wa_gw_endpoint || ""}
+                                onChange={(e) => updateSetting("wa_gw_endpoint", e.target.value)}
+                                placeholder="Contoh: http://waha-instance.com/api/sendText"
                             />
                         </div>
                         <div className="space-y-2">
                             <Label>API Key / Token</Label>
                             <Input
                                 type="password"
-                                value={settings.wa_api_token || ""}
-                                onChange={(e) => updateSetting("wa_api_token", e.target.value)}
+                                value={settings.wa_gw_token || ""}
+                                onChange={(e) => updateSetting("wa_gw_token", e.target.value)}
                                 placeholder="Masukkan token rahasia"
                             />
                         </div>
@@ -228,8 +228,8 @@ export default function PengaturanPage() {
                         <Label>Template Pesan Notifikasi</Label>
                         <textarea
                             className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            value={settings.wa_template_message || ""}
-                            onChange={(e) => updateSetting("wa_template_message", e.target.value)}
+                            value={settings.wa_gw_template || ""}
+                            onChange={(e) => updateSetting("wa_gw_template", e.target.value)}
                             placeholder="Halo {nama}, pendaftaran Anda untuk {program} berhasil."
                         />
                         <p className="text-xs text-muted-foreground mt-1">

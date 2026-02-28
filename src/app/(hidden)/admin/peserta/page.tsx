@@ -128,8 +128,24 @@ export default function PesertaPage() {
     };
 
     const getPreviewValue = (sub: Submission): string => {
+        let nameField = sub.values.find((v) => v.field.fieldType === "name");
+        if (!nameField) nameField = sub.values.find((v) => v.field.label && /nama|name|lengkap|peserta/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+        if (!nameField) nameField = sub.values.find((v) => v.field.fieldType === "text" && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+
+        let phoneField = sub.values.find((v) => v.field.fieldType === "phone");
+        if (!phoneField) phoneField = sub.values.find((v) => v.field.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
+        if (!phoneField) phoneField = sub.values.find((v) => v.field.fieldType === "number");
+
+        const name = nameField?.value?.trim();
+        const phone = phoneField?.value?.trim();
+
+        if (name && phone) return `${name} - ${phone}`;
+        if (name) return name;
+        if (phone) return `Peserta #${sub.id.slice(0, 6)} - ${phone}`;
+
+        // Fallback to first text field
         const firstText = sub.values.find((v) => v.field.fieldType === "text" && v.value);
-        return firstText?.value || sub.id.slice(0, 8);
+        return firstText?.value?.trim() || `Peserta #${sub.id.slice(0, 8)}`;
     };
 
     // Collect unique periods from existing submissions for autocomplete

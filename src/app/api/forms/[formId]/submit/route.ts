@@ -5,6 +5,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { sendWhatsAppNotification } from "@/lib/whatsapp";
 
 // POST submit form
 export async function POST(
@@ -89,65 +90,32 @@ export async function POST(
         // --- Trigger WhatsApp Notification (Non-blocking) ---
         // Fire-and-forget: do not await this block so it doesn't slow down the response
         Promise.all([
-            db.select().from(siteSettings),
             db.select({ label: formFields.label, type: formFields.fieldType, value: submissionValues.value })
                 .from(submissionValues)
                 .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
                 .where(eq(submissionValues.submissionId, submissionId))
-        ]).then(async ([settingsRows, subValues]) => {
-            if (!settingsRows || settingsRows.length === 0) return;
+        ]).then(async ([subValues]) => {
 
-            // Map settings
-            const settingsObj: Record<string, string> = {};
-            settingsRows.forEach((row: { key: string, value: string }) => {
-                settingsObj[row.key] = row.value;
-            });
-
-            const waUrl = settingsObj.wa_api_url;
-            const waToken = settingsObj.wa_api_token;
-            let waMsg = settingsObj.wa_template_message;
-
-            if (!waUrl || !waToken || !waMsg) return;
-
-            // Find Name and Phone
+            // Find Name and Phone with robust matching
             let nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.type === "name");
-            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type || ""));
-            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => /text/i.test(v.type || ""));
+            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.label && /nama|name|lengkap|peserta/i.test(v.label) && !/phone|email|hp|telp/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
+            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => /text/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
 
             let phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.type === "phone");
             if (!phoneField) phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label || ""));
+            if (!phoneField) phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => /number/i.test(v.type || ""));
 
             const participantPhone = phoneField?.value?.trim();
             const participantName = nameField?.value?.trim() || "Peserta";
 
             if (!participantPhone) return;
 
-            // Simple templating: {nama}, {program}
-            waMsg = waMsg.replace(/{nama}/g, participantName);
-            waMsg = waMsg.replace(/{program}/g, form.title || "Program kami");
+            // Trigger the WAHA service
+            await sendWhatsAppNotification(participantPhone, {
+                name: participantName,
+                programName: form.title || "Program kami"
+            });
 
-            // Format phone number (optional: ensure it starts with country code, logic depends on provider)
-            // Example Fonnte Payload: { target: "0812...", message: "...", delay: "2", countryCode: "62" }
-            const payload = {
-                target: participantPhone,
-                message: waMsg,
-                delay: "2",
-                countryCode: "62" // commonly required for WA gateways
-            };
-
-            try {
-                await fetch(waUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": waToken // Watzap/Fonnte often use the token in Authorization header
-                    },
-                    body: JSON.stringify(payload)
-                });
-                console.log(`WhatsApp Notification queued for ${participantPhone}`);
-            } catch (err) {
-                console.error("Failed to send WhatsApp notification", err);
-            }
         }).catch((err) => {
             console.error("WhatsApp integration block error", err);
         });
