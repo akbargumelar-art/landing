@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { formSubmissions, submissionValues, formFields, dynamicForms } from "@/db/schema";
+import { formSubmissions, submissionValues, formFields } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET() {

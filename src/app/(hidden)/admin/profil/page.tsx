@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "@/lib/auth-client";
 import { authClient } from "@/lib/auth-client";
-import { User, Lock, Save, Loader2, KeyRound } from "lucide-react";
+import { User, Save, Loader2, KeyRound } from "lucide-react";
 
 export default function ProfilPage() {
     const { data: session, isPending } = useSession();
@@ -46,8 +46,9 @@ export default function ProfilPage() {
             } else {
                 setNameMessage({ type: "success", text: "Profil berhasil diperbarui." });
             }
-        } catch (err: any) {
-            setNameMessage({ type: "error", text: err.message || "Terjadi kesalahan." });
+        } catch (err: unknown) {
+            const error = err as Error;
+            setNameMessage({ type: "error", text: error.message || "Terjadi kesalahan." });
         } finally {
             setIsUpdatingName(false);
         }
@@ -83,8 +84,9 @@ export default function ProfilPage() {
                 setNewPassword("");
                 setConfirmPassword("");
             }
-        } catch (err: any) {
-            setPasswordMessage({ type: "error", text: err.message || "Terjadi kesalahan." });
+        } catch (err: unknown) {
+            const error = err as Error;
+            setPasswordMessage({ type: "error", text: error.message || "Terjadi kesalahan." });
         } finally {
             setIsUpdatingPassword(false);
         }
