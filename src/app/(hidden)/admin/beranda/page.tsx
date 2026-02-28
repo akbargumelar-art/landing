@@ -79,6 +79,7 @@ export default function BerandaPage() {
     const [editSlide, setEditSlide] = useState<Partial<HeroSlide>>(defaultSlide);
     const [isEditing, setIsEditing] = useState(false);
     const [message, setMessage] = useState("");
+    const [isUploadingSlide, setIsUploadingSlide] = useState(false);
 
     // Quick card edit
     const [cardDialogOpen, setCardDialogOpen] = useState(false);
@@ -380,17 +381,33 @@ export default function BerandaPage() {
                         <div className="space-y-2">
                             <Label>Gambar Background (opsional)</Label>
                             <div className="flex items-center gap-3">
-                                <label className="flex-1 flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground">
-                                    <Upload className="h-4 w-4" />
-                                    <span>{editSlide.imageUrl ? "Ganti gambar" : "Upload gambar"}</span>
-                                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                <label className="flex-1 flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground w-full">
+                                    {isUploadingSlide ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    ) : (
+                                        <Upload className="h-4 w-4" />
+                                    )}
+                                    <span>{isUploadingSlide ? "Mengupload..." : editSlide.imageUrl ? "Ganti gambar" : "Upload gambar"}</span>
+                                    <input type="file" accept="image/*" className="hidden" disabled={isUploadingSlide} onChange={async (e) => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
-                                        const fd = new FormData();
-                                        fd.append("file", file);
-                                        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-                                        const data = await res.json();
-                                        if (data.url) setEditSlide({ ...editSlide, imageUrl: data.url });
+                                        setIsUploadingSlide(true);
+                                        try {
+                                            const fd = new FormData();
+                                            fd.append("file", file);
+                                            const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                                            const data = await res.json();
+                                            if (res.ok && data.url) {
+                                                setEditSlide({ ...editSlide, imageUrl: data.url });
+                                            } else {
+                                                alert(data.error || "Gagal upload gambar");
+                                            }
+                                        } catch (err) {
+                                            alert("Gagal koneksi server saat upload file.");
+                                        } finally {
+                                            setIsUploadingSlide(false);
+                                            e.target.value = "";
+                                        }
                                     }} />
                                 </label>
                                 {editSlide.imageUrl && (

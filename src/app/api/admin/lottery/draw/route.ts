@@ -60,17 +60,14 @@ export async function POST(request: Request) {
         const selected = eligible[randomIndex];
 
         // Get details from submission values
-        const nameValue = selected.values.find(
-            (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/nama/i) && v.value
-        ) || selected.values.find(
-            (v: { field: { fieldType: string } | null; value: string }) => v.field?.fieldType === "text" && v.value
-        );
-        const winnerName = nameValue?.value || "Peserta #" + selected.id.slice(0, 6);
+        let nameField = selected.values.find((v: any) => v.field?.fieldType === "name");
+        if (!nameField) nameField = selected.values.find((v: any) => v.field?.label && /nama|name/i.test(v.field.label) && !/phone|email/i.test(v.field.fieldType));
+        if (!nameField) nameField = selected.values.find((v: any) => /text/i.test(v.field?.fieldType || ""));
+        const winnerName = nameField?.value?.trim() || "Peserta #" + selected.id.slice(0, 6);
 
-        const phoneValue = selected.values.find(
-            (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/telepon|telp|hp|handphone|nomor/i) && v.value
-        );
-        const winnerPhone = phoneValue?.value || "";
+        let phoneField = selected.values.find((v: any) => v.field?.fieldType === "phone");
+        if (!phoneField) phoneField = selected.values.find((v: any) => v.field?.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
+        const winnerPhone = phoneField?.value?.trim() || "";
 
         const outletValue = selected.values.find(
             (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/outlet/i) && v.value

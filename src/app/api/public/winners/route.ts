@@ -58,12 +58,15 @@ export async function GET(request: Request) {
                         .where(eq(submissionValues.submissionId, w.submissionId));
 
                     if (finalName.startsWith("Peserta #")) {
-                        const nameField = values.find((v) => /nama/i.test(v.label));
-                        if (nameField?.value) finalName = nameField.value;
+                        let nameField = values.find((v: any) => v.type === "name");
+                        if (!nameField) nameField = values.find((v: any) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type));
+                        if (!nameField) nameField = values.find((v: any) => /text/i.test(v.type || ""));
+                        if (nameField?.value?.trim()) finalName = nameField.value.trim();
                     }
                     if (!finalPhone) {
-                        const phoneField = values.find((v) => /telepon|telp|hp|handphone|nomor/i.test(v.label));
-                        if (phoneField?.value) finalPhone = phoneField.value;
+                        let phoneField = values.find((v: any) => v.type === "phone");
+                        if (!phoneField) phoneField = values.find((v: any) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
+                        if (phoneField?.value?.trim()) finalPhone = phoneField.value.trim();
                     }
                     if (!finalOutlet) {
                         const outletField = values.find((v) => /outlet/i.test(v.label));

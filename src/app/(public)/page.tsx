@@ -9,6 +9,7 @@ interface HeroSlide {
     cta: string;
     ctaLink: string;
     bgColor: string;
+    imageUrl?: string;
 }
 
 interface Program {
@@ -87,8 +88,21 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                             }`}
                     >
                         <div
-                            className={`h-full w-full bg-gradient-to-br ${slide.bgColor} flex items-center`}
+                            className={`h-full w-full ${!slide.imageUrl ? 'bg-gradient-to-br ' + slide.bgColor : 'bg-gray-900'} flex items-center relative overflow-hidden`}
                         >
+                            {slide.imageUrl && (
+                                <>
+                                    <Image
+                                        src={slide.imageUrl}
+                                        alt={slide.title || "Banner"}
+                                        fill
+                                        className="object-cover absolute inset-0 z-0"
+                                        priority={index === 0}
+                                        unoptimized={true}
+                                    />
+                                    <div className="absolute inset-0 bg-black/50 z-0" />
+                                </>
+                            )}
                             {/* Decorative elements */}
                             <div className="absolute inset-0 overflow-hidden">
                                 <div className="absolute top-10 right-10 w-80 h-80 bg-white/5 rounded-full blur-3xl animate-float" />
