@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -414,48 +414,61 @@ export default function ProgramDetailPage() {
                                 ))}
                             </div>
 
-                            {/* Winners Grid */}
+                            {/* Winners Grid / Slider */}
                             {winnerGroups[activePeriodWinners] && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {winnerGroups[activePeriodWinners].winners.map((winner) => (
-                                        <Card
-                                            key={winner.id}
-                                            className="overflow-hidden cursor-pointer group border-0 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                                            onClick={() => setSelectedWinner(winner)}
-                                        >
-                                            {/* Photo / Placeholder */}
-                                            <div className="h-48 bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 relative overflow-hidden flex items-center justify-center">
-                                                {winner.photoUrl ? (
-                                                    <Image src={winner.photoUrl} alt={winner.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                                                ) : (
-                                                    <div className="flex flex-col items-center gap-2">
-                                                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-100 to-orange-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                                            <Trophy className="h-10 w-10 text-red-500" />
+                                <div className="relative w-full overflow-hidden py-4">
+                                    <div className="flex w-max animate-slider hover:[animation-play-state:paused] gap-6 px-4">
+                                        {/* Duplicate the list to create a seamless infinite loop */}
+                                        {[...winnerGroups[activePeriodWinners].winners, ...winnerGroups[activePeriodWinners].winners].map((winner, idx) => (
+                                            <div key={`${winner.id}-${idx}`} className="w-[280px] shrink-0">
+                                                <Card
+                                                    className="overflow-hidden cursor-pointer group border-0 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                                                    onClick={() => setSelectedWinner(winner)}
+                                                >
+                                                    {/* Photo / Placeholder */}
+                                                    <div className="h-48 bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 relative overflow-hidden flex items-center justify-center">
+                                                        {winner.photoUrl ? (
+                                                            <Image src={winner.photoUrl} alt={winner.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-100 to-orange-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                                    <Trophy className="h-10 w-10 text-red-500" />
+                                                                </div>
+                                                                <span className="text-xs text-muted-foreground">Klik untuk detail</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute top-3 left-3">
+                                                            <span className="px-2 py-1 rounded-full bg-red-600 text-white text-[10px] font-bold shadow">🏆 Pemenang</span>
                                                         </div>
-                                                        <span className="text-xs text-muted-foreground">Klik untuk detail</span>
                                                     </div>
-                                                )}
-                                                <div className="absolute top-3 left-3">
-                                                    <span className="px-2 py-1 rounded-full bg-red-600 text-white text-[10px] font-bold shadow">🏆 Pemenang</span>
-                                                </div>
+                                                    <CardContent className="p-4">
+                                                        <p className="font-bold text-foreground text-sm mb-1">{maskData(winner.name, 'name')}</p>
+                                                        {winner.outlet && (
+                                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                <MapPin className="h-3 w-3" />
+                                                                {winner.outlet}
+                                                            </p>
+                                                        )}
+                                                        {winner.phone && (
+                                                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                                                <Phone className="h-3 w-3" />
+                                                                {maskData(winner.phone, 'phone')}
+                                                            </p>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
                                             </div>
-                                            <CardContent className="p-4">
-                                                <p className="font-bold text-foreground text-sm mb-1">{maskData(winner.name, 'name')}</p>
-                                                {winner.outlet && (
-                                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                        <MapPin className="h-3 w-3" />
-                                                        {winner.outlet}
-                                                    </p>
-                                                )}
-                                                {winner.phone && (
-                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                                        <Phone className="h-3 w-3" />
-                                                        {maskData(winner.phone, 'phone')}
-                                                    </p>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                        ))}
+                                    </div>
+                                    <style jsx>{`
+                                        @keyframes slide {
+                                            0% { transform: translateX(0); }
+                                            100% { transform: translateX(-50%); }
+                                        }
+                                        .animate-slider {
+                                            animation: slide ${Math.max(20, winnerGroups[activePeriodWinners].winners.length * 4)}s linear infinite;
+                                        }
+                                    `}</style>
                                 </div>
                             )}
                         </div>
