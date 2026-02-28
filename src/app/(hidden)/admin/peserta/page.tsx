@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/table";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
+    DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage, Calendar,
+    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage, Calendar, Trash2, AlertTriangle
 } from "lucide-react";
 import Image from "next/image";
 
@@ -47,6 +48,7 @@ export default function PesertaPage() {
     const [exporting, setExporting] = useState(false);
     const [editingPeriod, setEditingPeriod] = useState("");
     const [savingPeriod, setSavingPeriod] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const fetchSubmissions = () => {
         const params = new URLSearchParams();
@@ -99,6 +101,18 @@ export default function PesertaPage() {
             setSelectedSubmission({ ...selectedSubmission, period });
         }
         setSavingPeriod(false);
+    };
+
+    const handleDelete = async () => {
+        if (!deletingId) return;
+        await fetch(`/api/admin/submissions/${deletingId}`, {
+            method: "DELETE",
+        });
+        setSubmissions((prev) => prev.filter((s) => s.id !== deletingId));
+        setDeletingId(null);
+        if (selectedSubmission?.id === deletingId) {
+            setSelectedSubmission(null);
+        }
     };
 
     const handleExport = async () => {
@@ -225,6 +239,7 @@ export default function PesertaPage() {
                                             <button onClick={() => { setSelectedSubmission(sub); setEditingPeriod(sub.period || ""); }} className="p-2 rounded-lg hover:bg-muted cursor-pointer"><Eye className="h-4 w-4" /></button>
                                             <button onClick={() => updateStatus(sub.id, "approved")} className="p-2 rounded-lg hover:bg-green-50 text-green-600 cursor-pointer" title="Approve"><CheckCircle className="h-4 w-4" /></button>
                                             <button onClick={() => updateStatus(sub.id, "rejected")} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer" title="Reject"><XCircle className="h-4 w-4" /></button>
+                                            <button onClick={() => setDeletingId(sub.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer" title="Hapus"><Trash2 className="h-4 w-4" /></button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -331,6 +346,28 @@ export default function PesertaPage() {
                             <Image src={lightboxImage} alt="Bukti" fill className="object-contain rounded-lg" unoptimized={true} />
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation */}
+            <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" /> Hapus Data
+                        </DialogTitle>
+                        <DialogDescription>
+                            Apakah Anda yakin ingin menghapus data peserta ini? Data yang dihapus tidak dapat dikembalikan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDeletingId(null)} className="cursor-pointer">
+                            Batal
+                        </Button>
+                        <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
+                            Hapus Peserta
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

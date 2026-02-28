@@ -25,3 +25,18 @@ export async function PUT(
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
+
+// DELETE submission
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        await db.delete(formSubmissions).where(eq(formSubmissions.id, id));
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Submission DELETE error:", error);
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
