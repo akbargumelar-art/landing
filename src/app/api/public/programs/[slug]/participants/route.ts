@@ -68,12 +68,12 @@ export async function GET(
         for (const sub of allSubmissions) {
             const periodLabel = sub.period || "Tanpa Periode";
 
-            const values = (sub as any).submissionValues || [];
-
             interface SubValType {
                 field: { label: string | null; fieldType: string | null } | null;
                 value: string;
             }
+
+            const values = (sub as unknown as { submissionValues: SubValType[] }).submissionValues || [];
 
             let nameField = values.find((v: SubValType) => v.field?.fieldType === "name");
             if (!nameField) nameField = values.find((v: SubValType) => v.field?.label && /nama/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));

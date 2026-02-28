@@ -15,6 +15,7 @@ interface FetchedSubmission {
         program: { id: string } | null;
     };
     values: SubValue[];
+    submissionValues?: SubValue[];
 }
 
 // GET submissions with filters
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
         });
 
         // Remap the relation "submissionValues" to "values" for frontend compatibility
-        const result = dbResult.map((sub: any) => ({
+        const result = dbResult.map((sub: FetchedSubmission) => ({
             ...sub,
             values: sub.submissionValues || [],
         }));
