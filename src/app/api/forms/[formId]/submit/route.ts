@@ -105,12 +105,11 @@ export async function POST(
                 } else if (field.fieldType === "phone") {
                     participantPhone = val;
                 } else {
-                    // Fallback to strict heuristic checking for older schemas or missing type definitions
-                    // but ONLY if we haven't already found the primary ones from `fieldType` above.
-                    // This prevents "Nama Outlet" (type 'text') from overwriting a legitimate 'name' field
-                    if (/^(nama|name|nama lengkap)$/i.test(fLabel) && participantName === "Peserta") {
+                    // Strict fallback: Must exactly match "Nama Lengkap" or "Nama" to prevent "Nama Outlet"
+                    // from overriding the value if the original field is missing the "name" type
+                    if (/^(nama lengkap|nama)$/i.test(fLabel.trim()) && participantName === "Peserta") {
                         participantName = val;
-                    } else if (/(wa|whatsapp|hp|phone|nomor telp|handphone)/i.test(fLabel) && participantPhone === "-") {
+                    } else if (fLabel.trim().toLowerCase() === "nomor whatsapp / hp" && participantPhone === "-") {
                         participantPhone = val;
                     }
                 }
