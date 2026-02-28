@@ -96,6 +96,7 @@ export const programs = mysqlTable("programs", {
     terms: text("terms").notNull().default("[]"),
     mechanics: text("mechanics").notNull().default("[]"),
     gallery: text("gallery").notNull().default("[]"),
+    prizes: text("prizes").notNull().default("[]"),
     status: varchar("status", { length: 50 }).notNull().default("draft"),
     sortOrder: int("sort_order").notNull().default(0),
     createdAt: datetime("created_at").notNull(),

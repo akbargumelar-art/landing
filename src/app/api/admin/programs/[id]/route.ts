@@ -46,6 +46,7 @@ export async function PUT(
             terms: body.terms,
             mechanics: body.mechanics,
             gallery: body.gallery,
+            prizes: body.prizes,
             status: body.status,
             slug: body.slug,
         }).where(eq(programs.id, id));

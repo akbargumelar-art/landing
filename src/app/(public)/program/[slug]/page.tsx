@@ -18,6 +18,7 @@ import {
     CheckCircle,
     ChevronDown,
     ChevronUp,
+    Gift,
     ListOrdered,
     Trophy,
     Users,
@@ -33,6 +34,7 @@ interface Program {
     content: string;
     terms: string[] | string;
     mechanics: string[] | string;
+    prizes?: { title: string; imageUrl: string }[] | string;
     form?: { id: string } | null;
 }
 
@@ -205,6 +207,45 @@ export default function ProgramDetailPage() {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* Hadiah Section */}
+                            {(() => {
+                                let prizes: { title: string; imageUrl: string }[] = [];
+                                try {
+                                    prizes = typeof program.prizes === "string" ? JSON.parse(program.prizes || "[]") : (program.prizes || []);
+                                } catch { /* ignore */ }
+                                if (prizes.length === 0) return null;
+                                return (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                                                <Gift className="h-4 w-4 text-white" />
+                                            </div>
+                                            <h3 className="text-lg font-bold text-foreground">Hadiah</h3>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                            {prizes.map((prize, i) => (
+                                                <div key={i} className="group rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
+                                                    {prize.imageUrl ? (
+                                                        <div className="relative w-full h-36 bg-gradient-to-br from-gray-50 to-gray-100">
+                                                            <Image src={prize.imageUrl} alt={prize.title} fill className="object-contain p-3 group-hover:scale-105 transition-transform duration-300" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full h-36 bg-gradient-to-br from-yellow-50 to-orange-50 flex items-center justify-center">
+                                                            <Gift className="h-12 w-12 text-orange-300" />
+                                                        </div>
+                                                    )}
+                                                    {prize.title && (
+                                                        <div className="px-3 py-2.5 text-center border-t">
+                                                            <p className="text-sm font-semibold text-foreground">{prize.title}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Sidebar */}

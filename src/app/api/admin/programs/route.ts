@@ -48,6 +48,7 @@ export async function POST(request: Request) {
             terms: body.terms || "[]",
             mechanics: body.mechanics || "[]",
             gallery: body.gallery || "[]",
+            prizes: body.prizes || "[]",
             status: body.status || "draft",
             sortOrder: (maxResult?.maxOrder ?? -1) + 1,
             createdAt: new Date(),

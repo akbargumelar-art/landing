@@ -25,13 +25,19 @@ interface Program {
     terms: string;
     mechanics: string;
     gallery: string;
+    prizes: string;
     status: string;
     sortOrder: number;
 }
 
+interface Prize {
+    title: string;
+    imageUrl: string;
+}
+
 const emptyProgram: Partial<Program> = {
     title: "", description: "", thumbnail: "", category: "pelanggan",
-    period: "", content: "", terms: "[]", mechanics: "[]", gallery: "[]", status: "draft",
+    period: "", content: "", terms: "[]", mechanics: "[]", gallery: "[]", prizes: "[]", status: "draft",
 };
 
 export default function ProgramPage() {
@@ -44,6 +50,7 @@ export default function ProgramPage() {
     const [termsText, setTermsText] = useState("");
     const [mechanicsText, setMechanicsText] = useState("");
     const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [prizesList, setPrizesList] = useState<Prize[]>([]);
     const [filterCategory, setFilterCategory] = useState("");
 
     useEffect(() => {
@@ -58,6 +65,7 @@ export default function ProgramPage() {
         setTermsText("");
         setMechanicsText("");
         setGalleryImages([]);
+        setPrizesList([]);
         setIsEditing(false);
         setDialogOpen(true);
     };
@@ -67,6 +75,7 @@ export default function ProgramPage() {
         try { setTermsText(JSON.parse(program.terms || "[]").join("\n")); } catch { setTermsText(""); }
         try { setMechanicsText(JSON.parse(program.mechanics || "[]").join("\n")); } catch { setMechanicsText(""); }
         try { setGalleryImages(JSON.parse(program.gallery || "[]")); } catch { setGalleryImages([]); }
+        try { setPrizesList(JSON.parse(program.prizes || "[]")); } catch { setPrizesList([]); }
         setIsEditing(true);
         setDialogOpen(true);
     };
@@ -78,6 +87,7 @@ export default function ProgramPage() {
             terms: JSON.stringify(termsText.split("\n").filter((t) => t.trim())),
             mechanics: JSON.stringify(mechanicsText.split("\n").filter((t) => t.trim())),
             gallery: JSON.stringify(galleryImages),
+            prizes: JSON.stringify(prizesList),
         };
 
         try {
@@ -138,6 +148,18 @@ export default function ProgramPage() {
             const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
             const data = await res.json();
             if (data.url) setGalleryImages((prev) => [...prev, data.url]);
+        }
+    };
+
+    const handleUploadPrizeImage = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (data.url) {
+            setPrizesList((prev) => prev.map((p, i) => i === index ? { ...p, imageUrl: data.url } : p));
         }
     };
 
@@ -294,6 +316,52 @@ export default function ProgramPage() {
                                 </div>
                             )}
                             <p className="text-xs text-muted-foreground">Upload foto dokumentasi penyerahan hadiah untuk ditampilkan di halaman program.</p>
+                        </div>
+
+                        {/* Prizes / Hadiah */}
+                        <div className="space-y-2">
+                            <Label>Hadiah Program</Label>
+                            {prizesList.map((prize, i) => (
+                                <div key={i} className="flex items-start gap-3 p-3 border rounded-lg bg-gray-50">
+                                    {/* Prize Image */}
+                                    <div className="shrink-0">
+                                        {prize.imageUrl ? (
+                                            <div className="relative w-20 h-20 rounded-lg border overflow-hidden group">
+                                                <Image src={prize.imageUrl} alt="" fill className="object-cover" />
+                                                <button
+                                                    onClick={() => setPrizesList(prev => prev.map((p, j) => j === i ? { ...p, imageUrl: "" } : p))}
+                                                    className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                                >
+                                                    <Trash2 className="h-2.5 w-2.5" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white transition-colors">
+                                                <ImageIcon className="h-5 w-5 text-muted-foreground opacity-40" />
+                                                <span className="text-[9px] text-muted-foreground mt-0.5">Upload</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPrizeImage(e, i)} />
+                                            </label>
+                                        )}
+                                    </div>
+                                    {/* Prize Title */}
+                                    <div className="flex-1 space-y-1">
+                                        <Input
+                                            value={prize.title}
+                                            onChange={(e) => setPrizesList(prev => prev.map((p, j) => j === i ? { ...p, title: e.target.value } : p))}
+                                            placeholder="Nama hadiah (misal: Samsung Galaxy A16)"
+                                            className="text-sm"
+                                        />
+                                    </div>
+                                    {/* Remove */}
+                                    <button onClick={() => setPrizesList(prev => prev.filter((_, j) => j !== i))} className="p-1 text-red-400 hover:text-red-600 cursor-pointer shrink-0 mt-1">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            <Button variant="outline" size="sm" onClick={() => setPrizesList(prev => [...prev, { title: "", imageUrl: "" }])} className="w-full cursor-pointer text-xs">
+                                <Plus className="mr-1 h-3 w-3" /> Tambah Hadiah
+                            </Button>
+                            <p className="text-xs text-muted-foreground">Tambahkan hadiah beserta gambarnya untuk ditampilkan di halaman detail program.</p>
                         </div>
                     </div>
                     <DialogFooter>
