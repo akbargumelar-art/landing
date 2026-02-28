@@ -184,6 +184,8 @@ function FormUndianContent() {
     const [isSuccess, setIsSuccess] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const [settings, setSettings] = useState<Record<string, string>>({});
+    const router = useRouter();
+    const [countdown, setCountdown] = useState(5);
 
     // Fetch site settings (logo, name)
     useEffect(() => {
@@ -192,6 +194,23 @@ function FormUndianContent() {
             .then((data) => setSettings(data))
             .catch(() => { });
     }, []);
+
+    // Auto-redirect after success
+    useEffect(() => {
+        if (!isSuccess) return;
+        setCountdown(5);
+        const interval = setInterval(() => {
+            setCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    router.push("/");
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isSuccess, router]);
 
     // Fetch form schema
     useEffect(() => {
@@ -313,25 +332,6 @@ function FormUndianContent() {
         );
     }
 
-    const router = useRouter();
-    const [countdown, setCountdown] = useState(5);
-
-    // Auto-redirect after success
-    useEffect(() => {
-        if (!isSuccess) return;
-        setCountdown(5);
-        const interval = setInterval(() => {
-            setCountdown((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    router.push("/");
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [isSuccess, router]);
 
     if (isSuccess) {
         return (
