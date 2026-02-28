@@ -9,6 +9,14 @@ export function middleware(request: NextRequest) {
         request.cookies.get("better-auth.session_token")?.value ||
         request.cookies.get("__Secure-better-auth.session_token")?.value;
 
+    // Redirect logged-in users away from login page
+    if (pathname === "/portal-admin") {
+        if (sessionCookie) {
+            return NextResponse.redirect(new URL("/admin/beranda", request.url));
+        }
+        return NextResponse.next();
+    }
+
     // Protect admin routes (but not the login page)
     if (pathname.startsWith("/admin")) {
         if (!sessionCookie) {
@@ -29,5 +37,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/admin/:path*", "/api/admin/:path*"],
+    matcher: ["/admin/:path*", "/api/admin/:path*", "/portal-admin"],
 };

@@ -49,12 +49,10 @@ export default function ProgramPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [termsText, setTermsText] = useState("");
     const [mechanicsText, setMechanicsText] = useState("");
-    const [galleryImages, setGalleryImages] = useState<string[]>([]);
     const [prizesList, setPrizesList] = useState<Prize[]>([]);
     const [filterCategory, setFilterCategory] = useState("");
 
     const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
-    const [isUploadingGallery, setIsUploadingGallery] = useState(false);
     const [uploadingPrizeIndex, setUploadingPrizeIndex] = useState<number | null>(null);
 
     useEffect(() => {
@@ -68,7 +66,6 @@ export default function ProgramPage() {
         setEditProgram({ ...emptyProgram });
         setTermsText("");
         setMechanicsText("");
-        setGalleryImages([]);
         setPrizesList([]);
         setIsEditing(false);
         setDialogOpen(true);
@@ -78,7 +75,6 @@ export default function ProgramPage() {
         setEditProgram({ ...program });
         try { setTermsText(JSON.parse(program.terms || "[]").join("\n")); } catch { setTermsText(""); }
         try { setMechanicsText(JSON.parse(program.mechanics || "[]").join("\n")); } catch { setMechanicsText(""); }
-        try { setGalleryImages(JSON.parse(program.gallery || "[]")); } catch { setGalleryImages([]); }
         try { setPrizesList(JSON.parse(program.prizes || "[]")); } catch { setPrizesList([]); }
         setIsEditing(true);
         setDialogOpen(true);
@@ -90,7 +86,6 @@ export default function ProgramPage() {
             ...editProgram,
             terms: JSON.stringify(termsText.split("\n").filter((t) => t.trim())),
             mechanics: JSON.stringify(mechanicsText.split("\n").filter((t) => t.trim())),
-            gallery: JSON.stringify(galleryImages),
             prizes: JSON.stringify(prizesList),
         };
 
@@ -152,28 +147,6 @@ export default function ProgramPage() {
         } finally {
             setIsUploadingThumbnail(false);
         }
-    };
-
-    const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files) return;
-        setIsUploadingGallery(true);
-        for (let i = 0; i < files.length; i++) {
-            const fd = new FormData();
-            fd.append("file", files[i]);
-            try {
-                const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-                const data = await res.json();
-                if (res.ok && data.url) {
-                    setGalleryImages((prev) => [...prev, data.url]);
-                } else {
-                    alert(`Gagal upload ${files[i].name}: ${data.error || "Error"}`);
-                }
-            } catch {
-                alert(`Terjadi kesalahan saat upload ${files[i].name}`);
-            }
-        }
-        setIsUploadingGallery(false);
     };
 
     const handleUploadPrizeImage = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
@@ -324,32 +297,6 @@ export default function ProgramPage() {
                         <div className="space-y-2">
                             <Label>Cara Mengikuti (satu per baris)</Label>
                             <Textarea value={mechanicsText} onChange={(e) => setMechanicsText(e.target.value)} rows={4} placeholder={"Langkah 1\nLangkah 2\nLangkah 3"} />
-                        </div>
-
-                        {/* Winner Gallery */}
-                        <div className="space-y-2">
-                            <Label>Galeri Pemenang / Dokumentasi Penyerahan Hadiah</Label>
-                            <label className={`flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground ${isUploadingGallery ? "opacity-50 pointer-events-none" : ""}`}>
-                                {isUploadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                <span>{isUploadingGallery ? "Mengunggah..." : "Upload foto (bisa pilih beberapa)"}</span>
-                                <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadGallery} disabled={isUploadingGallery} />
-                            </label>
-                            {galleryImages.length > 0 && (
-                                <div className="grid grid-cols-4 gap-2">
-                                    {galleryImages.map((img, i) => (
-                                        <div key={i} className="relative group w-full h-20 rounded-lg border overflow-hidden">
-                                            <Image src={img} alt="" fill className="object-cover" unoptimized={true} />
-                                            <button
-                                                onClick={() => setGalleryImages(galleryImages.filter((_, j) => j !== i))}
-                                                className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">Upload foto dokumentasi penyerahan hadiah untuk ditampilkan di halaman program.</p>
                         </div>
 
                         {/* Prizes / Hadiah */}

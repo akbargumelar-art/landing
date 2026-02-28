@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-    Shuffle, Trophy, PartyPopper, RotateCcw, Loader2, History,
+    Shuffle, Trophy, PartyPopper, RotateCcw, Loader2, History, Upload, Trash2,
 } from "lucide-react";
+import Image from "next/image";
 
 interface Program {
     id: string;
     title: string;
+    gallery?: string;
 }
 
 interface Winner {
@@ -28,6 +30,9 @@ export default function UndiPage() {
 
     const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState("");
+
+    const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [isUploadingGallery, setIsUploadingGallery] = useState(false);
 
     // Lottery state
     const [isRolling, setIsRolling] = useState(false);
@@ -51,13 +56,23 @@ export default function UndiPage() {
     useEffect(() => {
         setAvailablePeriods([]);
         setSelectedPeriod("");
+        setGalleryImages([]);
         if (selectedProgram) {
+            const prog = programs.find((p) => p.id === selectedProgram);
+            if (prog && prog.gallery) {
+                try {
+                    setGalleryImages(JSON.parse(prog.gallery));
+                } catch {
+                    setGalleryImages([]);
+                }
+            }
+
             fetch(`/api/admin/lottery/periods?programId=${selectedProgram}`)
                 .then(r => r.json())
                 .then(setAvailablePeriods)
                 .catch(() => { });
         }
-    }, [selectedProgram]);
+    }, [selectedProgram, programs]);
 
     const roll = useCallback(async () => {
         if (!selectedProgram) { setError("Pilih program terlebih dahulu"); return; }
@@ -118,6 +133,56 @@ export default function UndiPage() {
         setRollingName("");
         setShowConfetti(false);
         setError("");
+    };
+
+    const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || !selectedProgram) return;
+        setIsUploadingGallery(true);
+        const newUrls: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+            const fd = new FormData();
+            fd.append("file", files[i]);
+            try {
+                const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    newUrls.push(data.url);
+                } else {
+                    alert(`Gagal upload ${files[i].name}: ${data.error || "Error"}`);
+                }
+            } catch {
+                alert(`Terjadi kesalahan saat upload ${files[i].name}`);
+            }
+        }
+
+        if (newUrls.length > 0) {
+            const updatedGallery = [...galleryImages, ...newUrls];
+            setGalleryImages(updatedGallery);
+            saveGallery(updatedGallery);
+        }
+        setIsUploadingGallery(false);
+    };
+
+    const deleteGalleryImage = (index: number) => {
+        if (!confirm("Hapus foto ini dari galeri?")) return;
+        const updated = galleryImages.filter((_, i) => i !== index);
+        setGalleryImages(updated);
+        saveGallery(updated);
+    };
+
+    const saveGallery = async (urls: string[]) => {
+        if (!selectedProgram) return;
+        try {
+            await fetch(`/api/admin/programs/${selectedProgram}/gallery`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ gallery: urls })
+            });
+            setPrograms(prev => prev.map(p => p.id === selectedProgram ? { ...p, gallery: JSON.stringify(urls) } : p));
+        } catch {
+            alert("Gagal menyimpan galeri");
+        }
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -260,6 +325,44 @@ export default function UndiPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Winner Gallery / Penyerahan Hadiah */}
+            {selectedProgram && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Upload className="h-5 w-5" /> Galeri Penyerahan Hadiah
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <label className={`flex flex-col items-center justify-center gap-2 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground ${isUploadingGallery ? "opacity-50 pointer-events-none" : ""}`}>
+                            {isUploadingGallery ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+                            <span className="font-medium text-gray-700">{isUploadingGallery ? "Mengunggah..." : "Upload foto dokumentasi"}</span>
+                            <span className="text-xs">Bisa pilih lebih dari satu foto</span>
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadGallery} disabled={isUploadingGallery} />
+                        </label>
+
+                        {galleryImages.length > 0 && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                {galleryImages.map((img, i) => (
+                                    <div key={i} className="relative group w-full aspect-square rounded-lg border overflow-hidden">
+                                        <Image src={img} alt="Galeri" fill className="object-cover" unoptimized={true} />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <button
+                                                onClick={() => deleteGalleryImage(i)}
+                                                className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+                                                title="Hapus foto"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }
