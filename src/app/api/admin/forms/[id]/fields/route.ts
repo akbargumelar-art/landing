@@ -30,8 +30,18 @@ export async function PUT(
         }
 
         // 2. Upsert (Update or Insert) fields in order
+        let sortIndex = 0;
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
+
+            // Do NOT save static layout components to the database mapped columns
+            // since they are only used for UI rendering and don't accept input.
+            // (They are already saved in formSchema on the Form object)
+            if (["heading", "paragraph", "image", "divider"].includes(field.type)) {
+                continue;
+            }
+
+            // We use the JSON element's string ID or auto-generate if missing
             const fieldId = field.id || uuid();
             const isExisting = existingIds.includes(fieldId);
 
@@ -42,8 +52,8 @@ export async function PUT(
                 placeholder: field.content || field.placeholder || "",
                 hintText: field.hintText || "",
                 isRequired: field.isRequired ?? false,
-                options: field.options || "[]",
-                sortOrder: i,
+                options: Array.isArray(field.options) ? JSON.stringify(field.options) : (field.options || "[]"),
+                sortOrder: sortIndex++,
             };
 
             if (isExisting) {

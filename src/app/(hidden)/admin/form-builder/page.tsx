@@ -166,8 +166,20 @@ export default function FormBuilderPage() {
         try {
             const res = await fetch(`/api/admin/forms/${form.id}`);
             const data = await res.json();
-            if (data.fields && data.fields.length > 0) {
-                // Map the DB fields back to the FormElement structure
+
+            // Always try to load from the JSON schema first because it's the absolute source of truth
+            // for the builder frontend (it includes static layout fields like heading/image).
+            let parsedSchema: FormElement[] = [];
+            try {
+                parsedSchema = JSON.parse(form.formSchema || "[]");
+            } catch {
+                parsedSchema = [];
+            }
+
+            if (parsedSchema.length > 0) {
+                setElements(parsedSchema);
+            } else if (data.fields && data.fields.length > 0) {
+                // Fallback: if schema is totally empty but fields exist, reconstruct
                 const updatedElements = data.fields.map((f: typeof formFields.$inferSelect) => ({
                     id: f.id,
                     type: f.fieldType,
@@ -179,19 +191,9 @@ export default function FormBuilderPage() {
                     options: typeof f.options === 'string' ? JSON.parse(f.options) : f.options,
                     colSpan: 1
                 }));
-                // We also need to restore colSpan from formSchema if possible
-                try {
-                    const schema = JSON.parse(form.formSchema || "[]");
-                    updatedElements.forEach((el: Record<string, unknown>) => {
-                        const match = schema.find((s: { id: string, colSpan: number }) => s.id === el.id);
-                        if (match) el.colSpan = match.colSpan || 1;
-                    });
-                } catch { }
-
                 setElements(updatedElements as FormElement[]);
             } else {
-                const schema = JSON.parse(form.formSchema || "[]");
-                setElements(schema.length > 0 ? schema : []);
+                setElements([]);
             }
         } catch {
             const schema = JSON.parse(form.formSchema || "[]");
