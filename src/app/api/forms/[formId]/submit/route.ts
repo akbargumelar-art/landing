@@ -89,24 +89,19 @@ export async function POST(
         // --- Trigger WhatsApp Notification (Non-blocking) ---
         // Fire-and-forget: do not await this block so it doesn't slow down the response
         Promise.all([
-            db.select().from(siteSettings).limit(1),
+            db.select().from(siteSettings),
             db.select({ label: formFields.label, type: formFields.fieldType, value: submissionValues.value })
                 .from(submissionValues)
                 .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
                 .where(eq(submissionValues.submissionId, submissionId))
-        ]).then(async ([[settingsRow], subValues]) => {
-            if (!settingsRow) return;
+        ]).then(async ([settingsRows, subValues]) => {
+            if (!settingsRows || settingsRows.length === 0) return;
 
-            // Parse settings JSON
+            // Map settings
             const settingsObj: Record<string, string> = {};
-            try {
-                const arr = JSON.parse(settingsRow.settingsJson || "[]");
-                arr.forEach((item: { key: string, value: string }) => {
-                    settingsObj[item.key] = item.value;
-                });
-            } catch {
-                return;
-            }
+            settingsRows.forEach((row: { key: string, value: string }) => {
+                settingsObj[row.key] = row.value;
+            });
 
             const waUrl = settingsObj.wa_api_url;
             const waToken = settingsObj.wa_api_token;
