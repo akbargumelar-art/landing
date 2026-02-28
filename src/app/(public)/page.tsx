@@ -159,7 +159,7 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     );
 }
 
-function AboutSection() {
+function AboutSection({ aboutContent }: { aboutContent?: string }) {
     const features = [
         {
             icon: MapPin,
@@ -181,6 +181,11 @@ function AboutSection() {
         },
     ];
 
+    const defaultAbout = `Sebagai Telkomsel Authorized Partner, kami berkomitmen untuk
+                        menghadirkan layanan telekomunikasi terbaik dan program-program
+                        unggulan bagi pelanggan serta mitra outlet di seluruh wilayah
+                        operasional kami.`;
+
     return (
         <section className="py-20 bg-white">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -191,12 +196,16 @@ function AboutSection() {
                     <h2 className="text-3xl md:text-4xl font-extrabold text-foreground">
                         PT Agrabudi Komunika
                     </h2>
-                    <p className="mt-4 max-w-2xl mx-auto text-muted-foreground leading-relaxed text-lg">
-                        Sebagai Telkomsel Authorized Partner, kami berkomitmen untuk
-                        menghadirkan layanan telekomunikasi terbaik dan program-program
-                        unggulan bagi pelanggan serta mitra outlet di seluruh wilayah
-                        operasional kami.
-                    </p>
+                    {aboutContent ? (
+                        <div
+                            className="mt-4 max-w-2xl mx-auto text-muted-foreground leading-relaxed text-lg"
+                            dangerouslySetInnerHTML={{ __html: aboutContent }}
+                        />
+                    ) : (
+                        <p className="mt-4 max-w-2xl mx-auto text-muted-foreground leading-relaxed text-lg">
+                            {defaultAbout}
+                        </p>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -516,6 +525,7 @@ function MitraSection() {
 export default function HomePage() {
     const [slides, setSlides] = useState<HeroSlide[]>([]);
     const [programsList, setProgramsList] = useState<Program[]>([]);
+    const [aboutContent, setAboutContent] = useState<string>("");
 
     useEffect(() => {
         fetch("/api/public/hero-slides")
@@ -529,13 +539,20 @@ export default function HomePage() {
             .then((data) => {
                 if (Array.isArray(data)) setProgramsList(data);
             });
+
+        fetch("/api/public/settings")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.about_content) setAboutContent(data.about_content);
+            })
+            .catch(() => { });
     }, []);
 
     return (
         <>
             <HeroCarousel slides={slides} />
             <QuickAccessSection />
-            <AboutSection />
+            <AboutSection aboutContent={aboutContent} />
             <ProgramPreview programs={programsList} />
             <LokasiKantor />
             <MitraSection />
