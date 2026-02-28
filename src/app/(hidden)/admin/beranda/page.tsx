@@ -232,7 +232,7 @@ export default function BerandaPage() {
                                     </div>
                                     {slide.imageUrl ? (
                                         <div className="relative w-20 h-12 rounded-lg overflow-hidden shrink-0">
-                                            <Image src={slide.imageUrl} alt="" fill className="object-cover" />
+                                            <Image src={slide.imageUrl} alt="" fill className="object-cover" unoptimized={true} />
                                         </div>
                                     ) : (
                                         <div className={`w-20 h-12 rounded-lg bg-gradient-to-r ${slide.bgColor} shrink-0`} />
@@ -269,7 +269,7 @@ export default function BerandaPage() {
                             <div key={i} onClick={() => openEditCard(i)} className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-white hover:border-red-200 hover:bg-red-50/30 transition-colors cursor-pointer group">
                                 <div className={`w-12 h-12 relative rounded-2xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-sm overflow-hidden`}>
                                     {card.icon.startsWith("/") || card.icon.startsWith("http") ? (
-                                        <Image src={card.icon} alt="" fill className="object-contain p-2" />
+                                        <Image src={card.icon} alt="" fill className="object-contain p-2" unoptimized={true} />
                                     ) : (
                                         <span className="text-xl">{card.icon}</span>
                                     )}
@@ -305,7 +305,7 @@ export default function BerandaPage() {
                                 <div key={i} className="rounded-xl border overflow-hidden bg-white hover:border-red-200 transition-colors group relative">
                                     <div className="relative h-36 overflow-hidden cursor-pointer" onClick={() => openEditOffice(i)}>
                                         {office.image ? (
-                                            <Image src={office.image} alt={office.label} fill className="object-cover" />
+                                            <Image src={office.image} alt={office.label} fill className="object-cover" unoptimized={true} />
                                         ) : (
                                             <div className="w-full h-full bg-gray-100 flex items-center justify-center text-muted-foreground">
                                                 <Upload className="h-8 w-8 opacity-30" />
@@ -399,7 +399,7 @@ export default function BerandaPage() {
                             </div>
                             {editSlide.imageUrl && (
                                 <div className="relative w-full h-32 rounded-lg border overflow-hidden">
-                                    <Image src={editSlide.imageUrl} alt="Preview" fill className="object-cover" />
+                                    <Image src={editSlide.imageUrl} alt="Preview" fill className="object-cover" unoptimized={true} />
                                 </div>
                             )}
                             <p className="text-xs text-muted-foreground">Jika gambar diupload, digunakan sebagai background. Jika tidak, warna gradient dipakai.</p>
@@ -448,7 +448,7 @@ export default function BerandaPage() {
                             <div className="flex items-center gap-3">
                                 <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${editCard.color} flex items-center justify-center overflow-hidden`}>
                                     {editCard.icon.startsWith("/") || editCard.icon.startsWith("http") ? (
-                                        <Image src={editCard.icon} alt="" fill className="object-contain p-2" />
+                                        <Image src={editCard.icon} alt="" fill className="object-contain p-2" unoptimized={true} />
                                     ) : (
                                         <span className="text-xl">{editCard.icon}</span>
                                     )}
@@ -502,7 +502,7 @@ export default function BerandaPage() {
                             </div>
                             {editOffice.image && (
                                 <div className="relative w-full h-32 rounded-lg border overflow-hidden">
-                                    <Image src={editOffice.image} alt="Preview" fill className="object-cover" />
+                                    <Image src={editOffice.image} alt="Preview" fill className="object-cover" unoptimized={true} />
                                 </div>
                             )}
                         </div>

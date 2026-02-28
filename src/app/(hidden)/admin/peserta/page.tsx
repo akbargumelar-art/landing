@@ -301,7 +301,7 @@ export default function PesertaPage() {
                     <DialogTitle className="sr-only">Preview Gambar</DialogTitle>
                     {lightboxImage && (
                         <div className="relative w-full h-[80vh]">
-                            <Image src={lightboxImage} alt="Bukti" fill className="object-contain rounded-lg" />
+                            <Image src={lightboxImage} alt="Bukti" fill className="object-contain rounded-lg" unoptimized={true} />
                         </div>
                     )}
                 </DialogContent>

@@ -134,7 +134,7 @@ export default function PengaturanPage() {
                             <Label>Logo Website</Label>
                             <div className="flex items-center gap-3">
                                 {settings.logo_url ? (
-                                    <Image src={settings.logo_url} alt="Logo" width={48} height={48} className="h-12 w-auto object-contain rounded border" />
+                                    <Image src={settings.logo_url} alt="Logo" width={48} height={48} className="h-12 w-auto object-contain rounded border" unoptimized={true} />
                                 ) : (
                                     <div className="h-12 w-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">No logo</div>
                                 )}
@@ -147,7 +147,7 @@ export default function PengaturanPage() {
                             <Label>Favicon</Label>
                             <div className="flex items-center gap-3">
                                 {settings.favicon_url ? (
-                                    <Image src={settings.favicon_url} alt="Favicon" width={32} height={32} className="h-8 w-8 object-contain rounded border" />
+                                    <Image src={settings.favicon_url} alt="Favicon" width={32} height={32} className="h-8 w-8 object-contain rounded border" unoptimized={true} />
                                 ) : (
                                     <div className="h-8 w-8 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">—</div>
                                 )}

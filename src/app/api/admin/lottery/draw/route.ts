@@ -55,11 +55,25 @@ export async function POST(request: Request) {
         const randomIndex = Math.floor(Math.random() * eligible.length);
         const selected = eligible[randomIndex];
 
-        // Get name from submission values (first text field)
+        // Get details from submission values
         const nameValue = selected.values.find(
+            (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/nama/i) && v.value
+        ) || selected.values.find(
             (v: { field: { fieldType: string } | null; value: string }) => v.field?.fieldType === "text" && v.value
         );
         const winnerName = nameValue?.value || "Peserta #" + selected.id.slice(0, 6);
+
+        const phoneValue = selected.values.find(
+            (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/telepon|telp|hp|handphone|nomor/i) && v.value
+        );
+        const winnerPhone = phoneValue?.value || "";
+
+        const outletValue = selected.values.find(
+            (v: { field: { label: string } | null; value: string }) => v.field?.label.match(/outlet/i) && v.value
+        );
+        const winnerOutlet = outletValue?.value || "";
+
+        const winnerPeriod = selected.period || "";
 
         // Save winner
         const winnerId = uuid();
@@ -68,6 +82,9 @@ export async function POST(request: Request) {
             programId,
             submissionId: selected.id,
             name: winnerName,
+            phone: winnerPhone,
+            outlet: winnerOutlet,
+            period: winnerPeriod,
             drawnAt: new Date(),
         });
 

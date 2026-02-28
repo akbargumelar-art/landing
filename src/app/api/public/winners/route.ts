@@ -33,7 +33,53 @@ export async function GET(request: Request) {
                 .select({ title: programs.title })
                 .from(programs)
                 .where(eq(programs.id, w.programId));
-            result.push({ ...w, program: program || { title: "Unknown" } });
+
+            let finalName = w.name;
+            let finalPhone = w.phone;
+            let finalOutlet = w.outlet;
+            let finalPeriod = w.period;
+
+            // Fallback for old winners without complete details saved
+            if (finalName.startsWith("Peserta #") || !finalPeriod || (!finalPhone && !finalOutlet)) {
+                try {
+                    // Try to get them from submission
+                    const { formSubmissions, submissionValues, formFields } = await import("@/db/schema");
+
+                    if (!finalPeriod) {
+                        const [sub] = await db.select({ period: formSubmissions.period }).from(formSubmissions).where(eq(formSubmissions.id, w.submissionId));
+                        if (sub && sub.period) finalPeriod = sub.period;
+                    }
+
+                    // Only query values if name is generic or phone/outlet is missing
+                    const values = await db
+                        .select({ value: submissionValues.value, label: formFields.label })
+                        .from(submissionValues)
+                        .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
+                        .where(eq(submissionValues.submissionId, w.submissionId));
+
+                    if (finalName.startsWith("Peserta #")) {
+                        const nameField = values.find((v) => /nama/i.test(v.label));
+                        if (nameField?.value) finalName = nameField.value;
+                    }
+                    if (!finalPhone) {
+                        const phoneField = values.find((v) => /telepon|telp|hp|handphone|nomor/i.test(v.label));
+                        if (phoneField?.value) finalPhone = phoneField.value;
+                    }
+                    if (!finalOutlet) {
+                        const outletField = values.find((v) => /outlet/i.test(v.label));
+                        if (outletField?.value) finalOutlet = outletField.value;
+                    }
+                } catch { /* ignore fallback errors */ }
+            }
+
+            result.push({
+                ...w,
+                name: finalName,
+                phone: finalPhone,
+                outlet: finalOutlet,
+                period: finalPeriod,
+                program: program || { title: "Unknown" }
+            });
         }
 
         // Group by period, sorted newest period first

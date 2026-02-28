@@ -10,16 +10,25 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
     try {
-        const formData = await request.formData();
+        let formData;
+        try {
+            formData = await request.formData();
+        } catch (formError) {
+            console.error("Failed to parse formData:", formError);
+            return NextResponse.json({ error: "Failed to parse upload data" }, { status: 400 });
+        }
+
         const file = formData.get("file") as File | null;
 
         if (!file) {
+            console.error("No file found in formData");
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
 
         // Validate file type
         const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/x-icon", "image/gif"];
-        if (!allowedTypes.includes(file.type)) {
+        if (file.type && !allowedTypes.includes(file.type)) {
+            console.error(`Invalid file type rejected: "${file.type}"`);
             return NextResponse.json(
                 { error: "File type not allowed. Use JPG, PNG, WebP, SVG, ICO, or GIF." },
                 { status: 400 }
@@ -28,6 +37,7 @@ export async function POST(request: Request) {
 
         // Max 5MB
         if (file.size > 5 * 1024 * 1024) {
+            console.error(`File too large: ${file.size} bytes`);
             return NextResponse.json({ error: "File too large. Max 5MB." }, { status: 400 });
         }
 

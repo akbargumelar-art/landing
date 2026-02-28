@@ -134,9 +134,17 @@ export default function ProgramPage() {
         if (!file) return;
         const fd = new FormData();
         fd.append("file", file);
-        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-        const data = await res.json();
-        if (data.url) setEditProgram({ ...editProgram, thumbnail: data.url });
+        try {
+            const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+            const data = await res.json();
+            if (res.ok && data.url) {
+                setEditProgram({ ...editProgram, thumbnail: data.url });
+            } else {
+                alert(data.error || "Gagal upload gambar");
+            }
+        } catch (err) {
+            alert("Terjadi kesalahan saat upload");
+        }
     };
 
     const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,9 +153,17 @@ export default function ProgramPage() {
         for (let i = 0; i < files.length; i++) {
             const fd = new FormData();
             fd.append("file", files[i]);
-            const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-            const data = await res.json();
-            if (data.url) setGalleryImages((prev) => [...prev, data.url]);
+            try {
+                const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    setGalleryImages((prev) => [...prev, data.url]);
+                } else {
+                    alert(`Gagal upload ${files[i].name}: ${data.error || "Error"}`);
+                }
+            } catch (err) {
+                alert(`Terjadi kesalahan saat upload ${files[i].name}`);
+            }
         }
     };
 
@@ -156,10 +172,16 @@ export default function ProgramPage() {
         if (!file) return;
         const fd = new FormData();
         fd.append("file", file);
-        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-        const data = await res.json();
-        if (data.url) {
-            setPrizesList((prev) => prev.map((p, i) => i === index ? { ...p, imageUrl: data.url } : p));
+        try {
+            const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+            const data = await res.json();
+            if (res.ok && data.url) {
+                setPrizesList((prev) => prev.map((p, i) => i === index ? { ...p, imageUrl: data.url } : p));
+            } else {
+                alert(data.error || "Gagal upload gambar hadiah");
+            }
+        } catch (err) {
+            alert("Terjadi kesalahan saat upload");
         }
     };
 
@@ -193,7 +215,7 @@ export default function ProgramPage() {
                                 {/* Thumbnail */}
                                 {program.thumbnail ? (
                                     <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
-                                        <Image src={program.thumbnail} alt="" fill className="object-cover" />
+                                        <Image src={program.thumbnail} alt="" fill className="object-cover" unoptimized={true} />
                                     </div>
                                 ) : (
                                     <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 shrink-0 flex items-center justify-center">
@@ -270,7 +292,7 @@ export default function ProgramPage() {
                             </div>
                             {editProgram.thumbnail ? (
                                 <div className="relative w-full h-40 rounded-lg border overflow-hidden">
-                                    <Image src={editProgram.thumbnail} alt="Thumbnail" fill className="object-cover" />
+                                    <Image src={editProgram.thumbnail} alt="Thumbnail" fill className="object-cover" unoptimized={true} />
                                 </div>
                             ) : (
                                 <div className="w-full h-24 rounded-lg border-2 border-dashed flex items-center justify-center text-muted-foreground">
@@ -304,7 +326,7 @@ export default function ProgramPage() {
                                 <div className="grid grid-cols-4 gap-2">
                                     {galleryImages.map((img, i) => (
                                         <div key={i} className="relative group w-full h-20 rounded-lg border overflow-hidden">
-                                            <Image src={img} alt="" fill className="object-cover" />
+                                            <Image src={img} alt="" fill className="object-cover" unoptimized={true} />
                                             <button
                                                 onClick={() => setGalleryImages(galleryImages.filter((_, j) => j !== i))}
                                                 className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -327,7 +349,7 @@ export default function ProgramPage() {
                                     <div className="shrink-0">
                                         {prize.imageUrl ? (
                                             <div className="relative w-20 h-20 rounded-lg border overflow-hidden group">
-                                                <Image src={prize.imageUrl} alt="" fill className="object-cover" />
+                                                <Image src={prize.imageUrl} alt="" fill className="object-cover" unoptimized={true} />
                                                 <button
                                                     onClick={() => setPrizesList(prev => prev.map((p, j) => j === i ? { ...p, imageUrl: "" } : p))}
                                                     className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
