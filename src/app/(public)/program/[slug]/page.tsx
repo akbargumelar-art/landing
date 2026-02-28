@@ -16,6 +16,8 @@ import {
     ArrowLeft,
     Calendar,
     CheckCircle,
+    ChevronDown,
+    ChevronUp,
     ListOrdered,
     Trophy,
     Users,
@@ -269,8 +271,8 @@ export default function ProgramDetailPage() {
                                     <Link href={program.form?.id ? `/form-undian?id=${program.form.id}` : "#"}>
                                         <button
                                             className={`w-full py-3.5 rounded-xl font-bold text-base transition-all duration-300 cursor-pointer ${program.form?.id
-                                                    ? "bg-white text-red-600 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/30 hover:scale-[1.02] active:scale-[0.98]"
-                                                    : "bg-white/30 text-white/70 cursor-not-allowed"
+                                                ? "bg-white text-red-600 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/30 hover:scale-[1.02] active:scale-[0.98]"
+                                                : "bg-white/30 text-white/70 cursor-not-allowed"
                                                 }`}
                                             disabled={!program.form?.id}
                                         >
@@ -301,7 +303,7 @@ export default function ProgramDetailPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-extrabold text-foreground">Daftar Peserta</h2>
-                                    <p className="text-sm text-muted-foreground">{totalParticipants} peserta telah mendaftar (Hanya menampilkan 3 nama terbawah)</p>
+                                    <p className="text-sm text-muted-foreground">{totalParticipants} peserta telah mendaftar</p>
                                 </div>
                             </div>
 
@@ -324,24 +326,11 @@ export default function ProgramDetailPage() {
 
                             {/* Participant Grid */}
                             {participantGroups[activePeriodParticipants] && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {participantGroups[activePeriodParticipants].participants.slice(0, 3).map((participant, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
-                                        >
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
-                                                <span className="text-sm font-bold text-blue-600">
-                                                    {participant.name ? participant.name.charAt(0).toUpperCase() : "?"}
-                                                </span>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-foreground truncate">{maskName(participant.name)}</p>
-                                                <p className="text-xs text-muted-foreground truncate">{maskPhone(participant.phone)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <ParticipantList
+                                    participants={participantGroups[activePeriodParticipants].participants}
+                                    maskName={maskName}
+                                    maskPhone={maskPhone}
+                                />
                             )}
                         </div>
                     )}
@@ -456,6 +445,57 @@ export default function ProgramDetailPage() {
                     )}
                 </DialogContent>
             </Dialog>
+        </div>
+    );
+}
+
+// ── Participant List with Expand/Collapse ──
+const INITIAL_SHOW = 8;
+
+function ParticipantList({ participants, maskName, maskPhone }: {
+    participants: { name: string; phone: string }[];
+    maskName: (name: string) => string;
+    maskPhone: (phone: string) => string;
+}) {
+    const [expanded, setExpanded] = React.useState(false);
+    const showAll = expanded || participants.length <= INITIAL_SHOW;
+    const displayed = showAll ? participants : participants.slice(0, INITIAL_SHOW);
+    const remaining = participants.length - INITIAL_SHOW;
+
+    return (
+        <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {displayed.map((participant, index) => (
+                    <div
+                        key={index}
+                        className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
+                    >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-bold text-blue-600">
+                                {participant.name ? participant.name.charAt(0).toUpperCase() : "?"}
+                            </span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{maskName(participant.name)}</p>
+                            <p className="text-xs text-muted-foreground truncate">{maskPhone(participant.phone)}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {participants.length > INITIAL_SHOW && (
+                <div className="flex justify-center mt-4">
+                    <button
+                        onClick={() => setExpanded(!expanded)}
+                        className="flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer"
+                    >
+                        {expanded ? (
+                            <>Sembunyikan <ChevronUp className="h-4 w-4" /></>
+                        ) : (
+                            <>Tampilkan {remaining} peserta lainnya <ChevronDown className="h-4 w-4" /></>
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
