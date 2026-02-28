@@ -12,13 +12,13 @@ import Image from "next/image";
 interface Program {
     id: string;
     title: string;
-    gallery?: string;
 }
 
 interface Winner {
     id: string;
     name: string;
     drawnAt: string;
+    photoUrl?: string;
     program: { id: string; title: string };
 }
 
@@ -31,8 +31,7 @@ export default function UndiPage() {
     const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState("");
 
-    const [galleryImages, setGalleryImages] = useState<string[]>([]);
-    const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+    const [uploadingWinnerId, setUploadingWinnerId] = useState<string | null>(null);
 
     // Lottery state
     const [isRolling, setIsRolling] = useState(false);
@@ -56,23 +55,13 @@ export default function UndiPage() {
     useEffect(() => {
         setAvailablePeriods([]);
         setSelectedPeriod("");
-        setGalleryImages([]);
         if (selectedProgram) {
-            const prog = programs.find((p) => p.id === selectedProgram);
-            if (prog && prog.gallery) {
-                try {
-                    setGalleryImages(JSON.parse(prog.gallery));
-                } catch {
-                    setGalleryImages([]);
-                }
-            }
-
             fetch(`/api/admin/lottery/periods?programId=${selectedProgram}`)
                 .then(r => r.json())
                 .then(setAvailablePeriods)
                 .catch(() => { });
         }
-    }, [selectedProgram, programs]);
+    }, [selectedProgram]);
 
     const roll = useCallback(async () => {
         if (!selectedProgram) { setError("Pilih program terlebih dahulu"); return; }
@@ -135,54 +124,57 @@ export default function UndiPage() {
         setError("");
     };
 
-    const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || !selectedProgram) return;
-        setIsUploadingGallery(true);
-        const newUrls: string[] = [];
-        for (let i = 0; i < files.length; i++) {
-            const fd = new FormData();
-            fd.append("file", files[i]);
-            try {
-                const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-                const data = await res.json();
-                if (res.ok && data.url) {
-                    newUrls.push(data.url);
-                } else {
-                    alert(`Gagal upload ${files[i].name}: ${data.error || "Error"}`);
-                }
-            } catch {
-                alert(`Terjadi kesalahan saat upload ${files[i].name}`);
-            }
-        }
+    const handleUploadWinnerPhoto = async (e: React.ChangeEvent<HTMLInputElement>, winnerId: string) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingWinnerId(winnerId);
 
-        if (newUrls.length > 0) {
-            const updatedGallery = [...galleryImages, ...newUrls];
-            setGalleryImages(updatedGallery);
-            saveGallery(updatedGallery);
-        }
-        setIsUploadingGallery(false);
-    };
-
-    const deleteGalleryImage = (index: number) => {
-        if (!confirm("Hapus foto ini dari galeri?")) return;
-        const updated = galleryImages.filter((_, i) => i !== index);
-        setGalleryImages(updated);
-        saveGallery(updated);
-    };
-
-    const saveGallery = async (urls: string[]) => {
-        if (!selectedProgram) return;
+        const fd = new FormData();
+        fd.append("file", file);
         try {
-            await fetch(`/api/admin/programs/${selectedProgram}/gallery`, {
+            const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
+            const uploadData = await uploadRes.json();
+
+            if (uploadRes.ok && uploadData.url) {
+                const updateRes = await fetch(`/api/admin/lottery/winners/${winnerId}/photo`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ photoUrl: uploadData.url })
+                });
+
+                if (updateRes.ok) {
+                    setWinners(prev => prev.map(w => w.id === winnerId ? { ...w, photoUrl: uploadData.url } : w));
+                } else {
+                    alert("Gagal menyimpan foto ke database pemenang.");
+                }
+            } else {
+                alert(`Gagal upload file: ${uploadData.error || "Error"}`);
+            }
+        } catch {
+            alert("Terjadi kesalahan saat upload foto");
+        }
+        setUploadingWinnerId(null);
+    };
+
+    const deleteWinnerPhoto = async (winnerId: string) => {
+        if (!confirm("Hapus foto pemenang ini?")) return;
+        setUploadingWinnerId(winnerId); // Use same loading state to disable UI
+        try {
+            const updateRes = await fetch(`/api/admin/lottery/winners/${winnerId}/photo`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gallery: urls })
+                body: JSON.stringify({ photoUrl: "" })
             });
-            setPrograms(prev => prev.map(p => p.id === selectedProgram ? { ...p, gallery: JSON.stringify(urls) } : p));
+
+            if (updateRes.ok) {
+                setWinners(prev => prev.map(w => w.id === winnerId ? { ...w, photoUrl: "" } : w));
+            } else {
+                alert("Gagal menghapus foto dari database pemenang.");
+            }
         } catch {
-            alert("Gagal menyimpan galeri");
+            alert("Terjadi kesalahan saat menghapus foto");
         }
+        setUploadingWinnerId(null);
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -316,53 +308,39 @@ export default function UndiPage() {
                                         <p className="font-semibold text-sm">{w.name}</p>
                                         <p className="text-xs text-muted-foreground">{w.program.title}</p>
                                     </div>
-                                    <Badge variant="outline" className="text-xs shrink-0">
-                                        {new Date(w.drawnAt).toLocaleDateString("id-ID")}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs shrink-0">
+                                            {new Date(w.drawnAt).toLocaleDateString("id-ID")}
+                                        </Badge>
+
+                                        {/* Per-Winner Photo Display / Upload */}
+                                        <div className="shrink-0 flex gap-2 items-center border-l pl-3 ml-1">
+                                            {w.photoUrl ? (
+                                                <div className="relative group w-10 h-10 rounded overflow-hidden shadow-sm border">
+                                                    <Image src={w.photoUrl} alt="Foto Pemenang" fill className="object-cover" unoptimized={true} />
+                                                    <button
+                                                        onClick={() => deleteWinnerPhoto(w.id)}
+                                                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                                        title="Hapus foto pemenang"
+                                                        disabled={uploadingWinnerId === w.id}
+                                                    >
+                                                        {uploadingWinnerId === w.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label className={`w-10 h-10 flex flex-col items-center justify-center bg-gray-50 border border-dashed rounded text-muted-foreground hover:bg-gray-100 transition-colors cursor-pointer ${uploadingWinnerId === w.id ? "opacity-50 pointer-events-none" : ""}`} title="Upload foto penyerahan hadiah">
+                                                    {uploadingWinnerId === w.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadWinnerPhoto(e, w.id)} disabled={uploadingWinnerId === w.id} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </CardContent>
             </Card>
-
-            {/* Winner Gallery / Penyerahan Hadiah */}
-            {selectedProgram && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Upload className="h-5 w-5" /> Galeri Penyerahan Hadiah
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <label className={`flex flex-col items-center justify-center gap-2 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground ${isUploadingGallery ? "opacity-50 pointer-events-none" : ""}`}>
-                            {isUploadingGallery ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
-                            <span className="font-medium text-gray-700">{isUploadingGallery ? "Mengunggah..." : "Upload foto dokumentasi"}</span>
-                            <span className="text-xs">Bisa pilih lebih dari satu foto</span>
-                            <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadGallery} disabled={isUploadingGallery} />
-                        </label>
-
-                        {galleryImages.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                {galleryImages.map((img, i) => (
-                                    <div key={i} className="relative group w-full aspect-square rounded-lg border overflow-hidden">
-                                        <Image src={img} alt="Galeri" fill className="object-cover" unoptimized={true} />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <button
-                                                onClick={() => deleteGalleryImage(i)}
-                                                className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
-                                                title="Hapus foto"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }
