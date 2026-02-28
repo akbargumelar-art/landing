@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
                     // Only query values if name is generic or phone/outlet is missing
                     const values = await db
-                        .select({ value: submissionValues.value, label: formFields.label })
+                        .select({ value: submissionValues.value, label: formFields.label, type: formFields.fieldType })
                         .from(submissionValues)
                         .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
                         .where(eq(submissionValues.submissionId, w.submissionId));
