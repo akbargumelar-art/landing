@@ -233,10 +233,9 @@ export default function PesertaPage() {
                 </CardContent>
             </Card>
 
-            {/* Detail Dialog */}
             <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-                <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-2xl">
-                    <DialogHeader className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90vh]">
+                    <DialogHeader className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 shrink-0">
                         <DialogTitle className="text-xl font-bold flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                                 <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
@@ -256,7 +255,7 @@ export default function PesertaPage() {
                         <DialogDescription className="sr-only">Detail informasi peserta undian</DialogDescription>
                     </DialogHeader>
                     {selectedSubmission && (
-                        <div className="space-y-4 p-6">
+                        <div className="space-y-4 p-6 overflow-y-auto flex-1">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-muted-foreground">{selectedSubmission.form.program.title}</p>
                                 {getStatusBadge(selectedSubmission.status)}
