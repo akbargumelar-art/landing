@@ -50,7 +50,7 @@ export async function GET(
         const allSubmissions = await db.query.formSubmissions.findMany({
             where: inArray(formSubmissions.formId, formIds),
             with: {
-                values: {
+                submissionValues: {
                     with: {
                         field: true,
                     },
@@ -68,7 +68,7 @@ export async function GET(
         for (const sub of allSubmissions) {
             const periodLabel = sub.period || "Tanpa Periode";
 
-            const values = sub.values || [];
+            const values = (sub as any).submissionValues || [];
 
             interface SubValType {
                 field: { label: string | null; fieldType: string | null } | null;

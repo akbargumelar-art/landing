@@ -173,7 +173,7 @@ export const formFieldsRelations = relations(formFields, ({ one, many }) => ({
 
 export const formSubmissionsRelations = relations(formSubmissions, ({ one, many }) => ({
     form: one(dynamicForms, { fields: [formSubmissions.formId], references: [dynamicForms.id] }),
-    values: many(submissionValues),
+    submissionValues: many(submissionValues),
     winner: one(winners),
 }));
 

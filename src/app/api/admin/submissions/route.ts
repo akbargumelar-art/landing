@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         const search = searchParams.get("search");
 
         // Fetch using Drizzle Relational Queries
-        const result = await db.query.formSubmissions.findMany({
+        const dbResult = await db.query.formSubmissions.findMany({
             with: {
                 form: {
                     with: {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
                         fields: true, // we might not need to send all fields if we only care about submitted values, but left here for completeness if frontend uses it
                     },
                 },
-                values: {
+                submissionValues: {
                     with: {
                         field: true,
                     },
@@ -43,6 +43,12 @@ export async function GET(request: Request) {
             },
             orderBy: [desc(formSubmissions.submittedAt)],
         });
+
+        // Remap the relation "submissionValues" to "values" for frontend compatibility
+        const result = dbResult.map((sub: any) => ({
+            ...sub,
+            values: sub.submissionValues || [],
+        }));
 
         // Apply Filters
         let filtered = result;
