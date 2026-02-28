@@ -130,6 +130,8 @@ export const formSubmissions = mysqlTable("form_submissions", {
     formId: varchar("form_id", { length: 36 }).notNull().references(() => dynamicForms.id, { onDelete: "cascade" }),
     period: varchar("period", { length: 100 }).notNull().default(""),
     status: varchar("status", { length: 50 }).notNull().default("pending"),
+    participantName: varchar("participant_name", { length: 255 }).notNull().default("Peserta"),
+    participantPhone: varchar("participant_phone", { length: 255 }).notNull().default("-"),
     submittedAt: datetime("submitted_at").notNull(),
 });
 

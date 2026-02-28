@@ -10,10 +10,12 @@ interface SubValue {
 
 interface FetchedSubmission {
     id: string;
-    period: string;
-    status: string;
     formId: string;
+    status: string;
     submittedAt: Date;
+    period: string;
+    participantName: string;
+    participantPhone: string;
     form: {
         id: string;
         createdAt: Date;
@@ -40,7 +42,7 @@ export async function GET(request: Request) {
         const search = searchParams.get("search");
 
         // Fetch using Drizzle Relational Queries
-        const result = await db.query.formSubmissions.findMany({
+        const dbResult = await db.query.formSubmissions.findMany({
             with: {
                 form: {
                     with: {
@@ -58,6 +60,22 @@ export async function GET(request: Request) {
             orderBy: [desc(formSubmissions.submittedAt)],
         });
 
+        // Map dbResult to include participantName and participantPhone
+        const result: FetchedSubmission[] = dbResult.map((submission) => {
+            const participantNameValue = submission.values.find(
+                (v) => v.field?.label === "Nama Peserta"
+            )?.value;
+            const participantPhoneValue = submission.values.find(
+                (v) => v.field?.label === "Nomor Telepon"
+            )?.value;
+
+            return {
+                ...submission,
+                participantName: participantNameValue || "",
+                participantPhone: participantPhoneValue || "",
+            } as FetchedSubmission; // Cast to FetchedSubmission
+        });
+
         // Apply Filters
         let filtered = result;
 
@@ -70,14 +88,18 @@ export async function GET(request: Request) {
         }
 
         if (search) {
-            const q = search.toLowerCase();
-            filtered = filtered.filter((s: FetchedSubmission) =>
-                (s.values || []).some(
-                    (v: SubValue) =>
-                        v.value.toLowerCase().includes(q) ||
-                        (v.field?.label || "").toLowerCase().includes(q)
-                )
-            );
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter((s: FetchedSubmission) => {
+                // Cari di ID atau nama peserta langsung (denormalisasi)
+                if (s.id.toLowerCase().includes(searchLower)) return true;
+                if (s.participantName.toLowerCase().includes(searchLower)) return true;
+                if (s.participantPhone.toLowerCase().includes(searchLower)) return true;
+
+                // Fallback cari di detail fields
+                return (s.values || []).some((v: SubValue) =>
+                    v.value?.toLowerCase().includes(searchLower)
+                );
+            });
         }
 
         return NextResponse.json(filtered);

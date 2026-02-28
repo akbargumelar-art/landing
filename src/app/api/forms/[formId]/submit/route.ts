@@ -46,12 +46,33 @@ export async function POST(
             }
         }
 
-        // Create submission
+        // Create variables for denormalization
+        let participantName = "Peserta";
+        let participantPhone = "-";
+
+        // Pre-parse the names and phones explicitly using user constraints
+        for (const field of fields) {
+            const rawValue = formData.get(`field_${field.id}`);
+            const val = typeof rawValue === "string" ? rawValue.trim() : "";
+
+            if (val) {
+                const fLabel = field.label || "";
+                if (/nama|name/i.test(fLabel)) {
+                    participantName = val;
+                } else if (/wa|whatsapp|hp|phone/i.test(fLabel)) {
+                    participantPhone = val;
+                }
+            }
+        }
+
+        // Create submission directly embedding denormalized constraints
         const submissionId = uuid();
         await db.insert(formSubmissions).values({
             id: submissionId,
             formId,
             status: "pending",
+            participantName,
+            participantPhone,
             submittedAt: new Date(),
         });
 
@@ -89,36 +110,14 @@ export async function POST(
 
         // --- Trigger WhatsApp Notification (Non-blocking) ---
         // Fire-and-forget: do not await this block so it doesn't slow down the response
-        Promise.all([
-            db.select({ label: formFields.label, type: formFields.fieldType, value: submissionValues.value })
-                .from(submissionValues)
-                .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
-                .where(eq(submissionValues.submissionId, submissionId))
-        ]).then(async ([subValues]) => {
-
-            // Find Name and Phone with robust matching
-            let nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.type === "name");
-            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.label && /nama|name|lengkap|peserta/i.test(v.label) && !/phone|email|hp|telp/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
-            if (!nameField) nameField = subValues.find((v: { label: string | null, type: string | null, value: string }) => /text/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
-
-            let phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.type === "phone");
-            if (!phoneField) phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label || ""));
-            if (!phoneField) phoneField = subValues.find((v: { label: string | null, type: string | null, value: string }) => /number/i.test(v.type || ""));
-
-            const participantPhone = phoneField?.value?.trim();
-            const participantName = nameField?.value?.trim() || "Peserta";
-
-            if (!participantPhone) return;
-
-            // Trigger the WAHA service
-            await sendWhatsAppNotification(participantPhone, {
+        if (participantPhone !== "-") {
+            sendWhatsAppNotification(participantPhone, {
                 name: participantName,
                 programName: form.title || "Program kami"
+            }).catch((err) => {
+                console.error("WhatsApp integration block error", err);
             });
-
-        }).catch((err) => {
-            console.error("WhatsApp integration block error", err);
-        });
+        }
         // ----------------------------------------------------
 
         return NextResponse.json({ success: true, submissionId }, { status: 201 });

@@ -10,7 +10,8 @@ import { eq, inArray } from "drizzle-orm";
 
 export interface ParticipantEntry {
     id: string;
-    values: any[];
+    participantName: string;
+    participantPhone: string;
 }
 
 export interface ParticipantsByPeriod {
@@ -50,13 +51,12 @@ export async function GET(
         // Get submissions matching to forms of the given program
         const allSubmissions = await db.query.formSubmissions.findMany({
             where: inArray(formSubmissions.formId, formIds),
-            with: {
-                values: {
-                    with: {
-                        field: true,
-                    },
-                },
-            },
+            columns: {
+                id: true,
+                period: true,
+                participantName: true,
+                participantPhone: true,
+            }
         });
 
         if (allSubmissions.length === 0) {
@@ -72,7 +72,8 @@ export async function GET(
             if (!grouped[periodLabel]) grouped[periodLabel] = [];
             grouped[periodLabel].push({
                 id: sub.id,
-                values: sub.values || [],
+                participantName: sub.participantName,
+                participantPhone: sub.participantPhone,
             });
         }
 

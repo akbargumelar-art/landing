@@ -56,41 +56,34 @@ interface WinnerGroup {
 
 interface Participant {
     id: string;
-    values: any[];
+    participantName: string;
+    participantPhone: string;
 }
 
 interface ParticipantGroup {
     period: string;
     participants: Participant[];
 }
-const getMaskedValue = (values: any[], type: 'name' | 'phone') => {
-    if (!values || !Array.isArray(values)) return null;
+// Helper string masking
+function maskData(text: string, type: 'name' | 'phone'): string {
+    if (!text || text === "-") return type === 'name' ? "Peserta Anonim" : "-";
 
-    // Keyword pencarian
-    const nameKeys = ['nama', 'name', 'lengkap', 'identitas'];
-    const phoneKeys = ['whatsapp', 'wa', 'hp', 'phone', 'telepon', 'seluler'];
-
-    const keywords = type === 'name' ? nameKeys : phoneKeys;
-
-    // Cari value yang label field-nya mengandung keyword
-    const found = values.find(v =>
-        v.field && v.field.label && keywords.some(k => v.field.label.toLowerCase().includes(k))
-    );
-
-    if (!found || !found.value) return null;
-
-    // Logika Masking (Sensor)
-    const val = found.value.trim();
-    if (type === 'name') {
-        // Ambil 2 huruf pertama tiap kata, sisanya bintang
-        return val.split(' ').map((word: string) => word.length > 2 ? word.substring(0, 2) + '*'.repeat(3) : word).join(' ');
-    } else {
-        // Format HP: 0812*****789
-        return val.length > 7
-            ? val.substring(0, 4) + '*'.repeat(5) + val.substring(val.length - 3)
-            : val;
+    // Do not mask default participant ID format (Peserta #ABCDEF)
+    if (text.startsWith("Peserta #")) {
+        return text;
     }
-};
+
+    if (type === 'name') {
+        const words = text.split(" ");
+        return words.map(word => {
+            if (word.length <= 2) return word + "***";
+            return word.substring(0, 2) + "***";
+        }).join(" ");
+    } else {
+        if (text.length <= 7) return text.substring(0, 4) + "***";
+        return text.substring(0, 4) + "*****" + text.substring(text.length - 3);
+    }
+}
 
 export default function ProgramDetailPage() {
     const params = useParams();
@@ -447,7 +440,7 @@ export default function ProgramDetailPage() {
                                                 </div>
                                             </div>
                                             <CardContent className="p-4">
-                                                <p className="font-bold text-foreground text-sm mb-1">{getMaskedValue([{ field: { label: 'nama' }, value: winner.name }], 'name') || winner.name}</p>
+                                                <p className="font-bold text-foreground text-sm mb-1">{maskData(winner.name, 'name')}</p>
                                                 {winner.outlet && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                         <MapPin className="h-3 w-3" />
@@ -457,7 +450,7 @@ export default function ProgramDetailPage() {
                                                 {winner.phone && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                         <Phone className="h-3 w-3" />
-                                                        {getMaskedValue([{ field: { label: 'telepon' }, value: winner.phone }], 'phone') || winner.phone}
+                                                        {maskData(winner.phone, 'phone')}
                                                     </p>
                                                 )}
                                             </CardContent>
@@ -483,10 +476,10 @@ export default function ProgramDetailPage() {
                                     <Trophy className="h-12 w-12 text-primary" />
                                 )}
                             </div>
-                            <h3 className="text-xl font-bold text-foreground mb-1">{getMaskedValue([{ field: { label: 'nama' }, value: selectedWinner.name }], 'name') || selectedWinner.name}</h3>
+                            <h3 className="text-xl font-bold text-foreground mb-1">{maskData(selectedWinner.name, 'name')}</h3>
                             {selectedWinner.phone && (
                                 <p className="text-sm text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                                    <Phone className="h-3.5 w-3.5" /> {getMaskedValue([{ field: { label: 'telepon' }, value: selectedWinner.phone }], 'phone') || selectedWinner.phone}
+                                    <Phone className="h-3.5 w-3.5" /> {maskData(selectedWinner.phone, 'phone')}
                                 </p>
                             )}
                             {selectedWinner.outlet && (
@@ -509,7 +502,7 @@ export default function ProgramDetailPage() {
 const INITIAL_SHOW = 8;
 
 function ParticipantList({ participants }: {
-    participants: { id: string; values: any[] }[];
+    participants: { id: string; participantName: string; participantPhone: string }[];
 }) {
     const [expanded, setExpanded] = React.useState(false);
     const showAll = expanded || participants.length <= INITIAL_SHOW;
@@ -520,9 +513,8 @@ function ParticipantList({ participants }: {
         <div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {displayed.map((participant, index) => {
-                    const maskedName = getMaskedValue(participant.values, 'name');
-                    const maskedPhone = getMaskedValue(participant.values, 'phone');
-                    const displayName = maskedName || `Peserta #${participant.id.substring(0, 6)}`;
+                    const maskedName = maskData(participant.participantName, 'name');
+                    const maskedPhone = participant.participantPhone !== "-" ? maskData(participant.participantPhone, 'phone') : null;
 
                     return (
                         <div
@@ -531,11 +523,11 @@ function ParticipantList({ participants }: {
                         >
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
                                 <span className="text-sm font-bold text-blue-600">
-                                    {maskedName ? maskedName.charAt(0).toUpperCase() : "P"}
+                                    {participant.participantName ? participant.participantName.charAt(0).toUpperCase() : "P"}
                                 </span>
                             </div>
                             <div className="min-w-0">
-                                <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
+                                <p className="text-sm font-semibold text-foreground truncate">{maskedName}</p>
                                 {maskedPhone && <p className="text-xs text-muted-foreground truncate">{maskedPhone}</p>}
                             </div>
                         </div>

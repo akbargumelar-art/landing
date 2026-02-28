@@ -19,9 +19,12 @@ import Image from "next/image";
 
 interface Submission {
     id: string;
+    formId: string;
     status: string;
+    submittedAt: string | Date;
     period: string;
-    submittedAt: string;
+    participantName: string;
+    participantPhone: string;
     form: {
         title: string;
         program: { id: string; title: string };
@@ -141,27 +144,6 @@ export default function PesertaPage() {
         }
     };
 
-    const getPreviewValue = (sub: Submission): string => {
-        let nameField = sub.values.find((v) => v.field?.fieldType === "name");
-        if (!nameField) nameField = sub.values.find((v) => v.field?.label && /nama|name|lengkap|peserta/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
-        if (!nameField) nameField = sub.values.find((v) => v.field?.fieldType === "text" && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
-
-        let phoneField = sub.values.find((v) => v.field?.fieldType === "phone");
-        if (!phoneField) phoneField = sub.values.find((v) => v.field?.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
-        if (!phoneField) phoneField = sub.values.find((v) => v.field?.fieldType === "number");
-
-        const name = nameField?.value?.trim();
-        const phone = phoneField?.value?.trim();
-
-        if (name && phone) return `${name} - ${phone}`;
-        if (name) return name;
-        if (phone) return `Peserta #${sub.id.slice(0, 6)} - ${phone}`;
-
-        // Fallback to first text field
-        const firstText = sub.values.find((v) => v.field?.fieldType === "text" && v.value);
-        return firstText?.value?.trim() || `Peserta #${sub.id.slice(0, 8)}`;
-    };
-
     // Collect unique periods from existing submissions for autocomplete
     const existingPeriods = [...new Set(submissions.map(s => s.period).filter(Boolean))].sort();
 
@@ -220,7 +202,9 @@ export default function PesertaPage() {
                             ) : submissions.map((sub, i) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="text-sm">{i + 1}</TableCell>
-                                    <TableCell className="font-medium text-sm">{getPreviewValue(sub)}</TableCell>
+                                    <TableCell className="font-semibold text-gray-900 border-r border-gray-100/50">
+                                        {sub.participantName || `Peserta #${sub.id.substring(0, 6)}`}
+                                    </TableCell>
                                     <TableCell className="text-sm">{sub.form.program.title}</TableCell>
                                     <TableCell className="text-sm">
                                         {sub.period ? (
@@ -251,12 +235,28 @@ export default function PesertaPage() {
 
             {/* Detail Dialog */}
             <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Detail Peserta</DialogTitle>
+                <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-2xl">
+                    <DialogHeader className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                        <DialogTitle className="text-xl font-bold flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                    Detail Peserta
+                                </span>
+                                <span className="text-gray-500 font-normal text-sm">
+                                    #{selectedSubmission?.id.substring(0, 8)}
+                                </span>
+                            </div>
+                            <div className="text-2xl mt-1 text-gray-900">
+                                {selectedSubmission?.participantName}
+                            </div>
+                            <div className="text-sm font-medium text-gray-500 flex items-center gap-2 mt-1">
+                                <span>📞 {selectedSubmission?.participantPhone}</span>
+                            </div>
+                        </DialogTitle>
+                        <DialogDescription className="sr-only">Detail informasi peserta undian</DialogDescription>
                     </DialogHeader>
                     {selectedSubmission && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 p-6">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-muted-foreground">{selectedSubmission.form.program.title}</p>
                                 {getStatusBadge(selectedSubmission.status)}
