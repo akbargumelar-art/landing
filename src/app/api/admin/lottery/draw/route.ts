@@ -8,7 +8,7 @@ import { v4 as uuid } from "uuid";
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { programId } = body;
+        const { programId, period } = body;
 
         if (!programId) {
             return NextResponse.json({ error: "programId required" }, { status: 400 });
@@ -23,13 +23,17 @@ export async function POST(request: Request) {
         }
 
         // Get all approved submissions for those forms
-        const allSubmissions = [];
+        let allSubmissions = [];
         for (const fid of formIds) {
             const subs = await db
                 .select()
                 .from(formSubmissions)
                 .where(and(eq(formSubmissions.formId, fid), eq(formSubmissions.status, "approved")));
             allSubmissions.push(...subs);
+        }
+
+        if (period) {
+            allSubmissions = allSubmissions.filter(sub => sub.period === period);
         }
 
         // Filter out those who already won

@@ -458,6 +458,7 @@ function PropertiesPanel({ element, onChange, onClose }: {
 }) {
     const static_ = isStatic(element.type);
     const hasOptions = ["dropdown", "radio", "checkbox"].includes(element.type);
+    const [isUploading, setIsUploading] = useState(false);
 
     return (
         <Card className="min-h-[500px]">
@@ -486,22 +487,33 @@ function PropertiesPanel({ element, onChange, onClose }: {
                         <Label className="text-xs">URL Gambar / Upload</Label>
                         <div className="flex gap-2">
                             <Input value={element.content} onChange={(e) => onChange({ content: e.target.value })} placeholder="https://..." className="flex-1" />
-                            <button type="button" className="px-3 py-2 border rounded-md cursor-pointer hover:bg-muted text-sm flex items-center gap-1" onClick={() => {
+                            <button type="button" disabled={isUploading} className="px-3 py-2 border rounded-md cursor-pointer hover:bg-muted text-sm flex items-center gap-1 disabled:opacity-50" onClick={() => {
                                 const input = document.createElement("input");
                                 input.type = "file";
                                 input.accept = "image/*";
                                 input.onchange = async (e) => {
                                     const file = (e.target as HTMLInputElement).files?.[0];
                                     if (!file) return;
-                                    const fd = new FormData();
-                                    fd.append("file", file);
-                                    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-                                    const data = await res.json();
-                                    if (data.url) onChange({ content: data.url });
+                                    setIsUploading(true);
+                                    try {
+                                        const fd = new FormData();
+                                        fd.append("file", file);
+                                        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                                        const data = await res.json();
+                                        if (res.ok && data.url) {
+                                            onChange({ content: data.url });
+                                        } else {
+                                            alert(data.error || "Gagal upload gambar");
+                                        }
+                                    } catch (err) {
+                                        alert("Gagal koneksi server saat upload file.");
+                                    } finally {
+                                        setIsUploading(false);
+                                    }
                                 };
                                 input.click();
                             }}>
-                                <Upload className="h-3 w-3" />
+                                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                             </button>
                         </div>
                         {element.content && <img src={element.content} alt="" className="w-full h-24 object-cover rounded border" />}

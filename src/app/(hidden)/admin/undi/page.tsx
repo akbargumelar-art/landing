@@ -26,6 +26,9 @@ export default function UndiPage() {
     const [winners, setWinners] = useState<Winner[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
+    const [selectedPeriod, setSelectedPeriod] = useState("");
+
     // Lottery state
     const [isRolling, setIsRolling] = useState(false);
     const [rollingName, setRollingName] = useState("");
@@ -45,6 +48,17 @@ export default function UndiPage() {
         }).catch(() => setLoading(false));
     }, []);
 
+    useEffect(() => {
+        setAvailablePeriods([]);
+        setSelectedPeriod("");
+        if (selectedProgram) {
+            fetch(`/api/admin/lottery/periods?programId=${selectedProgram}`)
+                .then(r => r.json())
+                .then(setAvailablePeriods)
+                .catch(() => { });
+        }
+    }, [selectedProgram]);
+
     const roll = useCallback(async () => {
         if (!selectedProgram) { setError("Pilih program terlebih dahulu"); return; }
         setError("");
@@ -56,7 +70,7 @@ export default function UndiPage() {
             const res = await fetch("/api/admin/lottery/draw", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ programId: selectedProgram }),
+                body: JSON.stringify({ programId: selectedProgram, period: selectedPeriod }),
             });
 
             const data = await res.json();
@@ -119,16 +133,31 @@ export default function UndiPage() {
             {/* Program Selection */}
             <Card>
                 <CardContent className="p-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold">Pilih Program</label>
-                        <select
-                            value={selectedProgram}
-                            onChange={(e) => { setSelectedProgram(e.target.value); reset(); }}
-                            className="w-full px-3 py-2 border rounded-md text-sm bg-white"
-                        >
-                            <option value="">Pilih program untuk diundi...</option>
-                            {programs.map((p) => (<option key={p.id} value={p.id}>{p.title}</option>))}
-                        </select>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold">Pilih Program</label>
+                            <select
+                                value={selectedProgram}
+                                onChange={(e) => { setSelectedProgram(e.target.value); reset(); }}
+                                className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+                            >
+                                <option value="">Pilih program untuk diundi...</option>
+                                {programs.map((p) => (<option key={p.id} value={p.id}>{p.title}</option>))}
+                            </select>
+                        </div>
+                        {selectedProgram && availablePeriods.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold">Pilih Periode (Opsional)</label>
+                                <select
+                                    value={selectedPeriod}
+                                    onChange={(e) => { setSelectedPeriod(e.target.value); reset(); }}
+                                    className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+                                >
+                                    <option value="">Semua Periode</option>
+                                    {availablePeriods.map((p) => (<option key={p} value={p}>{p}</option>))}
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
