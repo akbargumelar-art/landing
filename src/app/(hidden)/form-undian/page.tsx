@@ -446,6 +446,22 @@ function FormUndianContent() {
                                             </div>
                                         )}
 
+                                        {/* Name */}
+                                        {el.type === "name" && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder={el.placeholder || "Masukkan nama lengkap"}
+                                                    value={values[el.id] || ""}
+                                                    onChange={(e) => setValue(el.id, e.target.value)}
+                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
+                                                />
+                                                {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
+                                                {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
+                                            </div>
+                                        )}
+
                                         {/* Textarea */}
                                         {el.type === "textarea" && (
                                             <div className="space-y-1.5">

@@ -139,6 +139,8 @@ export default function FormBuilderPage() {
     const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
     const [previewMode, setPreviewMode] = useState(false);
     const [message, setMessage] = useState("");
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
     // Create form dialog
     const [createOpen, setCreateOpen] = useState(false);
@@ -237,12 +239,46 @@ export default function FormBuilderPage() {
         setElements(elements.map((e) => (e.id === id ? { ...e, ...updates } : e)));
     };
 
-    const moveElement = (index: number, dir: "up" | "down") => {
-        const target = dir === "up" ? index - 1 : index + 1;
-        if (target < 0 || target >= elements.length) return;
-        const arr = [...elements];
-        [arr[index], arr[target]] = [arr[target], arr[index]];
-        setElements(arr);
+    const handleDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedIndex(index);
+        setTimeout(() => {
+            if (e.target instanceof HTMLElement) {
+                e.target.style.opacity = "0.4";
+            }
+        }, 0);
+    };
+
+    const handleDragEnter = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        setDragOverIndex(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        if (e.target instanceof HTMLElement) {
+            e.target.style.opacity = "1";
+        }
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === dropIndex) {
+            handleDragEnd(e);
+            return;
+        }
+
+        const newElements = [...elements];
+        const draggedEl = newElements[draggedIndex];
+        newElements.splice(draggedIndex, 1);
+        newElements.splice(dropIndex, 0, draggedEl);
+
+        setElements(newElements);
+        handleDragEnd(e);
     };
 
     const saveForm = async () => {
@@ -365,16 +401,19 @@ export default function FormBuilderPage() {
                                 {elements.map((el, index) => (
                                     <div
                                         key={el.id}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        onDragOver={handleDragOver}
+                                        onDragEnter={(e) => handleDragEnter(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        onDrop={(e) => handleDrop(e, index)}
                                         onClick={() => setSelectedElementId(el.id)}
-                                        className={`p-3 rounded-lg border-2 transition-colors cursor-pointer group ${selectedElementId === el.id ? "border-red-500 bg-red-50/50" : "border-transparent bg-gray-50/80 hover:border-gray-300"
-                                            }`}
+                                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer group ${selectedElementId === el.id ? "border-red-500 bg-red-50/50" : "border-transparent bg-gray-50/80 hover:border-gray-300"} ${dragOverIndex === index ? (draggedIndex !== null && draggedIndex < index ? "border-b-red-500 border-b-4 pb-4 bg-gray-100" : "border-t-red-500 border-t-4 pt-4 bg-gray-100") : ""} ${draggedIndex === index ? "opacity-50 blur-sm scale-95" : ""}`}
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); moveElement(index, "up"); }} disabled={index === 0} className="p-0.5 rounded hover:bg-white disabled:opacity-30 cursor-pointer"><ArrowUp className="h-3 w-3" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); moveElement(index, "down"); }} disabled={index === elements.length - 1} className="p-0.5 rounded hover:bg-white disabled:opacity-30 cursor-pointer"><ArrowDown className="h-3 w-3" /></button>
+                                            <div className="cursor-grab active:cursor-grabbing p-1 hover:bg-black/5 rounded group/grip">
+                                                <GripVertical className="h-4 w-4 text-muted-foreground opacity-30 group-hover/grip:opacity-100 transition-opacity" />
                                             </div>
-                                            <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
                                             {elementIcons[el.type]}
                                             <span className="text-xs font-medium text-muted-foreground flex-1 truncate">
                                                 {isStatic(el.type) ? el.type.toUpperCase() : el.label}
