@@ -306,39 +306,44 @@ export default function PesertaPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-4 mt-4">
-                                <h3 className="font-semibold text-gray-900 border-b pb-2">Data Form Peserta</h3>
+                            <div className="mt-6 space-y-5">
+                                <h4 className="text-sm font-semibold text-gray-900 border-b pb-2 mb-4">Detail Jawaban Form</h4>
 
                                 {selectedSubmission.values && selectedSubmission.values.length > 0 ? (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {selectedSubmission.values.map((val, index) => (
-                                            <div key={val.fieldId || index} className="flex flex-col">
-                                                {/* Tampilkan Label Pertanyaan (Bold) */}
-                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                                                    {val.field?.label || 'Unknown Field'}
-                                                </span>
+                                    <div className="grid grid-cols-1 gap-y-4">
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {selectedSubmission.values.map((val: any) => (
+                                            <div key={val.id} className="flex flex-col group">
+                                                {/* Label Pertanyaan */}
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                                                    {val.field?.label || 'Pertanyaan Tanpa Label'}
+                                                </label>
 
-                                                {/* Tampilkan Isi Jawaban / Gambar */}
-                                                {val.field?.fieldType === 'file' || val.field?.fieldType === 'image' || val.value?.startsWith('/uploads') || val.filePath ? (
-                                                    <a
-                                                        href={val.filePath || val.value}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium underline flex items-center gap-2"
-                                                    >
-                                                        📄 Lihat File / Gambar
-                                                    </a>
-                                                ) : (
-                                                    <p className="text-base font-medium text-gray-900 bg-gray-50 p-2 rounded border border-gray-100">
-                                                        {val.value || '-'}
-                                                    </p>
-                                                )}
+                                                {/* Jawaban */}
+                                                <div className="text-sm text-gray-900 font-medium">
+                                                    {val.field?.type === 'image' || val.field?.type === 'file' || (typeof val.value === 'string' && val.value.startsWith('/uploads')) ? (
+                                                        <div className="mt-1">
+                                                            <a
+                                                                href={val.value}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                                                            >
+                                                                📄 Lihat File / Gambar
+                                                            </a>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="bg-gray-50 px-3 py-2 rounded border border-gray-200">
+                                                            {val.value || '-'}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="p-4 bg-yellow-50 text-yellow-700 rounded-md text-sm">
-                                        ⚠️ Data detail jawaban tidak ditemukan (Array values kosong).
+                                    <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 text-sm text-center">
+                                        Belum ada detail jawaban yang tersimpan untuk peserta ini.
                                     </div>
                                 )}
                             </div>

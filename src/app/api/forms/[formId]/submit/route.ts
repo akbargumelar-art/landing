@@ -57,7 +57,7 @@ export async function POST(
 
             if (val) {
                 const fLabel = field.label || "";
-                if (/nama|name/i.test(fLabel)) {
+                if (/nama|name|lengkap/i.test(fLabel)) {
                     participantName = val;
                 } else if (/wa|whatsapp|hp|phone/i.test(fLabel)) {
                     participantPhone = val;

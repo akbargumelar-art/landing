@@ -60,24 +60,8 @@ export async function GET(request: Request) {
             orderBy: [desc(formSubmissions.submittedAt)],
         });
 
-        // Map dbResult to include participantName and participantPhone
-        const result: FetchedSubmission[] = dbResult.map((submission) => {
-            const participantNameValue = submission.values.find(
-                (v) => v.field?.label === "Nama Peserta"
-            )?.value;
-            const participantPhoneValue = submission.values.find(
-                (v) => v.field?.label === "Nomor Telepon"
-            )?.value;
-
-            return {
-                ...submission,
-                participantName: participantNameValue || "",
-                participantPhone: participantPhoneValue || "",
-            } as FetchedSubmission; // Cast to FetchedSubmission
-        });
-
         // Apply Filters
-        let filtered = result;
+        let filtered = dbResult as unknown as FetchedSubmission[];
 
         if (status) {
             filtered = filtered.filter((s: FetchedSubmission) => s.status === status);
