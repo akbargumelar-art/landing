@@ -53,6 +53,10 @@ export default function ProgramPage() {
     const [prizesList, setPrizesList] = useState<Prize[]>([]);
     const [filterCategory, setFilterCategory] = useState("");
 
+    const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+    const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+    const [uploadingPrizeIndex, setUploadingPrizeIndex] = useState<number | null>(null);
+
     useEffect(() => {
         fetch("/api/admin/programs")
             .then((r) => r.json())
@@ -132,6 +136,7 @@ export default function ProgramPage() {
     const handleUploadThumbnail = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setIsUploadingThumbnail(true);
         const fd = new FormData();
         fd.append("file", file);
         try {
@@ -144,12 +149,15 @@ export default function ProgramPage() {
             }
         } catch (err) {
             alert("Terjadi kesalahan saat upload");
+        } finally {
+            setIsUploadingThumbnail(false);
         }
     };
 
     const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files) return;
+        setIsUploadingGallery(true);
         for (let i = 0; i < files.length; i++) {
             const fd = new FormData();
             fd.append("file", files[i]);
@@ -165,11 +173,13 @@ export default function ProgramPage() {
                 alert(`Terjadi kesalahan saat upload ${files[i].name}`);
             }
         }
+        setIsUploadingGallery(false);
     };
 
     const handleUploadPrizeImage = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setUploadingPrizeIndex(index);
         const fd = new FormData();
         fd.append("file", file);
         try {
@@ -182,6 +192,8 @@ export default function ProgramPage() {
             }
         } catch (err) {
             alert("Terjadi kesalahan saat upload");
+        } finally {
+            setUploadingPrizeIndex(null);
         }
     };
 
@@ -281,10 +293,10 @@ export default function ProgramPage() {
                         <div className="space-y-2">
                             <Label>Key Visual / Gambar Program</Label>
                             <div className="flex items-center gap-3">
-                                <label className="flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground">
-                                    <Upload className="h-4 w-4" />
-                                    <span>{editProgram.thumbnail ? "Ganti gambar" : "Upload gambar"}</span>
-                                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadThumbnail} />
+                                <label className={`flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground ${isUploadingThumbnail ? "opacity-50 pointer-events-none" : ""}`}>
+                                    {isUploadingThumbnail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                    <span>{isUploadingThumbnail ? "Mengunggah..." : editProgram.thumbnail ? "Ganti gambar" : "Upload gambar"}</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadThumbnail} disabled={isUploadingThumbnail} />
                                 </label>
                                 {editProgram.thumbnail && (
                                     <button onClick={() => setEditProgram({ ...editProgram, thumbnail: "" })} className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"><Trash2 className="h-4 w-4" /></button>
@@ -317,10 +329,10 @@ export default function ProgramPage() {
                         {/* Winner Gallery */}
                         <div className="space-y-2">
                             <Label>Galeri Pemenang / Dokumentasi Penyerahan Hadiah</Label>
-                            <label className="flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground">
-                                <Upload className="h-4 w-4" />
-                                <span>Upload foto (bisa pilih beberapa)</span>
-                                <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadGallery} />
+                            <label className={`flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors text-sm text-muted-foreground ${isUploadingGallery ? "opacity-50 pointer-events-none" : ""}`}>
+                                {isUploadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                <span>{isUploadingGallery ? "Mengunggah..." : "Upload foto (bisa pilih beberapa)"}</span>
+                                <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadGallery} disabled={isUploadingGallery} />
                             </label>
                             {galleryImages.length > 0 && (
                                 <div className="grid grid-cols-4 gap-2">
@@ -358,10 +370,16 @@ export default function ProgramPage() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <label className="flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white transition-colors">
-                                                <ImageIcon className="h-5 w-5 text-muted-foreground opacity-40" />
-                                                <span className="text-[9px] text-muted-foreground mt-0.5">Upload</span>
-                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPrizeImage(e, i)} />
+                                            <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white transition-colors ${uploadingPrizeIndex === i ? "opacity-50 pointer-events-none" : ""}`}>
+                                                {uploadingPrizeIndex === i ? (
+                                                    <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon className="h-5 w-5 text-muted-foreground opacity-40" />
+                                                        <span className="text-[9px] text-muted-foreground mt-0.5">Upload</span>
+                                                    </>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadPrizeImage(e, i)} disabled={uploadingPrizeIndex === i} />
                                             </label>
                                         )}
                                     </div>

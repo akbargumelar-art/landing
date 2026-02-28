@@ -35,10 +35,10 @@ export async function POST(request: Request) {
             );
         }
 
-        // Max 5MB
-        if (file.size > 5 * 1024 * 1024) {
+        // Max 20MB
+        if (file.size > 20 * 1024 * 1024) {
             console.error(`File too large: ${file.size} bytes`);
-            return NextResponse.json({ error: "File too large. Max 5MB." }, { status: 400 });
+            return NextResponse.json({ error: "File too large. Max 20MB." }, { status: 400 });
         }
 
         const bytes = await file.arrayBuffer();
