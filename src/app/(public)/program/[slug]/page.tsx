@@ -76,8 +76,9 @@ function maskData(text: string, type: 'name' | 'phone'): string {
     if (type === 'name') {
         const words = text.split(" ");
         return words.map(word => {
-            if (word.length <= 2) return word + "***";
-            return word.substring(0, 2) + "***";
+            // As requested: the first characters are visible, but the last 3 characters are asterisks
+            if (word.length <= 3) return word.charAt(0) + "***";
+            return word.substring(0, word.length - 3) + "***";
         }).join(" ");
     } else {
         if (text.length <= 7) return text.substring(0, 4) + "***";

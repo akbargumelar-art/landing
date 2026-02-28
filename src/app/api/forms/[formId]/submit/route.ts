@@ -98,10 +98,21 @@ export async function POST(
 
             if (val) {
                 const fLabel = field.label || "";
-                if (/nama|name|lengkap/i.test(fLabel)) {
+
+                // Prioritize checking the official field property type 
+                if (field.fieldType === "name") {
                     participantName = val;
-                } else if (/wa|whatsapp|hp|phone|nomor/i.test(fLabel)) {
+                } else if (field.fieldType === "phone") {
                     participantPhone = val;
+                } else {
+                    // Fallback to strict heuristic checking for older schemas or missing type definitions
+                    // but ONLY if we haven't already found the primary ones from `fieldType` above.
+                    // This prevents "Nama Outlet" (type 'text') from overwriting a legitimate 'name' field
+                    if (/^(nama|name|nama lengkap)$/i.test(fLabel) && participantName === "Peserta") {
+                        participantName = val;
+                    } else if (/(wa|whatsapp|hp|phone|nomor telp|handphone)/i.test(fLabel) && participantPhone === "-") {
+                        participantPhone = val;
+                    }
                 }
             }
         }
