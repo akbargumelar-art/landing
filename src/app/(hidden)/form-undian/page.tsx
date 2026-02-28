@@ -49,6 +49,126 @@ export default function FormUndianPage() {
     );
 }
 
+// ---- Searchable Dropdown Component ----
+function SearchableDropdown({ options, value, onChange, placeholder, hasError }: {
+    options: string[];
+    value: string;
+    onChange: (val: string) => void;
+    placeholder: string;
+    hasError?: boolean;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const [highlightIndex, setHighlightIndex] = useState(-1);
+    const wrapperRef = React.useRef<HTMLDivElement>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    const listRef = React.useRef<HTMLDivElement>(null);
+
+    const filtered = search
+        ? options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()))
+        : options;
+
+    // Close on click outside
+    React.useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+                setSearch("");
+            }
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
+
+    // Scroll highlighted item into view
+    React.useEffect(() => {
+        if (highlightIndex >= 0 && listRef.current) {
+            const items = listRef.current.querySelectorAll("[data-option]");
+            items[highlightIndex]?.scrollIntoView({ block: "nearest" });
+        }
+    }, [highlightIndex]);
+
+    const selectOption = (opt: string) => {
+        onChange(opt);
+        setIsOpen(false);
+        setSearch("");
+        setHighlightIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setHighlightIndex(prev => Math.min(prev + 1, filtered.length - 1));
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlightIndex(prev => Math.max(prev - 1, 0));
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (highlightIndex >= 0 && highlightIndex < filtered.length) {
+                selectOption(filtered[highlightIndex]);
+            }
+        } else if (e.key === "Escape") {
+            setIsOpen(false);
+            setSearch("");
+        }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <div
+                className={`flex items-center w-full px-3 py-2 border rounded-lg text-sm cursor-pointer transition-colors ${hasError ? "border-red-500" : isOpen ? "border-primary ring-2 ring-primary/30" : "border-gray-200"}`}
+                onClick={() => { setIsOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+            >
+                {isOpen ? (
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setHighlightIndex(0); }}
+                        onKeyDown={handleKeyDown}
+                        placeholder={value || placeholder}
+                        className="w-full outline-none bg-transparent text-sm"
+                        autoFocus
+                    />
+                ) : (
+                    <span className={value ? "text-foreground" : "text-muted-foreground"}>
+                        {value || placeholder}
+                    </span>
+                )}
+                <svg className={`ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </div>
+            {isOpen && (
+                <div ref={listRef} className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {value && (
+                        <button
+                            type="button"
+                            onClick={() => selectOption("")}
+                            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b cursor-pointer"
+                        >
+                            ✕ Hapus pilihan
+                        </button>
+                    )}
+                    {filtered.length === 0 ? (
+                        <div className="px-3 py-3 text-sm text-muted-foreground text-center">Tidak ditemukan</div>
+                    ) : (
+                        filtered.map((opt, i) => (
+                            <button
+                                type="button"
+                                key={i}
+                                data-option
+                                onClick={() => selectOption(opt)}
+                                className={`w-full px-3 py-2 text-left text-sm cursor-pointer transition-colors ${opt === value ? "bg-primary/10 text-primary font-medium" : highlightIndex === i ? "bg-gray-100" : "hover:bg-gray-50"}`}
+                            >
+                                {opt}
+                            </button>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function FormUndianContent() {
     const searchParams = useSearchParams();
     const formId = searchParams.get("id");
@@ -352,18 +472,17 @@ function FormUndianContent() {
                                             </div>
                                         )}
 
-                                        {/* Dropdown */}
+                                        {/* Dropdown (Searchable) */}
                                         {el.type === "dropdown" && (
                                             <div className="space-y-1.5">
                                                 <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                                <select
+                                                <SearchableDropdown
+                                                    options={el.options}
                                                     value={values[el.id] || ""}
-                                                    onChange={(e) => setValue(el.id, e.target.value)}
-                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${errors[el.id] ? "border-red-500" : "border-gray-200"}`}
-                                                >
-                                                    <option value="">{el.placeholder || "Pilih..."}</option>
-                                                    {el.options.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
-                                                </select>
+                                                    onChange={(val) => setValue(el.id, val)}
+                                                    placeholder={el.placeholder || "Pilih..."}
+                                                    hasError={!!errors[el.id]}
+                                                />
                                                 {el.hintText && <p className="text-xs text-muted-foreground">{el.hintText}</p>}
                                                 {errors[el.id] && <p className="text-xs text-red-500">{errors[el.id]}</p>}
                                             </div>

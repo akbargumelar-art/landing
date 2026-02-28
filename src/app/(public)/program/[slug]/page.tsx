@@ -61,14 +61,14 @@ interface ParticipantGroup {
 
 function maskName(name: string): string {
     if (!name) return "***";
-    if (name.length <= 3) return name + "***";
-    return name.substring(0, 3) + "*".repeat(name.length - 3);
+    if (name.length <= 3) return "***";
+    return name.substring(0, name.length - 3) + "***";
 }
 
 function maskPhone(phone: string): string {
     if (!phone) return "***";
-    if (phone.length <= 3) return phone + "***";
-    return phone.substring(0, 3) + "*".repeat(phone.length - 3);
+    if (phone.length <= 3) return "***";
+    return phone.substring(0, phone.length - 3) + "***";
 }
 
 export default function ProgramDetailPage() {
@@ -226,35 +226,69 @@ export default function ProgramDetailPage() {
                                 </CardContent>
                             </Card>
 
-                            <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-orange-50">
-                                <CardContent className="p-6 text-center">
-                                    <Badge className="mb-3 btn-pill">Aktif</Badge>
-                                    <p className="text-sm text-muted-foreground mb-4">Ikuti program ini sekarang!</p>
-                                    <Link href={program.form?.id ? `/form-undian?id=${program.form.id}` : "#"}>
-                                        <Button className="btn-pill w-full font-semibold cursor-pointer" disabled={!program.form?.id}>
-                                            {program.form?.id ? "Daftar Sekarang" : "Form Belum Tersedia"}
-                                        </Button>
-                                    </Link>
-                                </CardContent>
-                            </Card>
+                            {/* ── CTA Daftar Card (Eye-Catching) ─── */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-red-500 to-orange-500 p-6 shadow-xl shadow-red-200/50">
+                                {/* Decorative background elements */}
+                                <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full blur-sm" />
+                                <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-white/10 rounded-full blur-sm" />
+                                <div className="absolute top-3 right-3 text-white/20 text-3xl animate-pulse">✦</div>
+                                <div className="absolute bottom-8 left-3 text-white/15 text-xl animate-pulse" style={{ animationDelay: "0.5s" }}>✦</div>
 
-                            {/* Stats */}
-                            {(totalParticipants > 0 || totalWinners > 0) && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {totalParticipants > 0 && (
-                                        <div className="bg-blue-50 rounded-2xl p-4 text-center">
-                                            <p className="text-2xl font-extrabold text-blue-600">{totalParticipants}</p>
-                                            <p className="text-xs text-blue-500 font-medium mt-0.5">Peserta</p>
+                                <div className="relative z-10 text-center">
+                                    {/* Icon + Badge */}
+                                    <div className="flex items-center justify-center gap-2 mb-3">
+                                        <span className="text-2xl">🎁</span>
+                                        <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm btn-pill text-xs font-bold tracking-wide">
+                                            🔥 PROGRAM AKTIF
+                                        </Badge>
+                                        <span className="text-2xl">🎁</span>
+                                    </div>
+
+                                    <h3 className="text-white font-extrabold text-lg mb-1">Ikuti Sekarang!</h3>
+                                    <p className="text-white/80 text-sm mb-5">Jangan lewatkan kesempatan memenangkan hadiah menarik</p>
+
+                                    {/* Stats inside card */}
+                                    {(totalParticipants > 0 || totalWinners > 0) && (
+                                        <div className="flex justify-center gap-3 mb-5">
+                                            {totalParticipants > 0 && (
+                                                <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5 text-center min-w-[80px]">
+                                                    <p className="text-xl font-extrabold text-white">{totalParticipants}</p>
+                                                    <p className="text-[10px] text-white/70 font-semibold uppercase tracking-wider">Peserta</p>
+                                                </div>
+                                            )}
+                                            {totalWinners > 0 && (
+                                                <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5 text-center min-w-[80px]">
+                                                    <p className="text-xl font-extrabold text-white">{totalWinners}</p>
+                                                    <p className="text-[10px] text-white/70 font-semibold uppercase tracking-wider">Pemenang</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-                                    {totalWinners > 0 && (
-                                        <div className="bg-orange-50 rounded-2xl p-4 text-center">
-                                            <p className="text-2xl font-extrabold text-orange-600">{totalWinners}</p>
-                                            <p className="text-xs text-orange-500 font-medium mt-0.5">Pemenang</p>
-                                        </div>
+
+                                    {/* CTA Button */}
+                                    <Link href={program.form?.id ? `/form-undian?id=${program.form.id}` : "#"}>
+                                        <button
+                                            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all duration-300 cursor-pointer ${program.form?.id
+                                                    ? "bg-white text-red-600 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/30 hover:scale-[1.02] active:scale-[0.98]"
+                                                    : "bg-white/30 text-white/70 cursor-not-allowed"
+                                                }`}
+                                            disabled={!program.form?.id}
+                                        >
+                                            {program.form?.id ? (
+                                                <span className="flex items-center justify-center gap-2">
+                                                    📝 Daftar Sekarang
+                                                </span>
+                                            ) : (
+                                                "Form Belum Tersedia"
+                                            )}
+                                        </button>
+                                    </Link>
+
+                                    {program.form?.id && (
+                                        <p className="text-white/50 text-[10px] mt-3 font-medium">Pendaftaran gratis • Data anda aman</p>
                                     )}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 

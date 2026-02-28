@@ -547,6 +547,25 @@ function PropertiesPanel({ element, onChange, onClose }: {
                         <Button variant="outline" size="sm" onClick={() => onChange({ options: [...element.options, `Opsi ${element.options.length + 1}`] })} className="w-full cursor-pointer text-xs">
                             <Plus className="mr-1 h-3 w-3" /> Tambah Opsi
                         </Button>
+                        <label className="flex items-center justify-center gap-1 w-full px-3 py-1.5 border border-dashed rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                            <Upload className="h-3 w-3" /> Upload List (.txt / .csv)
+                            <input type="file" accept=".txt,.csv,text/plain,text/csv" className="hidden" onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                    const text = ev.target?.result as string;
+                                    if (!text) return;
+                                    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                                    if (lines.length > 0) {
+                                        onChange({ options: [...element.options, ...lines] });
+                                    }
+                                };
+                                reader.readAsText(file);
+                                e.target.value = "";
+                            }} />
+                        </label>
+                        <p className="text-[10px] text-muted-foreground">{element.options.length} opsi. Upload file teks (satu opsi per baris) untuk import massal.</p>
                     </div>
                 )}
 
@@ -612,10 +631,11 @@ function PreviewPanel({ elements }: { elements: FormElement[] }) {
                                 {el.type === "dropdown" && (
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium">{el.label} {el.isRequired && <span className="text-red-500">*</span>}</label>
-                                        <select className="w-full px-3 py-2 border rounded-lg text-sm">
-                                            <option>{el.placeholder || "Pilih..."}</option>
-                                            {el.options.map((opt, i) => <option key={i}>{opt}</option>)}
-                                        </select>
+                                        <div className="flex items-center w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-muted-foreground bg-white">
+                                            <span>{el.placeholder || "Ketik untuk mencari..."}</span>
+                                            <svg className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground">{el.options.length} opsi — searchable dropdown</p>
                                     </div>
                                 )}
                                 {el.type === "radio" && (
