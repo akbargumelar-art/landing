@@ -306,22 +306,41 @@ export default function PesertaPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                {selectedSubmission.values.map((val) => (
-                                    <div key={val.fieldId} className="border-b pb-3 last:border-0">
-                                        <p className="font-bold text-sm text-foreground mb-1">{val.field?.label || "Unknown Field"}</p>
-                                        {val.field?.fieldType === "file" && val.filePath ? (
-                                            <button onClick={() => setLightboxImage(val.filePath)} className="group cursor-pointer">
-                                                <div className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                                                    <FileImage className="h-4 w-4" />
-                                                    <span className="font-normal">{val.value || "Lihat file"}</span>
-                                                </div>
-                                            </button>
-                                        ) : (
-                                            <p className="text-sm font-normal text-foreground">{val.value || "—"}</p>
-                                        )}
+                            <div className="space-y-4 mt-4">
+                                <h3 className="font-semibold text-gray-900 border-b pb-2">Data Form Peserta</h3>
+
+                                {selectedSubmission.values && selectedSubmission.values.length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {selectedSubmission.values.map((val, index) => (
+                                            <div key={val.fieldId || index} className="flex flex-col">
+                                                {/* Tampilkan Label Pertanyaan (Bold) */}
+                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                                    {val.field?.label || 'Unknown Field'}
+                                                </span>
+
+                                                {/* Tampilkan Isi Jawaban / Gambar */}
+                                                {val.field?.fieldType === 'file' || val.field?.fieldType === 'image' || val.value?.startsWith('/uploads') || val.filePath ? (
+                                                    <a
+                                                        href={val.filePath || val.value}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium underline flex items-center gap-2"
+                                                    >
+                                                        📄 Lihat File / Gambar
+                                                    </a>
+                                                ) : (
+                                                    <p className="text-base font-medium text-gray-900 bg-gray-50 p-2 rounded border border-gray-100">
+                                                        {val.value || '-'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                ) : (
+                                    <div className="p-4 bg-yellow-50 text-yellow-700 rounded-md text-sm">
+                                        ⚠️ Data detail jawaban tidak ditemukan (Array values kosong).
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-2 pt-2">

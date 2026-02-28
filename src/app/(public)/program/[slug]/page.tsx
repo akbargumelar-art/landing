@@ -54,36 +54,42 @@ interface WinnerGroup {
 }
 
 interface Participant {
-    name: string;
-    phone: string;
+    id: string;
+    values: any[];
 }
 
 interface ParticipantGroup {
     period: string;
     participants: Participant[];
 }
+const getMaskedValue = (values: any[], type: 'name' | 'phone') => {
+    if (!values || !Array.isArray(values)) return null;
 
-function maskData(text: string, type: 'name' | 'phone'): string {
-    if (!text) return type === 'name' ? "Peserta Anonim" : "-";
+    // Keyword pencarian
+    const nameKeys = ['nama', 'name', 'lengkap', 'identitas'];
+    const phoneKeys = ['whatsapp', 'wa', 'hp', 'phone', 'telepon', 'seluler'];
 
-    // Do not mask default participant ID format (Peserta #ABCDEF)
-    if (text.startsWith("Peserta #")) {
-        return text;
-    }
+    const keywords = type === 'name' ? nameKeys : phoneKeys;
 
+    // Cari value yang label field-nya mengandung keyword
+    const found = values.find(v =>
+        v.field && v.field.label && keywords.some(k => v.field.label.toLowerCase().includes(k))
+    );
+
+    if (!found || !found.value) return null;
+
+    // Logika Masking (Sensor)
+    const val = found.value.trim();
     if (type === 'name') {
-        return text
-            .split(" ")
-            .map((word) => {
-                if (word.length <= 2) return word + "***";
-                return word.substring(0, 2) + "***";
-            })
-            .join(" ");
+        // Ambil 2 huruf pertama tiap kata, sisanya bintang
+        return val.split(' ').map((word: string) => word.length > 2 ? word.substring(0, 2) + '*'.repeat(3) : word).join(' ');
     } else {
-        if (text.length <= 7) return text.substring(0, 4) + "***";
-        return text.substring(0, 4) + "*****" + text.substring(text.length - 3);
+        // Format HP: 0812*****789
+        return val.length > 7
+            ? val.substring(0, 4) + '*'.repeat(5) + val.substring(val.length - 3)
+            : val;
     }
-}
+};
 
 export default function ProgramDetailPage() {
     const params = useParams();
@@ -379,7 +385,6 @@ export default function ProgramDetailPage() {
                             {participantGroups[activePeriodParticipants] && (
                                 <ParticipantList
                                     participants={participantGroups[activePeriodParticipants].participants}
-                                    maskData={maskData}
                                 />
                             )}
                         </div>
@@ -441,7 +446,7 @@ export default function ProgramDetailPage() {
                                                 </div>
                                             </div>
                                             <CardContent className="p-4">
-                                                <p className="font-bold text-foreground text-sm mb-1">{maskData(winner.name, 'name')}</p>
+                                                <p className="font-bold text-foreground text-sm mb-1">{getMaskedValue([{ field: { label: 'nama' }, value: winner.name }], 'name') || winner.name}</p>
                                                 {winner.outlet && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                         <MapPin className="h-3 w-3" />
@@ -451,7 +456,7 @@ export default function ProgramDetailPage() {
                                                 {winner.phone && (
                                                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                         <Phone className="h-3 w-3" />
-                                                        {maskData(winner.phone, 'phone')}
+                                                        {getMaskedValue([{ field: { label: 'telepon' }, value: winner.phone }], 'phone') || winner.phone}
                                                     </p>
                                                 )}
                                             </CardContent>
@@ -477,10 +482,10 @@ export default function ProgramDetailPage() {
                                     <Trophy className="h-12 w-12 text-primary" />
                                 )}
                             </div>
-                            <h3 className="text-xl font-bold text-foreground mb-1">{maskData(selectedWinner.name, 'name')}</h3>
+                            <h3 className="text-xl font-bold text-foreground mb-1">{getMaskedValue([{ field: { label: 'nama' }, value: selectedWinner.name }], 'name') || selectedWinner.name}</h3>
                             {selectedWinner.phone && (
                                 <p className="text-sm text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                                    <Phone className="h-3.5 w-3.5" /> {maskData(selectedWinner.phone, 'phone')}
+                                    <Phone className="h-3.5 w-3.5" /> {getMaskedValue([{ field: { label: 'telepon' }, value: selectedWinner.phone }], 'phone') || selectedWinner.phone}
                                 </p>
                             )}
                             {selectedWinner.outlet && (
@@ -502,9 +507,8 @@ export default function ProgramDetailPage() {
 // ── Participant List with Expand/Collapse ──
 const INITIAL_SHOW = 8;
 
-function ParticipantList({ participants, maskData }: {
-    participants: { name: string; phone: string }[];
-    maskData: (text: string, type: 'name' | 'phone') => string;
+function ParticipantList({ participants }: {
+    participants: { id: string; values: any[] }[];
 }) {
     const [expanded, setExpanded] = React.useState(false);
     const showAll = expanded || participants.length <= INITIAL_SHOW;
@@ -514,22 +518,28 @@ function ParticipantList({ participants, maskData }: {
     return (
         <div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {displayed.map((participant, index) => (
-                    <div
-                        key={index}
-                        className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
-                    >
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
-                            <span className="text-sm font-bold text-blue-600">
-                                {participant.name ? participant.name.charAt(0).toUpperCase() : "?"}
-                            </span>
+                {displayed.map((participant, index) => {
+                    const maskedName = getMaskedValue(participant.values, 'name');
+                    const maskedPhone = getMaskedValue(participant.values, 'phone');
+                    const displayName = maskedName || `Peserta #${participant.id.substring(0, 6)}`;
+
+                    return (
+                        <div
+                            key={index}
+                            className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shrink-0">
+                                <span className="text-sm font-bold text-blue-600">
+                                    {maskedName ? maskedName.charAt(0).toUpperCase() : "P"}
+                                </span>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
+                                {maskedPhone && <p className="text-xs text-muted-foreground truncate">{maskedPhone}</p>}
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{maskData(participant.name, 'name')}</p>
-                            <p className="text-xs text-muted-foreground truncate">{maskData(participant.phone, 'phone')}</p>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
             {participants.length > INITIAL_SHOW && (
                 <div className="flex justify-center mt-4">

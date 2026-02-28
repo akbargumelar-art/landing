@@ -28,8 +28,7 @@ interface FetchedSubmission {
             slug: string;
         } | null;
     };
-    submissionValues: SubValue[];
-    values?: SubValue[];
+    values: SubValue[];
 }
 
 // GET submissions with filters
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
         const search = searchParams.get("search");
 
         // Fetch using Drizzle Relational Queries
-        const dbResult = await db.query.formSubmissions.findMany({
+        const result = await db.query.formSubmissions.findMany({
             with: {
                 form: {
                     with: {
@@ -49,7 +48,7 @@ export async function GET(request: Request) {
                         fields: true, // we might not need to send all fields if we only care about submitted values, but left here for completeness if frontend uses it
                     },
                 },
-                submissionValues: {
+                values: {
                     with: {
                         field: true,
                     },
@@ -58,12 +57,6 @@ export async function GET(request: Request) {
             },
             orderBy: [desc(formSubmissions.submittedAt)],
         });
-
-        // Remap the relation "submissionValues" to "values" for frontend compatibility
-        const result = dbResult.map((sub: FetchedSubmission) => ({
-            ...sub,
-            values: sub.submissionValues || [],
-        }));
 
         // Apply Filters
         let filtered = result;

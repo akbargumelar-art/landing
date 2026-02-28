@@ -8,8 +8,8 @@ import {
 import { eq, inArray } from "drizzle-orm";
 
 export interface ParticipantEntry {
-    name: string;
-    phone: string;
+    id: string;
+    values: any[];
 }
 
 export interface ParticipantsByPeriod {
@@ -50,7 +50,7 @@ export async function GET(
         const allSubmissions = await db.query.formSubmissions.findMany({
             where: inArray(formSubmissions.formId, formIds),
             with: {
-                submissionValues: {
+                values: {
                     with: {
                         field: true,
                     },
@@ -68,28 +68,10 @@ export async function GET(
         for (const sub of allSubmissions) {
             const periodLabel = sub.period || "Tanpa Periode";
 
-            interface SubValType {
-                field: { label: string | null; fieldType: string | null } | null;
-                value: string;
-            }
-
-            const values = (sub as unknown as { submissionValues: SubValType[] }).submissionValues || [];
-
-            let nameField = values.find((v: SubValType) => v.field?.fieldType === "name");
-            if (!nameField) nameField = values.find((v: SubValType) => v.field?.label && /nama/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
-            if (!nameField) nameField = values.find((v: SubValType) => /text/i.test(v.field?.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field?.label || ""));
-
-            let phoneField = values.find((v: SubValType) => v.field?.fieldType === "phone");
-            if (!phoneField) phoneField = values.find((v: SubValType) => v.field?.label && /whatsapp|hp/i.test(v.field.label));
-            if (!phoneField) phoneField = values.find((v: SubValType) => /number/i.test(v.field?.fieldType || ""));
-
-            const finalName = nameField?.value?.trim() || `Peserta #${sub.id.substring(0, 6)}`;
-            const finalPhone = phoneField?.value?.trim() || "";
-
             if (!grouped[periodLabel]) grouped[periodLabel] = [];
             grouped[periodLabel].push({
-                name: finalName,
-                phone: finalPhone,
+                id: sub.id,
+                values: sub.values || [],
             });
         }
 
