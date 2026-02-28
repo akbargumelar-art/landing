@@ -60,10 +60,16 @@ export async function GET(request: Request) {
             orderBy: [desc(formSubmissions.submittedAt)],
         });
 
-        const result: FetchedSubmission[] = dbResult.map(s => ({
-            ...s,
-            values: (s as unknown as { submissionValues: SubValue[] }).submissionValues || [],
-        })) as FetchedSubmission[];
+        const result: FetchedSubmission[] = dbResult.map(s => {
+            const valuesRaw = (s as unknown as { submissionValues: any[] }).submissionValues || [];
+            // Sort values by the original field's sortOrder
+            valuesRaw.sort((a, b) => (a.field?.sortOrder || 0) - (b.field?.sortOrder || 0));
+
+            return {
+                ...s,
+                values: valuesRaw,
+            };
+        }) as FetchedSubmission[];
 
         // Apply Filters
         let filtered = result;
