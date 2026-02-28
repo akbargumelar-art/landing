@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         let allWinners = await db.select().from(winners).orderBy(desc(winners.drawnAt));
 
         if (programId) {
-            allWinners = allWinners.filter((w: WinnerRow) => w.programId === programId);
+            allWinners = allWinners.filter((w: Omit<WinnerRow, 'program'>) => w.programId === programId);
         }
 
         const result: WinnerRow[] = [];
