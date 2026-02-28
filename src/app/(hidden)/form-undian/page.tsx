@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -313,6 +313,26 @@ function FormUndianContent() {
         );
     }
 
+    const router = useRouter();
+    const [countdown, setCountdown] = useState(5);
+
+    // Auto-redirect after success
+    useEffect(() => {
+        if (!isSuccess) return;
+        setCountdown(5);
+        const interval = setInterval(() => {
+            setCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    router.push("/");
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isSuccess, router]);
+
     if (isSuccess) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
@@ -324,22 +344,40 @@ function FormUndianContent() {
                         <h2 className="text-2xl font-bold text-foreground mb-2">
                             Terima Kasih! 🎉
                         </h2>
-                        <p className="text-muted-foreground mb-6">
+                        <p className="text-muted-foreground mb-4">
                             Data Anda telah berhasil dikirim. Kami akan memproses pendaftaran
                             undian Anda. Semoga beruntung!
                         </p>
-                        <Button
-                            onClick={() => {
-                                setIsSuccess(false);
-                                setValues({});
-                                setFiles({});
-                                setErrors({});
-                            }}
-                            variant="outline"
-                            className="w-full cursor-pointer"
-                        >
-                            Daftar Lagi
-                        </Button>
+                        <p className="text-xs text-muted-foreground mb-5">
+                            Anda akan dialihkan ke halaman utama dalam <span className="font-bold text-primary">{countdown}</span> detik...
+                        </p>
+                        <div className="w-full bg-gray-100 rounded-full h-1.5 mb-5 overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-1000 ease-linear"
+                                style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={() => router.push("/")}
+                                className="flex-1 cursor-pointer"
+                            >
+                                Ke Halaman Utama
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setIsSuccess(false);
+                                    setValues({});
+                                    setFiles({});
+                                    setErrors({});
+                                    setCountdown(5);
+                                }}
+                                variant="outline"
+                                className="flex-1 cursor-pointer"
+                            >
+                                Daftar Lagi
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
