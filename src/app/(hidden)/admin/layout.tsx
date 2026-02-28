@@ -15,6 +15,7 @@ import {
     Menu,
     X,
     ChevronLeft,
+    UserCircle,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -24,6 +25,7 @@ const sidebarLinks = [
     { href: "/admin/form-builder", label: "Kelola Form", icon: FormInput },
     { href: "/admin/peserta", label: "Data Peserta", icon: Users },
     { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
+    { href: "/admin/profil", label: "Profil Admin", icon: UserCircle },
 ];
 
 export default function AdminLayout({
