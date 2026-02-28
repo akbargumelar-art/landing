@@ -13,7 +13,7 @@ import {
     DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, FileImage, Calendar, Trash2, AlertTriangle
+    CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, Calendar, Trash2, AlertTriangle
 } from "lucide-react";
 import Image from "next/image";
 
