@@ -4,8 +4,6 @@ import {
     programs,
     dynamicForms,
     formSubmissions,
-    submissionValues,
-    formFields,
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
@@ -72,13 +70,18 @@ export async function GET(
 
             const values = sub.values || [];
 
-            let nameField = values.find((v: any) => v.field?.fieldType === "name");
-            if (!nameField) nameField = values.find((v: any) => v.field?.label && /nama/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
-            if (!nameField) nameField = values.find((v: any) => /text/i.test(v.field?.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field?.label || ""));
+            interface SubValType {
+                field: { label: string | null; fieldType: string | null } | null;
+                value: string;
+            }
 
-            let phoneField = values.find((v: any) => v.field?.fieldType === "phone");
-            if (!phoneField) phoneField = values.find((v: any) => v.field?.label && /whatsapp|hp/i.test(v.field.label));
-            if (!phoneField) phoneField = values.find((v: any) => /number/i.test(v.field?.fieldType || ""));
+            let nameField = values.find((v: SubValType) => v.field?.fieldType === "name");
+            if (!nameField) nameField = values.find((v: SubValType) => v.field?.label && /nama/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+            if (!nameField) nameField = values.find((v: SubValType) => /text/i.test(v.field?.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field?.label || ""));
+
+            let phoneField = values.find((v: SubValType) => v.field?.fieldType === "phone");
+            if (!phoneField) phoneField = values.find((v: SubValType) => v.field?.label && /whatsapp|hp/i.test(v.field.label));
+            if (!phoneField) phoneField = values.find((v: SubValType) => /number/i.test(v.field?.fieldType || ""));
 
             const finalName = nameField?.value?.trim() || `Peserta #${sub.id.substring(0, 6)}`;
             const finalPhone = phoneField?.value?.trim() || "";

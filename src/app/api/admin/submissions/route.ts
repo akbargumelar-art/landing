@@ -1,7 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { formSubmissions, submissionValues, formFields, dynamicForms, programs, winners } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { formSubmissions } from "@/db/schema";
+import { desc } from "drizzle-orm";
+
+interface SubValue {
+    value: string;
+    field: { label: string } | null;
+}
+
+interface FetchedSubmission {
+    id: string;
+    status: string;
+    form: {
+        program: { id: string } | null;
+    };
+    values: SubValue[];
+}
 
 // GET submissions with filters
 export async function GET(request: Request) {
@@ -34,18 +48,18 @@ export async function GET(request: Request) {
         let filtered = result;
 
         if (status) {
-            filtered = filtered.filter((s: any) => s.status === status);
+            filtered = filtered.filter((s: FetchedSubmission) => s.status === status);
         }
 
         if (programId) {
-            filtered = filtered.filter((s: any) => s.form.program?.id === programId);
+            filtered = filtered.filter((s: FetchedSubmission) => s.form.program?.id === programId);
         }
 
         if (search) {
             const q = search.toLowerCase();
-            filtered = filtered.filter((s: any) =>
+            filtered = filtered.filter((s: FetchedSubmission) =>
                 s.values.some(
-                    (v: any) =>
+                    (v: SubValue) =>
                         v.value.toLowerCase().includes(q) ||
                         (v.field?.label || "").toLowerCase().includes(q)
                 )
