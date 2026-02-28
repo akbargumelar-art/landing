@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { dynamicForms, formFields, formSubmissions, submissionValues, siteSettings } from "@/db/schema";
+import { dynamicForms, formFields, formSubmissions, submissionValues } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { writeFile, mkdir } from "fs/promises";

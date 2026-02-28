@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm"; // Lint issue 3f52cbf6 might occur, but it's a
 export interface WAHAData {
     name: string;
     programName: string;
-    [key: string]: any; // Allow other dynamic fields in the future
+    [key: string]: unknown; // Allow other dynamic fields in the future without triggering any
 }
 
 /**
