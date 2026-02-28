@@ -62,8 +62,35 @@ export async function GET(request: Request) {
 
         const result: FetchedSubmission[] = dbResult.map(s => {
             const valuesRaw = (s as unknown as { submissionValues: any[] }).submissionValues || [];
-            // Sort values by the original field's sortOrder
-            valuesRaw.sort((a, b) => (a.field?.sortOrder || 0) - (b.field?.sortOrder || 0));
+
+            // Reconstruct absolute order based on the master formSchema JSON created by the FormBuilder
+            let schemaOrder: string[] = [];
+            if (s.form?.formSchema) {
+                try {
+                    const parsedSchema = JSON.parse(s.form.formSchema);
+                    if (Array.isArray(parsedSchema)) {
+                        schemaOrder = parsedSchema.map((el: any) => el.id);
+                    }
+                } catch (e) {
+                    console.error("Failed to parse formSchema for sorting", e);
+                }
+            }
+
+            // Sort values matching exactly the layout order
+            valuesRaw.sort((a, b) => {
+                const indexA = schemaOrder.indexOf(a.field?.id || "");
+                const indexB = schemaOrder.indexOf(b.field?.id || "");
+
+                // If both are found in the schema, sort by their index position
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                // If A is found but B is not, A comes first
+                if (indexA !== -1) return -1;
+                // If B is found but A is not, B comes first
+                if (indexB !== -1) return 1;
+
+                // Fallback to old sort order if absolutely needed
+                return (a.field?.sortOrder || 0) - (b.field?.sortOrder || 0);
+            });
 
             return {
                 ...s,
