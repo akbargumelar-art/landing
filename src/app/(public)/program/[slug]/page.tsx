@@ -65,12 +65,20 @@ interface ParticipantGroup {
 
 function maskName(name: string): string {
     if (!name) return "Peserta Anonim";
-    return name;
+    if (name.startsWith("Peserta #")) return name;
+    return name
+        .split(" ")
+        .map((word) => {
+            if (word.length <= 3) return word.charAt(0) + "***";
+            return word.substring(0, word.length - 3) + "***";
+        })
+        .join(" ");
 }
 
 function maskPhone(phone: string): string {
     if (!phone) return "-";
-    return phone;
+    if (phone.length <= 3) return phone + "***";
+    return phone.substring(0, phone.length - 3) + "***";
 }
 
 export default function ProgramDetailPage() {
