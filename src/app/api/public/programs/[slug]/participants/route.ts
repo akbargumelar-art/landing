@@ -7,7 +7,7 @@ import {
     submissionValues,
     formFields,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export interface ParticipantEntry {
     name: string;
@@ -48,15 +48,17 @@ export async function GET(
 
         const formIds = forms.map((f: { id: string }) => f.id);
 
-        // Get all submissions for these forms
-        const allSubmissions: { id: string; period: string }[] = [];
-        for (const formId of formIds) {
-            const subs = await db
-                .select({ id: formSubmissions.id, period: formSubmissions.period })
-                .from(formSubmissions)
-                .where(eq(formSubmissions.formId, formId));
-            allSubmissions.push(...subs);
-        }
+        // Get submissions matching to forms of the given program
+        const allSubmissions = await db.query.formSubmissions.findMany({
+            where: inArray(formSubmissions.formId, formIds),
+            with: {
+                values: {
+                    with: {
+                        field: true,
+                    },
+                },
+            },
+        });
 
         if (allSubmissions.length === 0) {
             return NextResponse.json([]);
@@ -68,19 +70,15 @@ export async function GET(
         for (const sub of allSubmissions) {
             const periodLabel = sub.period || "Tanpa Periode";
 
-            const values = await db
-                .select({ value: submissionValues.value, label: formFields.label, type: formFields.fieldType })
-                .from(submissionValues)
-                .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
-                .where(eq(submissionValues.submissionId, sub.id));
+            const values = sub.values || [];
 
-            let nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "name");
-            if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /nama|name|lengkap|peserta/i.test(v.label) && !/phone|email|hp|telp/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
-            if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => /text/i.test(v.type || "") && !/phone|email|hp|telp|wa/i.test(v.label || ""));
+            let nameField = values.find((v: any) => v.field?.fieldType === "name");
+            if (!nameField) nameField = values.find((v: any) => v.field?.label && /nama/i.test(v.field.label) && !/phone|email|hp|telp/i.test(v.field.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field.label || ""));
+            if (!nameField) nameField = values.find((v: any) => /text/i.test(v.field?.fieldType || "") && !/phone|email|hp|telp|wa/i.test(v.field?.label || ""));
 
-            let phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "phone");
-            if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
-            if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => /number/i.test(v.type || ""));
+            let phoneField = values.find((v: any) => v.field?.fieldType === "phone");
+            if (!phoneField) phoneField = values.find((v: any) => v.field?.label && /whatsapp|hp/i.test(v.field.label));
+            if (!phoneField) phoneField = values.find((v: any) => /number/i.test(v.field?.fieldType || ""));
 
             const finalName = nameField?.value?.trim() || `Peserta #${sub.id.substring(0, 6)}`;
             const finalPhone = phoneField?.value?.trim() || "";

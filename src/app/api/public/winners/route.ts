@@ -59,13 +59,13 @@ export async function GET(request: Request) {
 
                     if (finalName.startsWith("Peserta #")) {
                         let nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "name");
-                        if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type || ""));
+                        if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /nama/i.test(v.label) && !/phone|email/i.test(v.type || ""));
                         if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => /text/i.test(v.type || ""));
                         if (nameField?.value?.trim()) finalName = nameField.value.trim();
                     }
                     if (!finalPhone) {
                         let phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "phone");
-                        if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
+                        if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /whatsapp|hp/i.test(v.label));
                         if (phoneField?.value?.trim()) finalPhone = phoneField.value.trim();
                     }
                     if (!finalOutlet) {

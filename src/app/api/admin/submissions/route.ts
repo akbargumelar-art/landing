@@ -11,53 +11,41 @@ export async function GET(request: Request) {
         const status = searchParams.get("status");
         const search = searchParams.get("search");
 
-        // Get all submissions
-        let allSubmissions = await db.select().from(formSubmissions).orderBy(desc(formSubmissions.submittedAt));
+        // Fetch using Drizzle Relational Queries
+        const result = await db.query.formSubmissions.findMany({
+            with: {
+                form: {
+                    with: {
+                        program: true,
+                        fields: true, // we might not need to send all fields if we only care about submitted values, but left here for completeness if frontend uses it
+                    },
+                },
+                values: {
+                    with: {
+                        field: true,
+                    },
+                },
+                winner: true,
+            },
+            orderBy: [desc(formSubmissions.submittedAt)],
+        });
 
-        // Filter by status
-        if (status) {
-            allSubmissions = allSubmissions.filter((s) => s.status === status);
-        }
-
-        // Build full results with relations
-        const result = [];
-        for (const sub of allSubmissions) {
-            const [form] = await db.select().from(dynamicForms).where(eq(dynamicForms.id, sub.formId));
-            if (!form) continue;
-
-            // Filter by programId
-            if (programId && form.programId !== programId) continue;
-
-            const [program] = await db
-                .select({ id: programs.id, title: programs.title })
-                .from(programs)
-                .where(eq(programs.id, form.programId));
-
-            const fields = await db.select().from(formFields).where(eq(formFields.formId, form.id));
-
-            const values = await db.select().from(submissionValues).where(eq(submissionValues.submissionId, sub.id));
-            const valuesWithField = values.map((v) => ({
-                ...v,
-                field: fields.find((f) => f.id === v.fieldId) || null,
-            }));
-
-            const [winner] = await db.select().from(winners).where(eq(winners.submissionId, sub.id));
-
-            result.push({
-                ...sub,
-                form: { ...form, program: program || null, fields },
-                values: valuesWithField,
-                winner: winner || null,
-            });
-        }
-
-        // Apply search filter
+        // Apply Filters
         let filtered = result;
+
+        if (status) {
+            filtered = filtered.filter((s: any) => s.status === status);
+        }
+
+        if (programId) {
+            filtered = filtered.filter((s: any) => s.form.program?.id === programId);
+        }
+
         if (search) {
             const q = search.toLowerCase();
-            filtered = result.filter((s) =>
+            filtered = filtered.filter((s: any) =>
                 s.values.some(
-                    (v) =>
+                    (v: any) =>
                         v.value.toLowerCase().includes(q) ||
                         (v.field?.label || "").toLowerCase().includes(q)
                 )
