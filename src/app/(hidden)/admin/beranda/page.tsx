@@ -402,7 +402,7 @@ export default function BerandaPage() {
                                             } else {
                                                 alert(data.error || "Gagal upload gambar");
                                             }
-                                        } catch (err) {
+                                        } catch {
                                             alert("Gagal koneksi server saat upload file.");
                                         } finally {
                                             setIsUploadingSlide(false);

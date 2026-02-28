@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2 } from "lucide-react";
+import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare } from "lucide-react";
 import Image from "next/image";
 
 interface OfficeData {
@@ -189,6 +189,53 @@ export default function PengaturanPage() {
                     <div className="space-y-2">
                         <Label>URL Facebook</Label>
                         <Input value={settings.facebook_url || ""} onChange={(e) => updateSetting("facebook_url", e.target.value)} />
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* WhatsApp Integration */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5" /> Integrasi & Notifikasi WhatsApp API
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Pengaturan ini digunakan untuk mengirim pesan notifikasi WhatsApp otomatis kepada pendaftar.
+                        Jika dibiarkan kosong, fitur notifikasi tidak akan berjalan.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Endpoint API URL (POST)</Label>
+                            <Input
+                                value={settings.wa_api_url || ""}
+                                onChange={(e) => updateSetting("wa_api_url", e.target.value)}
+                                placeholder="Contoh: https://api.fonnte.com/send"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>API Key / Token</Label>
+                            <Input
+                                type="password"
+                                value={settings.wa_api_token || ""}
+                                onChange={(e) => updateSetting("wa_api_token", e.target.value)}
+                                placeholder="Masukkan token rahasia"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Template Pesan Notifikasi</Label>
+                        <textarea
+                            className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            value={settings.wa_template_message || ""}
+                            onChange={(e) => updateSetting("wa_template_message", e.target.value)}
+                            placeholder="Halo {nama}, pendaftaran Anda untuk {program} berhasil."
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Gunakan <code>&#123;nama&#125;</code> untuk nama peserta, dan <code>&#123;program&#125;</code> untuk judul program pendaftaran.
+                            Variabel lain akan menyusul sesuai label di formulir.
+                        </p>
                     </div>
                 </CardContent>
             </Card>

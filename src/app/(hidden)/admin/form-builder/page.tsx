@@ -12,7 +12,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-    Plus, Trash2, Loader2, Save, ArrowUp, ArrowDown, GripVertical,
+    Plus, Trash2, Loader2, Save, GripVertical,
     Type, AlignLeft, Hash, Mail, Phone, ChevronDown, CircleDot, CheckSquare,
     CalendarIcon, Upload, ImageIcon, Minus, Columns2, Eye, Settings2, X,
 } from "lucide-react";
@@ -546,7 +546,7 @@ function PropertiesPanel({ element, onChange, onClose }: {
                                         } else {
                                             alert(data.error || "Gagal upload gambar");
                                         }
-                                    } catch (err) {
+                                    } catch {
                                         alert("Gagal koneksi server saat upload file.");
                                     } finally {
                                         setIsUploading(false);

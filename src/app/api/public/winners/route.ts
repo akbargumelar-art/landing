@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         let allWinners = await db.select().from(winners).orderBy(desc(winners.drawnAt));
 
         if (programId) {
-            allWinners = allWinners.filter((w) => w.programId === programId);
+            allWinners = allWinners.filter((w: WinnerRow) => w.programId === programId);
         }
 
         const result: WinnerRow[] = [];
@@ -58,18 +58,18 @@ export async function GET(request: Request) {
                         .where(eq(submissionValues.submissionId, w.submissionId));
 
                     if (finalName.startsWith("Peserta #")) {
-                        let nameField = values.find((v: any) => v.type === "name");
-                        if (!nameField) nameField = values.find((v: any) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type));
-                        if (!nameField) nameField = values.find((v: any) => /text/i.test(v.type || ""));
+                        let nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "name");
+                        if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type || ""));
+                        if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => /text/i.test(v.type || ""));
                         if (nameField?.value?.trim()) finalName = nameField.value.trim();
                     }
                     if (!finalPhone) {
-                        let phoneField = values.find((v: any) => v.type === "phone");
-                        if (!phoneField) phoneField = values.find((v: any) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
+                        let phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "phone");
+                        if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
                         if (phoneField?.value?.trim()) finalPhone = phoneField.value.trim();
                     }
                     if (!finalOutlet) {
-                        const outletField = values.find((v) => /outlet/i.test(v.label));
+                        const outletField = values.find((v: { label: string | null, value: string }) => /outlet/i.test(v.label || ""));
                         if (outletField?.value) finalOutlet = outletField.value;
                     }
                 } catch { /* ignore fallback errors */ }

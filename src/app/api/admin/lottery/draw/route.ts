@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
         // Get approved submissions for this program
         const forms = await db.select().from(dynamicForms).where(eq(dynamicForms.programId, programId));
-        const formIds = forms.map((f) => f.id);
+        const formIds = forms.map((f: { id: string }) => f.id);
 
         if (formIds.length === 0) {
             return NextResponse.json({ error: "Tidak ada form untuk program ini" }, { status: 400 });
@@ -60,13 +60,13 @@ export async function POST(request: Request) {
         const selected = eligible[randomIndex];
 
         // Get details from submission values
-        let nameField = selected.values.find((v: any) => v.field?.fieldType === "name");
-        if (!nameField) nameField = selected.values.find((v: any) => v.field?.label && /nama|name/i.test(v.field.label) && !/phone|email/i.test(v.field.fieldType));
-        if (!nameField) nameField = selected.values.find((v: any) => /text/i.test(v.field?.fieldType || ""));
+        let nameField = selected.values.find((v: { field: { fieldType: string, label: string } | null, value: string }) => v.field?.fieldType === "name");
+        if (!nameField) nameField = selected.values.find((v: { field: { fieldType: string, label: string } | null, value: string }) => v.field?.label && /nama|name/i.test(v.field.label) && !/phone|email/i.test(v.field?.fieldType || ""));
+        if (!nameField) nameField = selected.values.find((v: { field: { fieldType: string, label: string } | null, value: string }) => /text/i.test(v.field?.fieldType || ""));
         const winnerName = nameField?.value?.trim() || "Peserta #" + selected.id.slice(0, 6);
 
-        let phoneField = selected.values.find((v: any) => v.field?.fieldType === "phone");
-        if (!phoneField) phoneField = selected.values.find((v: any) => v.field?.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
+        let phoneField = selected.values.find((v: { field: { fieldType: string, label: string } | null, value: string }) => v.field?.fieldType === "phone");
+        if (!phoneField) phoneField = selected.values.find((v: { field: { fieldType: string, label: string } | null, value: string }) => v.field?.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.field.label));
         const winnerPhone = phoneField?.value?.trim() || "";
 
         const outletValue = selected.values.find(

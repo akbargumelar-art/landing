@@ -74,15 +74,15 @@ export async function GET(
                 .innerJoin(formFields, eq(submissionValues.fieldId, formFields.id))
                 .where(eq(submissionValues.submissionId, sub.id));
 
-            let nameField = values.find((v: any) => v.type === "name");
-            if (!nameField) nameField = values.find((v: any) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type));
-            if (!nameField) nameField = values.find((v: any) => /text/i.test(v.type || ""));
+            let nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "name");
+            if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /nama|name/i.test(v.label) && !/phone|email/i.test(v.type || ""));
+            if (!nameField) nameField = values.find((v: { type: string | null, label: string | null, value: string }) => /text/i.test(v.type || ""));
 
-            let phoneField = values.find((v: any) => v.type === "phone");
-            if (!phoneField) phoneField = values.find((v: any) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
+            let phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.type === "phone");
+            if (!phoneField) phoneField = values.find((v: { type: string | null, label: string | null, value: string }) => v.label && /telepon|telp|hp|handphone|nomor|wa|whatsapp/i.test(v.label));
 
-            let finalName = nameField?.value?.trim() || `Peserta #${sub.id.substring(0, 6)}`;
-            let finalPhone = phoneField?.value?.trim() || "";
+            const finalName = nameField?.value?.trim() || `Peserta #${sub.id.substring(0, 6)}`;
+            const finalPhone = phoneField?.value?.trim() || "";
 
             if (!grouped[periodLabel]) grouped[periodLabel] = [];
             grouped[periodLabel].push({

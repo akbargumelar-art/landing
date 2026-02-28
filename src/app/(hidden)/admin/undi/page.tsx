@@ -109,7 +109,7 @@ export default function UndiPage() {
             setError("Terjadi kesalahan");
             setIsRolling(false);
         }
-    }, [selectedProgram]);
+    }, [selectedProgram, selectedPeriod]);
 
     const reset = () => {
         if (rollInterval.current) clearInterval(rollInterval.current);

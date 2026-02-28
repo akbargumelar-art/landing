@@ -147,7 +147,7 @@ export default function ProgramPage() {
             } else {
                 alert(data.error || "Gagal upload gambar");
             }
-        } catch (err) {
+        } catch {
             alert("Terjadi kesalahan saat upload");
         } finally {
             setIsUploadingThumbnail(false);
@@ -169,7 +169,7 @@ export default function ProgramPage() {
                 } else {
                     alert(`Gagal upload ${files[i].name}: ${data.error || "Error"}`);
                 }
-            } catch (err) {
+            } catch {
                 alert(`Terjadi kesalahan saat upload ${files[i].name}`);
             }
         }
@@ -190,7 +190,7 @@ export default function ProgramPage() {
             } else {
                 alert(data.error || "Gagal upload gambar hadiah");
             }
-        } catch (err) {
+        } catch {
             alert("Terjadi kesalahan saat upload");
         } finally {
             setUploadingPrizeIndex(null);
