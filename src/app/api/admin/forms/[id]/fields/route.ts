@@ -14,14 +14,28 @@ export async function PUT(
         const body = await request.json();
         const { fields } = body;
 
-        // Delete existing fields
-        await db.delete(formFields).where(eq(formFields.formId, formId));
+        // Instead of wiping all fields (which cascade-deletes submission data),
+        // we will find which fields to delete, update, or insert.
+        const existingFieldsMap = await db.select({ id: formFields.id }).from(formFields).where(eq(formFields.formId, formId));
+        const existingIds = existingFieldsMap.map((f: { id: string }) => f.id);
+        const newIds = fields.map((f: { id?: string }) => f.id).filter(Boolean);
 
-        // Create new fields in order
+        const idsToDelete = existingIds.filter((id: string) => !newIds.includes(id));
+
+        // 1. Delete removed fields
+        if (idsToDelete.length > 0) {
+            for (const delId of idsToDelete) {
+                await db.delete(formFields).where(eq(formFields.id, delId));
+            }
+        }
+
+        // 2. Upsert (Update or Insert) fields in order
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
-            await db.insert(formFields).values({
-                id: field.id || uuid(),
+            const fieldId = field.id || uuid();
+            const isExisting = existingIds.includes(fieldId);
+
+            const fieldValues = {
                 formId,
                 fieldType: field.type || "text",
                 label: field.label || "",
@@ -30,7 +44,13 @@ export async function PUT(
                 isRequired: field.isRequired ?? false,
                 options: field.options || "[]",
                 sortOrder: i,
-            });
+            };
+
+            if (isExisting) {
+                await db.update(formFields).set(fieldValues).where(eq(formFields.id, fieldId));
+            } else {
+                await db.insert(formFields).values({ id: fieldId, ...fieldValues });
+            }
         }
 
         // Return updated form with fields
