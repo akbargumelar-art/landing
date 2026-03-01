@@ -518,10 +518,11 @@ export default function BerandaPage() {
                                 )}
                             </div>
                             {editOffice.image && (
-                                <div className="relative w-full h-32 rounded-lg border overflow-hidden">
+                                <div className="relative w-32 h-40 rounded-lg border overflow-hidden mx-auto sm:mx-0">
                                     <Image src={editOffice.image} alt="Preview" fill className="object-cover" unoptimized={true} />
                                 </div>
                             )}
+                            <p className="text-xs text-muted-foreground">Rekomendasi rasio foto: Potrait (3:4 atau 4:5). Contoh: 600x800 pixel.</p>
                         </div>
                         <div className="space-y-2">
                             <Label>Alamat Lengkap</Label>

@@ -266,6 +266,7 @@ function QuickAccessSection({ quickCards }: { quickCards: QuickCard[] | null }) 
         <section className="py-10 bg-gray-50/80">
             <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {displayItems.map((item: any, i: number) => {
                         const isDynamic = quickCards && quickCards.length > 0;
                         return (
@@ -413,22 +414,22 @@ function LokasiKantor() {
                     </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
                     {offices.map((office) => (
                         <Card
                             key={office.city}
-                            className="overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white"
+                            className="overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white flex flex-col sm:flex-row h-full"
                         >
-                            {/* Photo */}
-                            <div className="relative h-56 overflow-hidden">
+                            {/* Photo (Portrait Mode) */}
+                            <div className="relative h-64 sm:h-auto sm:w-2/5 shrink-0 overflow-hidden">
                                 <Image
                                     src={office.image}
                                     alt={office.label}
                                     fill
                                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                                <div className="absolute top-3 left-3">
+                                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/60 sm:from-black/40 to-transparent" />
+                                <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold shadow-lg">
                                         <MapPin className="h-3 w-3" />
                                         {office.label}
@@ -436,7 +437,7 @@ function LokasiKantor() {
                                 </div>
                             </div>
 
-                            <CardContent className="p-6 space-y-4">
+                            <CardContent className="p-6 space-y-4 flex flex-col justify-center flex-1">
                                 {/* City Name */}
                                 <h3 className="text-xl font-extrabold text-foreground flex items-center gap-2">
                                     {office.city}
@@ -450,23 +451,23 @@ function LokasiKantor() {
 
                                 {/* Phone */}
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                                         <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
                                         </svg>
                                     </div>
-                                    <span className="text-sm font-semibold text-foreground">{office.phone}</span>
+                                    <span className="text-sm font-semibold text-foreground line-clamp-1">{office.phone}</span>
                                 </div>
 
                                 {/* Separator */}
-                                <div className="border-t border-red-500 w-16" />
+                                <div className="border-t border-red-500 w-16 my-1" />
 
                                 {/* Map Link */}
                                 <a
                                     href={office.mapUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700 transition-colors"
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700 transition-colors mt-auto pt-2"
                                 >
                                     <MapPin className="h-4 w-4" />
                                     Lihat di Google Maps
