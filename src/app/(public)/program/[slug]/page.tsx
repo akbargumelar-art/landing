@@ -456,6 +456,13 @@ export default function ProgramDetailPage() {
                                                                 {maskData(winner.phone, 'phone')}
                                                             </p>
                                                         )}
+                                                        {winner.prizeName && (
+                                                            <div className="mt-2">
+                                                                <span className="text-[10px] uppercase font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full inline-block truncate max-w-full">
+                                                                    Hadiah: {winner.prizeName}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </CardContent>
                                                 </Card>
                                             </div>
