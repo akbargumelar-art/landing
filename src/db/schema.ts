@@ -154,6 +154,7 @@ export const winners = mysqlTable("winners", {
     outlet: varchar("outlet", { length: 255 }).notNull().default(""),
     period: varchar("period", { length: 100 }).notNull().default(""),
     photoUrl: varchar("photo_url", { length: 500 }).notNull().default(""),
+    prizeName: varchar("prize_name", { length: 255 }).notNull().default("Hadiah Utama"),
     drawnAt: datetime("drawn_at").notNull(),
 });
 

@@ -12,6 +12,7 @@ interface WinnerRow {
     outlet: string;
     period: string;
     photoUrl: string;
+    prizeName: string;
     drawnAt: Date;
     program: { title: string };
 }
@@ -81,6 +82,7 @@ export async function GET(request: Request) {
                 phone: finalPhone,
                 outlet: finalOutlet,
                 period: finalPeriod,
+                prizeName: w.prizeName || "",
                 program: program || { title: "Unknown" }
             });
         }

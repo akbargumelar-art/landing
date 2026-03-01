@@ -44,6 +44,7 @@ interface Winner {
     phone?: string;
     outlet?: string;
     period: string;
+    prizeName?: string;
     photoUrl?: string;
     programId: string;
 }
@@ -500,9 +501,16 @@ export default function ProgramDetailPage() {
                                     <MapPin className="h-3.5 w-3.5" /> {selectedWinner.outlet}
                                 </p>
                             )}
-                            <Badge className="btn-pill bg-gradient-to-r from-red-500 to-orange-500 text-white border-0">
-                                {selectedWinner.period}
-                            </Badge>
+                            {selectedWinner.prizeName && (
+                                <Badge variant="outline" className="mb-3 text-orange-600 border-orange-200 bg-orange-50 font-semibold px-4 py-1.5 whitespace-normal text-center">
+                                    Menang: {selectedWinner.prizeName}
+                                </Badge>
+                            )}
+                            <div>
+                                <Badge className="btn-pill bg-gradient-to-r from-red-500 to-orange-500 text-white border-0 mt-1">
+                                    {selectedWinner.period}
+                                </Badge>
+                            </div>
                         </div>
                     )}
                 </DialogContent>

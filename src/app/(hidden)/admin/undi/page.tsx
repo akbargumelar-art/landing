@@ -12,6 +12,7 @@ import Image from "next/image";
 interface Program {
     id: string;
     title: string;
+    prizes?: string;
 }
 
 interface Winner {
@@ -19,7 +20,8 @@ interface Winner {
     name: string;
     drawnAt: string;
     photoUrl?: string;
-    program: { id: string; title: string };
+    prizeName?: string;
+    program: { id: string; title: string, prizes?: string };
 }
 
 export default function UndiPage() {
@@ -30,6 +32,8 @@ export default function UndiPage() {
 
     const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState("");
+    const [availablePrizes, setAvailablePrizes] = useState<{ title: string }[]>([]);
+    const [selectedPrize, setSelectedPrize] = useState("");
 
     const [uploadingWinnerId, setUploadingWinnerId] = useState<string | null>(null);
 
@@ -55,13 +59,22 @@ export default function UndiPage() {
     useEffect(() => {
         setAvailablePeriods([]);
         setSelectedPeriod("");
+        setAvailablePrizes([]);
+        setSelectedPrize("");
         if (selectedProgram) {
+            const prog = programs.find(p => p.id === selectedProgram);
+            if (prog && prog.prizes) {
+                try {
+                    setAvailablePrizes(JSON.parse(prog.prizes));
+                } catch { setAvailablePrizes([]); }
+            }
+
             fetch(`/api/admin/lottery/periods?programId=${selectedProgram}`)
                 .then(r => r.json())
                 .then(setAvailablePeriods)
                 .catch(() => { });
         }
-    }, [selectedProgram]);
+    }, [selectedProgram, programs]);
 
     const roll = useCallback(async () => {
         if (!selectedProgram) { setError("Pilih program terlebih dahulu"); return; }
@@ -74,7 +87,7 @@ export default function UndiPage() {
             const res = await fetch("/api/admin/lottery/draw", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ programId: selectedProgram, period: selectedPeriod }),
+                body: JSON.stringify({ programId: selectedProgram, period: selectedPeriod, prizeName: selectedPrize }),
             });
 
             const data = await res.json();
@@ -215,6 +228,19 @@ export default function UndiPage() {
                                 </select>
                             </div>
                         )}
+                        {selectedProgram && availablePrizes.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold">Pilih Hadiah (Opsional)</label>
+                                <select
+                                    value={selectedPrize}
+                                    onChange={(e) => setSelectedPrize(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+                                >
+                                    <option value="">Tanpa Keterangan Hadiah</option>
+                                    {availablePrizes.map((p, i) => (<option key={i} value={p.title}>{p.title}</option>))}
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -306,7 +332,7 @@ export default function UndiPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold text-sm">{w.name}</p>
-                                        <p className="text-xs text-muted-foreground">{w.program.title}</p>
+                                        <p className="text-xs text-muted-foreground">{w.program.title} {w.prizeName ? `- ${w.prizeName}` : ""}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Badge variant="outline" className="text-xs shrink-0">

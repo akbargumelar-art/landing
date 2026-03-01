@@ -35,7 +35,8 @@ export async function GET(request: Request) {
 
             result.push({
                 ...w,
-                program: program || null,
+                prizeName: w.prizeName || "",
+                program: program || { id: w.programId, title: "Unknown" },
                 submission: submission ? { ...submission, values: valuesWithField } : null,
             });
         }

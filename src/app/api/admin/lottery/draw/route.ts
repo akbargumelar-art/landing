@@ -8,7 +8,7 @@ import { v4 as uuid } from "uuid";
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { programId, period } = body;
+        const { programId, period, prizeName } = body;
 
         if (!programId) {
             return NextResponse.json({ error: "programId required" }, { status: 400 });
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
             phone: winnerPhone,
             outlet: winnerOutlet,
             period: winnerPeriod,
+            prizeName: prizeName || "",
             drawnAt: new Date(),
         });
 
