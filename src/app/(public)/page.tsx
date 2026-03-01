@@ -327,15 +327,30 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                                         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
                                         <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full" />
                                         <div className="absolute -bottom-2 -left-2 w-16 h-16 bg-white/10 rounded-full" />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                <span className="text-2xl font-extrabold text-white">
+                                                    {program.title.charAt(0)}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
-                                <div className="absolute top-3 left-3 pointer-events-none">
-                                    <span className="text-[10px] bg-white/90 backdrop-blur-sm shadow-sm text-gray-800 px-3 py-1.5 rounded-full font-bold z-10 relative">
-                                        {program.period}
+                                {/* Category Badge */}
+                                <div className="absolute bottom-3 right-3">
+                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide shadow-md ${program.category === "mitra"
+                                        ? "bg-orange-500 text-white"
+                                        : "bg-red-600 text-white"
+                                        }`}>
+                                        {program.category === "mitra" ? "Mitra Outlet" : "Pelanggan"}
                                     </span>
                                 </div>
                             </div>
                             <CardContent className="p-5">
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-3">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{program.period}</span>
+                                </div>
                                 <h3 className="font-bold text-foreground mb-2 text-sm leading-snug line-clamp-2">
                                     {program.title}
                                 </h3>
@@ -344,7 +359,7 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                                 </p>
                                 <Link href={`/program/${program.slug}`}>
                                     <Button variant="outline" size="sm" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
-                                        Detail
+                                        Lihat Detail
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </Button>
                                 </Link>
