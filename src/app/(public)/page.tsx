@@ -245,31 +245,48 @@ function AboutSection({ aboutContent }: { aboutContent?: string }) {
     );
 }
 
-function QuickAccessSection() {
-    const items = [
-        { icon: Zap, label: "Hot Promo", color: "from-red-500 to-red-600" },
-        { icon: Gift, label: "Undian Berhadiah", color: "from-orange-500 to-red-500" },
-        { icon: Shield, label: "Paket Hemat", color: "from-red-600 to-red-700" },
-        { icon: Users, label: "Mitra Outlet", color: "from-red-500 to-orange-500" },
+interface QuickCard {
+    label: string;
+    icon: string;
+    link: string;
+    color: string;
+}
+
+function QuickAccessSection({ quickCards }: { quickCards: QuickCard[] | null }) {
+    const defaultItems = [
+        { icon: Zap, label: "Hot Promo", color: "from-red-500 to-red-600", link: "/program" },
+        { icon: Gift, label: "Undian Berhadiah", color: "from-orange-500 to-red-500", link: "/program" },
+        { icon: Shield, label: "Paket Hemat", color: "from-red-600 to-red-700", link: "/program" },
+        { icon: Users, label: "Mitra Outlet", color: "from-red-500 to-orange-500", link: "/program" },
     ];
+
+    const displayItems = quickCards && quickCards.length > 0 ? quickCards : defaultItems;
 
     return (
         <section className="py-10 bg-gray-50/80">
             <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                    {items.map((item, i) => (
-                        <div
-                            key={i}
-                            className="flex flex-col items-center gap-3 p-5 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group"
-                        >
-                            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                                <item.icon className="h-7 w-7 text-white" />
-                            </div>
-                            <span className="text-sm font-bold text-foreground text-center">
-                                {item.label}
-                            </span>
-                        </div>
-                    ))}
+                    {displayItems.map((item: any, i: number) => {
+                        const isDynamic = quickCards && quickCards.length > 0;
+                        return (
+                            <Link href={item.link || "/program"} key={i} className="flex flex-col items-center gap-3 p-5 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group">
+                                <div className={`relative w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300 overflow-hidden`}>
+                                    {isDynamic ? (
+                                        item.icon && (item.icon.startsWith("/") || item.icon.startsWith("http")) ? (
+                                            <Image src={item.icon} alt={item.label} fill className="object-contain p-2" unoptimized={true} />
+                                        ) : (
+                                            <span className="text-2xl text-white">{item.icon}</span>
+                                        )
+                                    ) : (
+                                        <item.icon className="h-7 w-7 text-white" />
+                                    )}
+                                </div>
+                                <span className="text-sm font-bold text-foreground text-center">
+                                    {item.label}
+                                </span>
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
         </section>
@@ -540,6 +557,7 @@ export default function HomePage() {
     const [slides, setSlides] = useState<HeroSlide[]>([]);
     const [programsList, setProgramsList] = useState<Program[]>([]);
     const [aboutContent, setAboutContent] = useState<string>("");
+    const [quickCards, setQuickCards] = useState<QuickCard[] | null>(null);
 
     useEffect(() => {
         fetch("/api/public/hero-slides")
@@ -558,6 +576,11 @@ export default function HomePage() {
             .then((res) => res.json())
             .then((data) => {
                 if (data.about_content) setAboutContent(data.about_content);
+                if (data.quick_access_cards) {
+                    try {
+                        setQuickCards(JSON.parse(data.quick_access_cards));
+                    } catch { }
+                }
             })
             .catch(() => { });
     }, []);
@@ -565,7 +588,7 @@ export default function HomePage() {
     return (
         <>
             <HeroCarousel slides={slides} />
-            <QuickAccessSection />
+            <QuickAccessSection quickCards={quickCards} />
             <AboutSection aboutContent={aboutContent} />
             <ProgramPreview programs={programsList} />
             <LokasiKantor />
