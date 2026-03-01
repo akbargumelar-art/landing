@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
 import {
     MapPin,
     Phone,
@@ -15,18 +16,20 @@ import {
 } from "lucide-react";
 
 // Fallback defaults
-const defaultOffices = [
+const defaultOffices: { city: string; address: string; mapUrl: string; gradient: string; image?: string; }[] = [
     {
         city: "Kantor Pusat Cirebon",
         address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
         mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
         gradient: "from-red-500 via-red-600 to-orange-500",
+        image: "/images/office-cirebon.png"
     },
     {
         city: "Kantor Kuningan",
         address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
         mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
         gradient: "from-red-600 via-red-500 to-red-700",
+        image: "/images/office-kuningan.png"
     },
 ];
 
@@ -60,6 +63,7 @@ interface OfficeData {
     address: string;
     phone: string;
     mapUrl: string;
+    image?: string;
 }
 
 export default function LokasiKontakPage() {
@@ -103,7 +107,6 @@ export default function LokasiKontakPage() {
 
     const whatsappCTA = settings.whatsapp_url || defaultContacts[0].href;
 
-    // Parse office_data from settings, or use defaults
     let offices = defaultOffices;
     if (settings.office_data) {
         try {
@@ -113,6 +116,7 @@ export default function LokasiKontakPage() {
                     city: o.label || o.city || `Kantor ${i + 1}`,
                     address: o.address,
                     mapUrl: o.mapUrl,
+                    image: o.image || defaultOffices[i]?.image || "/images/office-default.png",
                     gradient: i % 2 === 0 ? "from-red-500 via-red-600 to-orange-500" : "from-red-600 via-red-500 to-red-700",
                 }));
             }
@@ -168,35 +172,57 @@ export default function LokasiKontakPage() {
                         </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
                         {offices.map((office, index) => (
                             <Card
                                 key={index}
-                                className="overflow-hidden border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+                                className="overflow-hidden border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white flex flex-col sm:flex-row h-full"
                             >
-                                <div className={`h-44 bg-gradient-to-br ${office.gradient} relative overflow-hidden`}>
-                                    <div className="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full" />
-                                    <div className="absolute -bottom-2 -left-2 w-14 h-14 bg-white/10 rounded-full" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
-                                            <MapPin className="h-8 w-8 text-white" />
+                                {/* Photo (Portrait Mode) */}
+                                <div className={`relative h-64 sm:h-auto sm:w-2/5 shrink-0 overflow-hidden ${!office.image ? 'bg-gradient-to-br ' + office.gradient : ''}`}>
+                                    {office.image ? (
+                                        <Image
+                                            src={office.image as string}
+                                            alt={office.city}
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                            unoptimized={true}
+                                        />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center z-10">
+                                                <MapPin className="h-8 w-8 text-white" />
+                                            </div>
                                         </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/60 sm:from-black/40 to-transparent" />
+                                    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold shadow-lg">
+                                            <MapPin className="h-3 w-3" />
+                                            {office.city}
+                                        </span>
                                     </div>
+                                    {/* Decorative */}
+                                    <div className="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full z-0 pointer-events-none" />
+                                    <div className="absolute -bottom-2 -left-2 w-14 h-14 bg-white/10 rounded-full z-0 pointer-events-none" />
                                 </div>
-                                <CardContent className="p-6">
-                                    <h3 className="font-bold text-foreground text-lg mb-2">
+
+                                <CardContent className="p-6 space-y-4 flex flex-col justify-center flex-1">
+                                    <h3 className="text-xl font-extrabold text-foreground flex items-center gap-2">
                                         {office.city}
                                     </h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
                                         {office.address}
                                     </p>
-                                    <a href={office.mapUrl} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="outline" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
-                                            <MapPin className="mr-2 h-4 w-4" />
-                                            Lihat di Google Maps
-                                            <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                                        </Button>
-                                    </a>
+                                    <div className="mt-auto pt-4">
+                                        <a href={office.mapUrl} target="_blank" rel="noopener noreferrer">
+                                            <Button variant="outline" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
+                                                <MapPin className="mr-2 h-4 w-4" />
+                                                Lihat di Google Maps
+                                                <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                                            </Button>
+                                        </a>
+                                    </div>
                                 </CardContent>
                             </Card>
                         ))}
