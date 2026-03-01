@@ -309,13 +309,13 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                     </h2>
                 </div>
 
-                <div className="flex flex-wrap justify-center gap-6">
-                    {programs.slice(0, 4).map((program) => (
+                <div className="flex flex-wrap justify-center gap-8">
+                    {programs.slice(0, 3).map((program) => (
                         <Card
                             key={program.id}
-                            className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(25%-18px)] overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+                            className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                         >
-                            <div className="h-44 relative overflow-hidden">
+                            <div className="h-48 relative overflow-hidden">
                                 {program.thumbnail ? (
                                     <Image
                                         src={program.thumbnail}
