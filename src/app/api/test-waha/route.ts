@@ -16,6 +16,7 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json({ success: true, message: `Check terminal logs to see WAHA HTTP status code for ${phone}` });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e?.message });
     }

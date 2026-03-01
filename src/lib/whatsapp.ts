@@ -105,6 +105,7 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
             console.log(`[WAHA] Successfully sent notification to ${chatId}.`);
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         // Catch errors explicitly to debug
         console.error("[WAHA] Exception during sendWhatsAppNotification:", error?.message || error);
