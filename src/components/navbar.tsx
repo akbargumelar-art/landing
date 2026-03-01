@@ -16,6 +16,7 @@ import {
 const navLinks = [
     { href: "/", label: "BERANDA" },
     { href: "/program", label: "PROGRAM" },
+    { href: "/belanja", label: "BELANJA" },
     { href: "/lokasi-kontak", label: "LOKASI & KONTAK" },
 ];
 
