@@ -308,11 +308,11 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                     </h2>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="flex flex-wrap justify-center gap-6">
                     {programs.slice(0, 4).map((program) => (
                         <Card
                             key={program.id}
-                            className="overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+                            className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(25%-18px)] overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                         >
                             <div className="h-44 relative overflow-hidden">
                                 {program.thumbnail ? (

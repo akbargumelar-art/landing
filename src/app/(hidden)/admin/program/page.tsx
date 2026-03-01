@@ -284,6 +284,9 @@ export default function ProgramPage() {
                                     <ImageIcon className="h-8 w-8 opacity-30" />
                                 </div>
                             )}
+                            <p className="text-[11px] text-muted-foreground leading-tight mt-1">
+                                Rekomendasi rasio gambar: <b>16:9</b> (Landscape), ukuran optimal <b>800x450 piksel</b>. Maksimal file 2MB.
+                            </p>
                         </div>
 
                         <div className="space-y-2">
