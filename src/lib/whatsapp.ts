@@ -51,6 +51,7 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
         const endpoint = settings["wa_gw_endpoint"];
         const token = settings["wa_gw_token"];
         const template = settings["wa_gw_template"];
+        const sessionName = settings["wa_gw_session"] || "default";
 
         // 2. Abort if integration is not configured
         if (!endpoint || !template) {
@@ -86,7 +87,7 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
         const payload = {
             chatId: chatId,
             text: finalMessage,
-            session: "default"
+            session: sessionName
         };
 
         console.log(`[WAHA] Sending notification to ${chatId}...`);
@@ -104,8 +105,9 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
             console.log(`[WAHA] Successfully sent notification to ${chatId}.`);
         }
 
-    } catch (error) {
-        // 7. Catch errors silently to not break surrounding logic
-        console.error("[WAHA] Exception during sendWhatsAppNotification:", error);
+    } catch (error: any) {
+        // Catch errors explicitly to debug
+        console.error("[WAHA] Exception during sendWhatsAppNotification:", error?.message || error);
+        if (error.cause) console.error("[WAHA] Cause:", error.cause);
     }
 }

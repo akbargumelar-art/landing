@@ -207,6 +207,14 @@ export default function PengaturanPage() {
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
+                            <Label>Nama Session WAHA</Label>
+                            <Input
+                                value={settings.wa_gw_session || ""}
+                                onChange={(e) => updateSetting("wa_gw_session", e.target.value)}
+                                placeholder="default"
+                            />
+                        </div>
+                        <div className="space-y-2">
                             <Label>Endpoint API URL (POST)</Label>
                             <Input
                                 value={settings.wa_gw_endpoint || ""}
@@ -289,6 +297,6 @@ export default function PengaturanPage() {
                     <p className="text-xs text-muted-foreground">Foto kantor diatur di halaman Kelola Beranda. Tekan Simpan setelah selesai mengubah.</p>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }
