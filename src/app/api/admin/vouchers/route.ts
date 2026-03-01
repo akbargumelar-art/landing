@@ -21,6 +21,7 @@ export async function GET(request: Request) {
             .orderBy(desc(vouchers.createdAt));
 
         if (productId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             query = query.where(eq(vouchers.productId, productId)) as any;
         }
 

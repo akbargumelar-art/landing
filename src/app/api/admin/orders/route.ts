@@ -34,7 +34,8 @@ export async function GET(request: Request) {
         // For each order, find if there's a redemption log (for virtual products)
         const orderIds = allOrders.map(o => o.id);
 
-        let logsMap: Record<string, any> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const logsMap: Record<string, any> = {};
         if (orderIds.length > 0) {
             const logs = await db.select()
                 .from(redemptionLogs)

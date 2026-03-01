@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle, Clock, Search, ArrowRight, ExternalLink } from "lucide-react";
@@ -55,6 +55,7 @@ export default function CheckoutTrackingPage() {
             }
         }, 5000);
         return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orderId, order?.paymentStatus]);
 
     const handleSimulatePayment = async () => {
