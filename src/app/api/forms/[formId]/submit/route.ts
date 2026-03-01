@@ -103,10 +103,14 @@ export async function POST(
                 // textual inputs like 'Kuota' or 'Nama Outlet'. To prevent accidental overrides, 
                 // we ONLY extract the name if the label is precisely "nama lengkap".
                 // Same strict logic applies for the phone number.
-                if (fLabel === "nama lengkap") {
+                if (/^nama(?:\s+lengkap)?$/i.test(fLabel)) {
                     participantName = val;
-                } else if (fLabel === "nomor whatsapp / hp") {
-                    participantPhone = val;
+                } else if (/wa|whatsapp|telepon|telp|hp|handphone|nomor/i.test(fLabel)) {
+                    // Update phone if we find a matching pattern, but favor the first match
+                    // or fields explicitly named whatsapp
+                    if (participantPhone === "-" || /wa|whatsapp/i.test(fLabel)) {
+                        participantPhone = val;
+                    }
                 }
             }
         }
