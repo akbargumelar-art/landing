@@ -22,6 +22,7 @@ interface Program {
     category: string;
 }
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -313,13 +314,24 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                             key={program.id}
                             className="overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                         >
-                            <div className="h-44 bg-gradient-to-br from-red-500 via-red-600 to-orange-500 relative overflow-hidden">
-                                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
-                                {/* Decorative */}
-                                <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full" />
-                                <div className="absolute -bottom-2 -left-2 w-16 h-16 bg-white/10 rounded-full" />
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4">
-                                    <span className="text-xs text-white/90 font-medium">
+                            <div className="h-44 relative overflow-hidden">
+                                {program.thumbnail ? (
+                                    <Image
+                                        src={program.thumbnail}
+                                        alt={program.title}
+                                        fill
+                                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-red-500 via-red-600 to-orange-500 relative">
+                                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
+                                        <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full" />
+                                        <div className="absolute -bottom-2 -left-2 w-16 h-16 bg-white/10 rounded-full" />
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
+                                <div className="absolute bottom-3 left-4 right-4 pointer-events-none">
+                                    <span className="text-xs text-white/90 font-medium z-10 relative drop-shadow-md">
                                         {program.period}
                                     </span>
                                 </div>
@@ -354,8 +366,6 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
         </section>
     );
 }
-
-import Image from "next/image";
 
 const defaultOffices: { city?: string; label?: string; address?: string; phone?: string; mapUrl?: string; image?: string }[] = [
     {
