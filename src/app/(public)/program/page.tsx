@@ -99,11 +99,11 @@ export default function ProgramPage() {
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <div className="flex flex-wrap justify-center gap-8">
                             {filtered.map((program) => (
                                 <Card
                                     key={program.id}
-                                    className="overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+                                    className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                                 >
                                     <div className="h-48 relative overflow-hidden">
                                         {program.thumbnail ? (
