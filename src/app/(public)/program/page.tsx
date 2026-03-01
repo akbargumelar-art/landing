@@ -127,10 +127,9 @@ export default function ProgramPage() {
                                                 </div>
                                             </div>
                                         )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                                         {/* Category Badge */}
-                                        <div className="absolute top-3 left-3">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${program.category === "mitra"
+                                        <div className="absolute bottom-3 right-3">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide shadow-md ${program.category === "mitra"
                                                 ? "bg-orange-500 text-white"
                                                 : "bg-red-600 text-white"
                                                 }`}>

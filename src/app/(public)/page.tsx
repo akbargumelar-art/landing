@@ -329,9 +329,8 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                                         <div className="absolute -bottom-2 -left-2 w-16 h-16 bg-white/10 rounded-full" />
                                     </div>
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
-                                <div className="absolute bottom-3 left-4 right-4 pointer-events-none">
-                                    <span className="text-xs text-white/90 font-medium z-10 relative drop-shadow-md">
+                                <div className="absolute top-3 left-3 pointer-events-none">
+                                    <span className="text-[10px] bg-white/90 backdrop-blur-sm shadow-sm text-gray-800 px-3 py-1.5 rounded-full font-bold z-10 relative">
                                         {program.period}
                                     </span>
                                 </div>
