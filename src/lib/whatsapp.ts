@@ -65,6 +65,7 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
         // 4. Replace template variables
         let finalMessage = template;
         finalMessage = finalMessage.replace(/{nama}/gi, data.name || "");
+        finalMessage = finalMessage.replace(/{nama\s+lengkap}/gi, data.name || "");
         finalMessage = finalMessage.replace(/{program}/gi, data.programName || "");
 
         // 5. Build Headers
