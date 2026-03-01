@@ -357,11 +357,10 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
 
 import Image from "next/image";
 
-const defaultOffices = [
+const defaultOffices: { city?: string; label?: string; address?: string; phone?: string; mapUrl?: string; image?: string }[] = [
     {
         city: "CIREBON",
         label: "Kantor Pusat Cirebon",
-        image: "/images/office-cirebon.png",
         address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
         phone: "+62 851-6882-2280",
         mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
@@ -369,7 +368,6 @@ const defaultOffices = [
     {
         city: "KUNINGAN",
         label: "Kantor Cabang Kuningan",
-        image: "/images/office-kuningan.png",
         address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
         phone: "+62 851-6882-2280",
         mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
@@ -387,10 +385,10 @@ function LokasiKantor() {
                     try {
                         const parsed = JSON.parse(data.office_data);
                         if (Array.isArray(parsed) && parsed.length > 0) {
-                            setOffices(parsed.map((o: { city?: string; label?: string; address?: string; phone?: string; mapUrl?: string }, i: number) => ({
+                            setOffices(parsed.map((o: { city?: string; label?: string; address?: string; phone?: string; mapUrl?: string; image?: string }, i: number) => ({
                                 city: o.city || defaultOffices[i]?.city || `KANTOR ${i + 1}`,
                                 label: o.label || defaultOffices[i]?.label || `Kantor ${i + 1}`,
-                                image: defaultOffices[i]?.image || "/images/office-default.png",
+                                image: o.image || defaultOffices[i]?.image,
                                 address: o.address || "",
                                 phone: o.phone || data.footer_phone || defaultOffices[0].phone,
                                 mapUrl: o.mapUrl || "",
@@ -421,20 +419,32 @@ function LokasiKantor() {
                             className="overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white flex flex-col sm:flex-row h-full"
                         >
                             {/* Photo (Portrait Mode) */}
-                            <div className="relative h-64 sm:h-auto sm:w-2/5 shrink-0 overflow-hidden">
-                                <Image
-                                    src={office.image}
-                                    alt={office.label}
-                                    fill
-                                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/60 sm:from-black/40 to-transparent" />
-                                <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
+                            <div className={`relative h-64 sm:h-auto sm:w-2/5 shrink-0 overflow-hidden ${!office.image ? 'bg-gradient-to-br from-red-600 via-red-500 to-red-700' : ''}`}>
+                                {office.image ? (
+                                    <Image
+                                        src={office.image as string}
+                                        alt={office.label || "Kantor"}
+                                        fill
+                                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                        unoptimized={true}
+                                    />
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center z-10">
+                                            <MapPin className="h-8 w-8 text-white" />
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/60 sm:from-black/40 to-transparent z-10" />
+                                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20">
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold shadow-lg">
                                         <MapPin className="h-3 w-3" />
                                         {office.label}
                                     </span>
                                 </div>
+                                {/* Decorative */}
+                                <div className="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full z-0 pointer-events-none" />
+                                <div className="absolute -bottom-2 -left-2 w-14 h-14 bg-white/10 rounded-full z-0 pointer-events-none" />
                             </div>
 
                             <CardContent className="p-6 space-y-4 flex flex-col justify-center flex-1">

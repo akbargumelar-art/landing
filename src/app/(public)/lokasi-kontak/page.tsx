@@ -22,14 +22,12 @@ const defaultOffices: { city: string; address: string; mapUrl: string; gradient:
         address: "Jl. Pemuda Raya No.21B, Sunyaragi, Kec. Kesambi, Kota Cirebon, Jawa Barat 45132",
         mapUrl: "https://www.google.com/maps/search/Jl.+Pemuda+Raya+No.21B+Sunyaragi+Kesambi+Kota+Cirebon",
         gradient: "from-red-500 via-red-600 to-orange-500",
-        image: "/images/office-cirebon.png"
     },
     {
         city: "Kantor Kuningan",
         address: "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kabupaten Kuningan, Jawa Barat 45512",
         mapUrl: "https://www.google.com/maps/search/Jl.+Siliwangi+No.45+Purwawinangun+Kuningan",
         gradient: "from-red-600 via-red-500 to-red-700",
-        image: "/images/office-kuningan.png"
     },
 ];
 
@@ -116,7 +114,7 @@ export default function LokasiKontakPage() {
                     city: o.label || o.city || `Kantor ${i + 1}`,
                     address: o.address,
                     mapUrl: o.mapUrl,
-                    image: o.image || defaultOffices[i]?.image || "/images/office-default.png",
+                    image: o.image || defaultOffices[i]?.image,
                     gradient: i % 2 === 0 ? "from-red-500 via-red-600 to-orange-500" : "from-red-600 via-red-500 to-red-700",
                 }));
             }
