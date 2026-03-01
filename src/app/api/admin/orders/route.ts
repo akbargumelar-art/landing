@@ -47,7 +47,10 @@ export async function GET(request: Request) {
 
         const result = allOrders.map(o => ({
             ...o,
-            redemptionLog: logsMap[o.id] || null,
+            // If logsMap stores arrays, we might want to return the first log or the whole array.
+            // Sticking to the original behavior of returning a single log or null,
+            // we'll take the first element if an array exists, otherwise null.
+            redemptionLog: logsMap[o.id] ? logsMap[o.id][0] : null,
         }));
 
         const totalCountParams = await db.select({ value: count() }).from(orders);

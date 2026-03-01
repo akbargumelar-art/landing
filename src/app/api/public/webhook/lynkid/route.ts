@@ -8,7 +8,7 @@ import { triggerAutoRedeem } from "@/lib/auto-redeem";
 export async function POST(request: Request) {
     try {
         const payload = await request.text();
-        const headers = request.headers;
+        // const headers = request.headers;
 
         // TODO: Validate Lynk.id signature
         // const signature = headers.get("x-lynkid-signature");

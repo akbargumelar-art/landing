@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle, Clock, Search, ArrowRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 
 interface Product {
     name: string;
@@ -25,7 +24,6 @@ interface Order {
 
 export default function CheckoutTrackingPage() {
     const params = useParams();
-    const router = useRouter();
     const orderId = params?.orderId as string;
 
     const [order, setOrder] = useState<Order | null>(null);
@@ -64,7 +62,7 @@ export default function CheckoutTrackingPage() {
         try {
             await fetch(`/api/public/orders/${orderId}/simulate`, { method: "POST" });
             fetchOrder();
-        } catch (e) {
+        } catch {
             alert("Gagal iterasi test payment");
         }
         setSimulating(false);

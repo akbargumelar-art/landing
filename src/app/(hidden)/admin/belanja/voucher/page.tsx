@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, UploadCloud, Ticket } from "lucide-react";
@@ -78,6 +77,7 @@ export default function VoucherPage() {
                 const wb = XLSX.read(bstr, { type: "binary" });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const data = XLSX.utils.sheet_to_json<any>(ws, { header: 1 });
 
                 // Assume codes are in the first column
@@ -109,7 +109,7 @@ export default function VoucherPage() {
                 } else {
                     alert(result.error || "Gagal upload voucher");
                 }
-            } catch (err) {
+            } catch {
                 alert("Terjadi kesalahan membaca file CSV/Excel.");
             }
             setUploading(false);

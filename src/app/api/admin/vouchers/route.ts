@@ -42,7 +42,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
         }
 
-        const values = codes.map((code: string) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const values = body.codes.map((code: any) => ({
             id: uuid(),
             productId,
             code: code.trim(),

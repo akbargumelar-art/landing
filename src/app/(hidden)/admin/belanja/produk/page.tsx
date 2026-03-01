@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload, ImageIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload } from "lucide-react";
 import Image from "next/image";
 
 interface Product {

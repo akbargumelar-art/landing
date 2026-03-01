@@ -5,9 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, ShieldCheck, Tag, ShoppingBag, Truck, Smartphone } from "lucide-react";
+import { Loader2, ArrowLeft, ShieldCheck, ShoppingBag, Truck, Smartphone } from "lucide-react";
 import Link from "next/link";
 
 interface Product {
@@ -68,7 +67,7 @@ export default function ProductDetailPage() {
                 alert(data.error || "Gagal membuat pesanan.");
                 setSubmitting(false);
             }
-        } catch (error) {
+        } catch {
             alert("Terjadi kesalahan jaringan.");
             setSubmitting(false);
         }
