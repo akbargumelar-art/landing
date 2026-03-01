@@ -525,7 +525,7 @@ export default function ProgramDetailPage() {
 }
 
 // ── Participant List with Expand/Collapse ──
-const INITIAL_SHOW = 8;
+const INITIAL_SHOW = 4;
 
 function ParticipantList({ participants }: {
     participants: { id: string; participantName: string; participantPhone: string }[];
