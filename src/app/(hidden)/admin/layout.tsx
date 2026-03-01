@@ -16,12 +16,18 @@ import {
     X,
     ChevronLeft,
     UserCircle,
+    ShoppingCart,
+    Ticket,
+    Inbox,
 } from "lucide-react";
 
 const sidebarLinks = [
     { href: "/admin/pengaturan", label: "Pengaturan Website", icon: Settings },
     { href: "/admin/beranda", label: "Kelola Beranda", icon: Image },
     { href: "/admin/program", label: "Kelola Program", icon: FileText },
+    { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart },
+    { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
+    { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
     { href: "/admin/form-builder", label: "Kelola Form", icon: FormInput },
     { href: "/admin/peserta", label: "Data Peserta", icon: Users },
     { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
