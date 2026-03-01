@@ -378,9 +378,7 @@ export default function ProgramDetailPage() {
 
                             {/* Participant Grid */}
                             {participantGroups[activePeriodParticipants] && (
-                                <ParticipantList
-                                    participants={participantGroups[activePeriodParticipants].participants}
-                                />
+                                <ParticipantList participants={participantGroups[activePeriodParticipants].participants} />
                             )}
                         </div>
                     )}
