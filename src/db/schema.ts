@@ -6,6 +6,8 @@ import {
     boolean,
     datetime,
     timestamp,
+    decimal,
+    mysqlEnum
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
@@ -155,6 +157,51 @@ export const winners = mysqlTable("winners", {
     drawnAt: datetime("drawn_at").notNull(),
 });
 
+// ========== E-Commerce / Shopping ========
+
+export const products = mysqlTable("products", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: mysqlEnum("type", ["fisik", "virtual", "jasa"]).notNull().default("fisik"),
+    description: text("description").notNull().default(""),
+    imageUrl: varchar("image_url", { length: 500 }).notNull().default(""),
+    price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0.00"),
+    stock: int("stock").notNull().default(0), // Applicable primarily for physical
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+});
+
+export const orders = mysqlTable("orders", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
+    productId: varchar("product_id", { length: 36 }).notNull().references(() => products.id),
+    paymentStatus: mysqlEnum("payment_status", ["pending", "success", "failed"]).notNull().default("pending"),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull().default("0.00"),
+    lynkIdUrl: text("lynk_id_url"), // The generated payment link
+    lynkIdTrx: varchar("lynk_id_trx", { length: 255 }), // Webhook reference
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+});
+
+export const vouchers = mysqlTable("vouchers", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    productId: varchar("product_id", { length: 36 }).notNull().references(() => products.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 255 }).notNull().unique(),
+    isUsed: boolean("is_used").notNull().default(false),
+    createdAt: datetime("created_at").notNull(),
+    usedAt: datetime("used_at"),
+});
+
+export const redemptionLogs = mysqlTable("redemption_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    orderId: varchar("order_id", { length: 36 }).notNull().references(() => orders.id, { onDelete: "cascade" }),
+    voucherId: varchar("voucher_id", { length: 36 }).notNull().references(() => vouchers.id),
+    status: mysqlEnum("status", ["sukses", "gagal"]).notNull(),
+    responseMessage: text("response_message").notNull().default(""),
+    createdAt: datetime("created_at").notNull(),
+});
+
 // ========== Relations ==========
 
 export const programsRelations = relations(programs, ({ many }) => ({
@@ -187,4 +234,24 @@ export const submissionValuesRelations = relations(submissionValues, ({ one }) =
 export const winnersRelations = relations(winners, ({ one }) => ({
     program: one(programs, { fields: [winners.programId], references: [programs.id] }),
     submission: one(formSubmissions, { fields: [winners.submissionId], references: [formSubmissions.id] }),
+}));
+
+export const productsRelations = relations(products, ({ many }) => ({
+    orders: many(orders),
+    vouchers: many(vouchers),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+    product: one(products, { fields: [orders.productId], references: [products.id] }),
+    redemptionLogs: many(redemptionLogs),
+}));
+
+export const vouchersRelations = relations(vouchers, ({ one, many }) => ({
+    product: one(products, { fields: [vouchers.productId], references: [products.id] }),
+    redemptionLogs: many(redemptionLogs),
+}));
+
+export const redemptionLogsRelations = relations(redemptionLogs, ({ one }) => ({
+    order: one(orders, { fields: [redemptionLogs.orderId], references: [orders.id] }),
+    voucher: one(vouchers, { fields: [redemptionLogs.voucherId], references: [vouchers.id] }),
 }));
