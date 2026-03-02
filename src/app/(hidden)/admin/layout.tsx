@@ -19,6 +19,7 @@ import {
     ShoppingCart,
     Ticket,
     Inbox,
+    Store,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -28,6 +29,7 @@ const sidebarLinks = [
     { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart },
     { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
     { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
+    { href: "/admin/shop", label: "Halaman Shop", icon: Store },
     { href: "/admin/form-builder", label: "Kelola Form", icon: FormInput },
     { href: "/admin/peserta", label: "Data Peserta", icon: Users },
     { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },

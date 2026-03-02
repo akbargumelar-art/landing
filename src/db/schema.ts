@@ -205,6 +205,29 @@ export const redemptionLogs = mysqlTable("redemption_logs", {
     createdAt: datetime("created_at").notNull(),
 });
 
+// ========== Shop Page ==========
+
+export const shopBanners = mysqlTable("shop_banners", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    title: varchar("title", { length: 255 }).notNull().default(""),
+    imageUrl: varchar("image_url", { length: 500 }).notNull().default(""),
+    link: varchar("link", { length: 500 }).notNull().default(""),
+    sortOrder: int("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull(),
+});
+
+export const shopSections = mysqlTable("shop_sections", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    type: mysqlEnum("type", ["banner", "product_carousel", "service_grid", "cta_cards"]).notNull().default("product_carousel"),
+    title: varchar("title", { length: 255 }).notNull().default(""),
+    subtitle: varchar("subtitle", { length: 500 }).notNull().default(""),
+    config: text("config").notNull().default("{}"),
+    sortOrder: int("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull(),
+});
+
 // ========== Relations ==========
 
 export const programsRelations = relations(programs, ({ many }) => ({
