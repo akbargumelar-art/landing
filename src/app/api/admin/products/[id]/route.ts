@@ -17,6 +17,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             price: body.price,
             stock: body.stock,
             isActive: body.isActive,
+            shopeeUrl: body.shopeeUrl ?? "",
+            tokopediaUrl: body.tokopediaUrl ?? "",
         }).where(eq(products.id, id));
 
         const updated = await db.query.products.findFirst({

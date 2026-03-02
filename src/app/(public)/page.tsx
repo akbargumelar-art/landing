@@ -73,12 +73,12 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     }, [next]);
 
     if (!slides || slides.length === 0) {
-        return <div className="h-[520px] md:h-[620px] bg-red-600 flex items-center justify-center text-white">Loading...</div>;
+        return <div className="h-[360px] md:h-[480px] bg-red-600 flex items-center justify-center text-white">Loading...</div>;
     }
 
     return (
         <section className="relative overflow-hidden">
-            <div className="relative h-[520px] md:h-[620px]">
+            <div className="relative h-[360px] md:h-[480px]">
                 {slides.map((slide, index) => (
                     <div
                         key={slide.id}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare } from "lucide-react";
+import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare, CreditCard } from "lucide-react";
 import Image from "next/image";
 
 interface OfficeData {
@@ -244,6 +244,57 @@ export default function PengaturanPage() {
                             Gunakan <code>&#123;nama&#125;</code> untuk nama peserta, dan <code>&#123;program&#125;</code> untuk judul program pendaftaran.
                             Variabel lain akan menyusul sesuai label di formulir.
                         </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Payment Gateway Lynk.id */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <CreditCard className="h-5 w-5" /> Payment Gateway (Lynk.id)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Konfigurasi integrasi pembayaran Lynk.id untuk halaman belanja.
+                        Pastikan data API sesuai dengan akun Lynk.id Anda.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input
+                                value={settings.lynk_api_key || ""}
+                                onChange={(e) => updateSetting("lynk_api_key", e.target.value)}
+                                placeholder="Masukkan API Key Lynk.id"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Merchant ID</Label>
+                            <Input
+                                value={settings.lynk_merchant_id || ""}
+                                onChange={(e) => updateSetting("lynk_merchant_id", e.target.value)}
+                                placeholder="Masukkan Merchant ID"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Secret Key</Label>
+                            <Input
+                                type="password"
+                                value={settings.lynk_secret_key || ""}
+                                onChange={(e) => updateSetting("lynk_secret_key", e.target.value)}
+                                placeholder="Masukkan Secret Key"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Callback / Webhook URL</Label>
+                            <Input
+                                readOnly
+                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/lynk` : "/api/public/webhook/lynk"}
+                                className="bg-gray-50 text-muted-foreground cursor-default"
+                            />
+                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di dashboard Lynk.id Anda sebagai callback URL.</p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

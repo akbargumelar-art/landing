@@ -17,6 +17,8 @@ interface Product {
     imageUrl: string;
     price: string | number;
     stock: number;
+    shopeeUrl?: string;
+    tokopediaUrl?: string;
 }
 
 export default function ProductDetailPage() {
@@ -108,7 +110,7 @@ export default function ProductDetailPage() {
                             </div>
                         )}
                         <Badge variant="secondary" className="absolute top-6 left-6 text-sm py-1.5 px-4 bg-white/90 backdrop-blur-sm shadow-md border-0 font-bold uppercase tracking-wider">
-                            {isVirtual ? "Virtual Auto" : product.type === "fisik" ? "Barang Fisik" : "Layanan Jasa"}
+                            {isVirtual ? "Voucher Internet" : product.type === "fisik" ? "Produk Fisik" : "Jasa"}
                         </Badge>
                     </div>
 
@@ -137,6 +139,22 @@ export default function ProductDetailPage() {
                             <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{product.description || "Tidak ada deskripsi detail."}</p>
                             <p className="text-sm font-semibold mt-4 text-gray-800">Sisa Stok: {product.stock > 0 ? product.stock : <span className="text-red-600 underline">Habis Terjual</span>}</p>
                         </div>
+
+                        {/* Marketplace Links */}
+                        {(product.shopeeUrl || product.tokopediaUrl) && (
+                            <div className="flex flex-wrap gap-3 mb-8">
+                                {product.shopeeUrl && (
+                                    <a href={product.shopeeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-semibold text-sm hover:bg-orange-100 transition-colors">
+                                        🛒 Beli di Shopee
+                                    </a>
+                                )}
+                                {product.tokopediaUrl && (
+                                    <a href={product.tokopediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-50 border border-green-200 text-green-600 font-semibold text-sm hover:bg-green-100 transition-colors">
+                                        🏪 Beli di Tokopedia
+                                    </a>
+                                )}
+                            </div>
+                        )}
 
                         {/* Order Form */}
                         <form onSubmit={handleBuy} className="mt-auto">

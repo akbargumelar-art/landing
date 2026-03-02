@@ -39,7 +39,7 @@ export default function ProgramPage() {
     return (
         <div className="min-h-screen">
             {/* Header */}
-            <section className="h-[520px] md:h-[620px] bg-gradient-to-br from-red-600 via-red-500 to-orange-500 relative overflow-hidden flex items-center">
+            <section className="h-[360px] md:h-[480px] bg-gradient-to-br from-red-600 via-red-500 to-orange-500 relative overflow-hidden flex items-center">
                 <div className="absolute inset-0">
                     <div className="absolute top-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
                     <div className="absolute bottom-10 left-10 w-48 h-48 bg-white/5 rounded-full blur-3xl" />

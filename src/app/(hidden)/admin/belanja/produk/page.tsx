@@ -22,10 +22,12 @@ interface Product {
     price: string | number;
     stock: number;
     isActive: boolean;
+    shopeeUrl: string;
+    tokopediaUrl: string;
 }
 
 const emptyProduct: Partial<Product> = {
-    name: "", type: "fisik", description: "", imageUrl: "", price: "0", stock: 0, isActive: true,
+    name: "", type: "fisik", description: "", imageUrl: "", price: "0", stock: 0, isActive: true, shopeeUrl: "", tokopediaUrl: "",
 };
 
 export default function ProdukBelanjaPage() {
@@ -152,9 +154,9 @@ export default function ProdukBelanjaPage() {
             {/* Category Filter */}
             <div className="flex gap-2">
                 <button onClick={() => setFilterType("")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${!filterType ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Semua</button>
-                <button onClick={() => setFilterType("fisik")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${filterType === "fisik" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Barang Fisik</button>
+                <button onClick={() => setFilterType("fisik")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${filterType === "fisik" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Produk Fisik</button>
                 <button onClick={() => setFilterType("virtual")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${filterType === "virtual" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Produk Virtual</button>
-                <button onClick={() => setFilterType("jasa")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${filterType === "jasa" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Jasa Pemasangan</button>
+                <button onClick={() => setFilterType("jasa")} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${filterType === "jasa" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Jasa</button>
             </div>
 
             {filtered.length === 0 ? (
@@ -215,9 +217,9 @@ export default function ProdukBelanjaPage() {
                             <div className="space-y-2">
                                 <Label>Tipe</Label>
                                 <select value={editProduct.type || "fisik"} onChange={(e) => setEditProduct({ ...editProduct, type: e.target.value as "fisik" | "virtual" | "jasa" })} className="w-full px-3 py-2 border rounded-md text-sm bg-white">
-                                    <option value="fisik">Barang Fisik</option>
-                                    <option value="virtual">Virtual (Auto-Redeem)</option>
-                                    <option value="jasa">Jasa Pemasangan</option>
+                                    <option value="fisik">Produk Fisik</option>
+                                    <option value="virtual">Voucher Internet</option>
+                                    <option value="jasa">Jasa</option>
                                 </select>
                             </div>
                         </div>
@@ -259,6 +261,21 @@ export default function ProdukBelanjaPage() {
                                     <Image src={editProduct.imageUrl} alt="Produk" fill className="object-cover" unoptimized={true} />
                                 </div>
                             ) : null}
+                        </div>
+
+                        {/* Marketplace Links */}
+                        <div className="space-y-2">
+                            <Label className="text-sm font-semibold">Link Marketplace (Opsional)</Label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Shopee</Label>
+                                    <Input value={editProduct.shopeeUrl || ""} onChange={(e) => setEditProduct({ ...editProduct, shopeeUrl: e.target.value })} placeholder="https://shopee.co.id/..." />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Tokopedia</Label>
+                                    <Input value={editProduct.tokopediaUrl || ""} onChange={(e) => setEditProduct({ ...editProduct, tokopediaUrl: e.target.value })} placeholder="https://tokopedia.com/..." />
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>

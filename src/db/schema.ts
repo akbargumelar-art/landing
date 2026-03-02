@@ -169,6 +169,8 @@ export const products = mysqlTable("products", {
     price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0.00"),
     stock: int("stock").notNull().default(0), // Applicable primarily for physical
     isActive: boolean("is_active").notNull().default(true),
+    shopeeUrl: varchar("shopee_url", { length: 500 }).notNull().default(""),
+    tokopediaUrl: varchar("tokopedia_url", { length: 500 }).notNull().default(""),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });

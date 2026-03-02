@@ -162,7 +162,7 @@ export default function ProgramDetailPage() {
     return (
         <div className="min-h-screen">
             {/* Header */}
-            <section className="h-[520px] md:h-[620px] bg-gradient-to-br from-red-600 via-red-500 to-orange-500 relative overflow-hidden flex items-center">
+            <section className="h-[360px] md:h-[480px] bg-gradient-to-br from-red-600 via-red-500 to-orange-500 relative overflow-hidden flex items-center">
                 <div className="absolute inset-0">
                     <div className="absolute top-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
                     <div className="absolute top-20 left-1/4 w-16 h-16 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />

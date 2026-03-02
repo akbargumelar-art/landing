@@ -27,6 +27,8 @@ export async function POST(request: Request) {
             price: body.price || "0.00",
             stock: body.stock || 0,
             isActive: body.isActive ?? true,
+            shopeeUrl: body.shopeeUrl || "",
+            tokopediaUrl: body.tokopediaUrl || "",
             createdAt: new Date(),
         });
 

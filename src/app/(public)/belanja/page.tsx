@@ -54,9 +54,9 @@ export default function BelanjaKatalogPage() {
             {/* Header / Hero Section */}
             <div className="bg-gradient-to-r from-red-600 to-red-800 py-16 text-white text-center">
                 <div className="max-w-4xl mx-auto px-4">
-                    <h1 className="text-4xl lg:text-5xl font-extrabold mb-4 tracking-tight">Mall Khusus Pelanggan</h1>
+                    <h1 className="text-4xl lg:text-5xl font-extrabold mb-4 tracking-tight">Halaman Belanja</h1>
                     <p className="text-lg text-red-100 mb-8 max-w-2xl mx-auto">
-                        Beli voucher internet otomatis masuk, barang fisik dengan pengiriman, dan layanan jasa instalasi kami dengan mudah menggunakan Lynk.id.
+                        Belanja produk Telkomsel mudah tinggal klik langsung dikirim, Voucher Internet langsung masuk, langganan IndiHome langsung diproses.
                     </p>
 
                     {/* Search Bar */}
@@ -80,13 +80,13 @@ export default function BelanjaKatalogPage() {
                         <Store className="h-4 w-4" /> Semua Produk
                     </button>
                     <button onClick={() => setFilterType("virtual")} className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${filterType === "virtual" ? "bg-blue-600 text-white scale-105" : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"}`}>
-                        <Tag className="h-4 w-4" /> Voucher Virtual (Auto)
+                        <Tag className="h-4 w-4" /> Voucher Internet
                     </button>
                     <button onClick={() => setFilterType("fisik")} className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${filterType === "fisik" ? "bg-emerald-600 text-white scale-105" : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"}`}>
-                        <ShoppingBag className="h-4 w-4" /> Barang Fisik
+                        <ShoppingBag className="h-4 w-4" /> Produk Fisik
                     </button>
                     <button onClick={() => setFilterType("jasa")} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${filterType === "jasa" ? "bg-orange-600 text-white scale-105" : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"}`}>
-                        Layanan Jasa
+                        Jasa
                     </button>
                 </div>
 
@@ -124,7 +124,7 @@ export default function BelanjaKatalogPage() {
                                         {/* Badges */}
                                         <div className="absolute top-3 left-3 flex flex-col gap-2">
                                             <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-sm text-xs font-bold border-0">
-                                                {product.type === "virtual" ? "🛒 VOUCHER AUTO" : product.type === "fisik" ? "📦 BARANG FISIK" : "🔧 JASA"}
+                                                {product.type === "virtual" ? "🛒 VOUCHER INTERNET" : product.type === "fisik" ? "📦 PRODUK FISIK" : "🔧 JASA"}
                                             </Badge>
                                         </div>
                                     </div>
