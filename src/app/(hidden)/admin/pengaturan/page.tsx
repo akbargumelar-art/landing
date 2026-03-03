@@ -248,52 +248,56 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
-            {/* Payment Gateway Lynk.id */}
+            {/* Payment Gateway DOKU */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                        <CreditCard className="h-5 w-5" /> Payment Gateway (Lynk.id)
+                        <CreditCard className="h-5 w-5" /> Payment Gateway (DOKU)
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Konfigurasi integrasi pembayaran Lynk.id untuk halaman belanja.
-                        Pastikan data API sesuai dengan akun Lynk.id Anda.
+                        Konfigurasi integrasi pembayaran DOKU Checkout untuk halaman belanja.
+                        Pastikan data API sesuai dengan akun DOKU Anda di dashboard.doku.com.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>API Key</Label>
+                            <Label>Client ID</Label>
                             <Input
-                                value={settings.lynk_api_key || ""}
-                                onChange={(e) => updateSetting("lynk_api_key", e.target.value)}
-                                placeholder="Masukkan API Key Lynk.id"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Merchant ID</Label>
-                            <Input
-                                value={settings.lynk_merchant_id || ""}
-                                onChange={(e) => updateSetting("lynk_merchant_id", e.target.value)}
-                                placeholder="Masukkan Merchant ID"
+                                value={settings.doku_client_id || ""}
+                                onChange={(e) => updateSetting("doku_client_id", e.target.value)}
+                                placeholder="Masukkan Client-Id dari DOKU Back Office"
                             />
                         </div>
                         <div className="space-y-2">
                             <Label>Secret Key</Label>
                             <Input
                                 type="password"
-                                value={settings.lynk_secret_key || ""}
-                                onChange={(e) => updateSetting("lynk_secret_key", e.target.value)}
-                                placeholder="Masukkan Secret Key"
+                                value={settings.doku_secret_key || ""}
+                                onChange={(e) => updateSetting("doku_secret_key", e.target.value)}
+                                placeholder="Masukkan Secret Key dari DOKU Back Office"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Mode</Label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={settings.doku_mode || "sandbox"}
+                                onChange={(e) => updateSetting("doku_mode", e.target.value)}
+                            >
+                                <option value="sandbox">Sandbox (Testing)</option>
+                                <option value="production">Production (Live)</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground">Gunakan mode Sandbox untuk testing sebelum beralih ke Production.</p>
                         </div>
                         <div className="space-y-2">
                             <Label>Callback / Webhook URL</Label>
                             <Input
                                 readOnly
-                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/lynk` : "/api/public/webhook/lynk"}
+                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/doku` : "/api/public/webhook/doku"}
                                 className="bg-gray-50 text-muted-foreground cursor-default"
                             />
-                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di dashboard Lynk.id Anda sebagai callback URL.</p>
+                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di DOKU Back Office sebagai HTTP Notification URL.</p>
                         </div>
                     </div>
                 </CardContent>

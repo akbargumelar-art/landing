@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { products, orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { createDokuPayment } from "@/lib/doku";
 
 export async function POST(request: Request) {
     try {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        // Clean phone number (remove non-digits, replace starting 0 with 62 is optional for Lynk, but good for WA)
+        // Clean phone number (remove non-digits)
         const cleanPhone = customerPhone.replace(/\D/g, '');
 
         // Check product exists and has stock
@@ -28,15 +29,14 @@ export async function POST(request: Request) {
         const newOrderId = uuid();
 
         // ==============================================================================
-        // MOCK LYNK.ID INTEGRATION (To be replaced with actual HTTP request to Lynk.id)
+        // DOKU Payment Gateway Integration
         // ==============================================================================
-        // TODO: The user needs to provide Lynk.id API Keys and Secret.
-        // For now, we will simulate a successful invoice creation.
-        const mockLynkIdTrx = `LYNK-${Date.now()}`;
-        // Since we don't have the real URL, we'll direct them to our own waiting page for testing
-        // or a simulated payment gateway. 
-        // We will just redirect them to our checkout status page where they can "simulasikan bayar".
-        const mockLynkIdUrl = `/checkout/simulate?orderId=${newOrderId}&amount=${product.price}`;
+        const dokuResult = await createDokuPayment({
+            orderId: newOrderId,
+            amount: Number(product.price),
+            customerPhone: cleanPhone,
+            productName: product.name,
+        });
 
         // Insert Order
         await db.insert(orders).values({
@@ -45,15 +45,15 @@ export async function POST(request: Request) {
             customerPhone: cleanPhone,
             totalPrice: product.price,
             paymentStatus: "pending",
-            lynkIdTrx: mockLynkIdTrx,
-            lynkIdUrl: mockLynkIdUrl,
+            dokuInvoiceNumber: dokuResult.invoiceNumber,
+            dokuPaymentUrl: dokuResult.paymentUrl,
             createdAt: new Date(),
         });
 
         return NextResponse.json({
             success: true,
             orderId: newOrderId,
-            paymentUrl: mockLynkIdUrl
+            paymentUrl: dokuResult.paymentUrl,
         });
 
     } catch (error) {

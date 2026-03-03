@@ -13,7 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
             customerPhone: orders.customerPhone,
             paymentStatus: orders.paymentStatus,
             totalPrice: orders.totalPrice,
-            lynkIdUrl: orders.lynkIdUrl,
+            dokuPaymentUrl: orders.dokuPaymentUrl,
             createdAt: orders.createdAt,
             product: {
                 name: products.name,

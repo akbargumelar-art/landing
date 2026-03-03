@@ -181,8 +181,8 @@ export const orders = mysqlTable("orders", {
     productId: varchar("product_id", { length: 36 }).notNull().references(() => products.id),
     paymentStatus: mysqlEnum("payment_status", ["pending", "success", "failed"]).notNull().default("pending"),
     totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull().default("0.00"),
-    lynkIdUrl: text("lynk_id_url"), // The generated payment link
-    lynkIdTrx: varchar("lynk_id_trx", { length: 255 }), // Webhook reference
+    dokuPaymentUrl: text("doku_payment_url"), // The generated DOKU checkout payment link
+    dokuInvoiceNumber: varchar("doku_invoice_number", { length: 255 }), // DOKU invoice number reference
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
