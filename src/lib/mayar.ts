@@ -82,6 +82,9 @@ export async function createMayarInvoice(
         const baseUrl = config.isProduction ? MAYAR_PRODUCTION_URL : MAYAR_SANDBOX_URL;
         const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || (config.isProduction ? "https://abkciraya.cloud" : "");
 
+        // Set expiry to 24 hours from now
+        const expiredAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
         const requestBody = {
             name: req.productName,
             email: `${req.customerPhone}@guest.abkciraya.cloud`,
@@ -89,6 +92,18 @@ export async function createMayarInvoice(
             mobile: req.customerPhone,
             description: `Pembelian ${req.productName} — Order #${req.orderId.slice(0, 8)}`,
             redirectUrl: `${siteUrl}/checkout/${req.orderId}`,
+            expiredAt,
+            items: [
+                {
+                    quantity: 1,
+                    rate: Math.round(req.amount),
+                    description: req.productName,
+                },
+            ],
+            extraData: {
+                noCustomer: req.customerPhone,
+                idProd: req.orderId,
+            },
         };
 
         console.log("[Mayar] Creating invoice:", JSON.stringify(requestBody));
