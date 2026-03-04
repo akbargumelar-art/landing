@@ -28,7 +28,6 @@ export default function CheckoutTrackingPage() {
 
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
-    const [simulating, setSimulating] = useState(false);
 
     const fetchOrder = async () => {
         try {
@@ -57,17 +56,6 @@ export default function CheckoutTrackingPage() {
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orderId, order?.paymentStatus]);
-
-    const handleSimulatePayment = async () => {
-        setSimulating(true);
-        try {
-            await fetch(`/api/public/orders/${orderId}/simulate`, { method: "POST" });
-            fetchOrder();
-        } catch {
-            alert("Gagal iterasi test payment");
-        }
-        setSimulating(false);
-    };
 
     if (loading && !order) {
         return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="h-10 w-10 animate-spin text-red-600" /></div>;
@@ -175,22 +163,7 @@ export default function CheckoutTrackingPage() {
                             </Link>
                         </div>
 
-                        {/* Simulation Tool (Development Only) */}
-                        {order.paymentStatus === 'pending' && (
-                            <div className="mt-8 pt-6 border-t border-dashed text-center">
-                                <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-3">🛠️ Development Tools</p>
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleSimulatePayment}
-                                    disabled={simulating}
-                                    className="text-xs w-full bg-slate-800 text-white hover:bg-slate-700 cursor-pointer h-10"
-                                >
-                                    {simulating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                    [DEV] Bypas Pembayaran (Simulasikan Lunas)
-                                </Button>
-                            </div>
-                        )}
+
                     </CardContent>
                 </Card>
 
