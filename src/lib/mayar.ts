@@ -84,6 +84,7 @@ export async function createMayarInvoice(
 
         const requestBody = {
             name: req.productName,
+            email: `${req.customerPhone}@guest.abkciraya.cloud`,
             amount: Math.round(req.amount),
             mobile: req.customerPhone,
             description: `Pembelian ${req.productName} — Order #${req.orderId.slice(0, 8)}`,
@@ -92,34 +93,17 @@ export async function createMayarInvoice(
 
         console.log("[Mayar] Creating invoice:", JSON.stringify(requestBody));
 
-        // Try multiple endpoint paths — Mayar API docs are inconsistent
-        const endpointPaths = ["/payment-link", "/invoice", "/payment-request"];
-        let lastResponse: Response | null = null;
-        let lastData: Record<string, unknown> | null = null;
+        const response = await fetch(`${baseUrl}/invoice/create`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+        });
 
-        for (const path of endpointPaths) {
-            console.log(`[Mayar] Trying endpoint: ${baseUrl}${path}`);
-            const res = await fetch(`${baseUrl}${path}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${config.apiKey}`,
-                },
-                body: JSON.stringify(requestBody),
-            });
-
-            const resData = await res.json();
-            console.log(`[Mayar] ${path} → status: ${res.status}, body:`, JSON.stringify(resData));
-
-            if (res.ok) {
-                lastResponse = res;
-                lastData = resData as Record<string, unknown>;
-                break; // Found working endpoint
-            }
-
-            lastResponse = res;
-            lastData = resData as Record<string, unknown>;
-        }
+        const lastData = await response.json();
+        console.log("[Mayar] API Response status:", response.status, "body:", JSON.stringify(lastData));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = lastData as any;
@@ -128,7 +112,7 @@ export async function createMayarInvoice(
         const paymentUrl = data?.data?.link || data?.data?.paymentUrl || data?.data?.payment_url || data?.link;
         const invoiceId = data?.data?.id || data?.id;
 
-        if (lastResponse?.ok && paymentUrl) {
+        if (response.ok && paymentUrl) {
             return {
                 success: true,
                 paymentUrl: paymentUrl,
