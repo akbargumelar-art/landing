@@ -248,45 +248,37 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
-            {/* Payment Gateway DOKU */}
+            {/* Payment Gateway Mayar.id */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                        <CreditCard className="h-5 w-5" /> Payment Gateway (DOKU)
+                        <CreditCard className="h-5 w-5" /> Payment Gateway (Mayar.id)
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Konfigurasi integrasi pembayaran DOKU Checkout untuk halaman belanja.
-                        Pastikan data API sesuai dengan akun DOKU Anda di dashboard.doku.com.
+                        Konfigurasi integrasi pembayaran Mayar.id untuk halaman belanja.
+                        Dapatkan API Key dari dashboard Mayar.id Anda.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Client ID</Label>
-                            <Input
-                                value={settings.doku_client_id || ""}
-                                onChange={(e) => updateSetting("doku_client_id", e.target.value)}
-                                placeholder="Masukkan Client-Id dari DOKU Back Office"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Secret Key</Label>
+                            <Label>API Key</Label>
                             <Input
                                 type="password"
-                                value={settings.doku_secret_key || ""}
-                                onChange={(e) => updateSetting("doku_secret_key", e.target.value)}
-                                placeholder="Masukkan Secret Key dari DOKU Back Office"
+                                value={settings.mayar_api_key || ""}
+                                onChange={(e) => updateSetting("mayar_api_key", e.target.value)}
+                                placeholder="Masukkan API Key dari Dashboard Mayar.id"
                             />
                         </div>
                         <div className="space-y-2">
                             <Label>Mode</Label>
                             <select
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                value={settings.doku_mode || "sandbox"}
-                                onChange={(e) => updateSetting("doku_mode", e.target.value)}
+                                value={settings.mayar_mode || "sandbox"}
+                                onChange={(e) => updateSetting("mayar_mode", e.target.value)}
                             >
-                                <option value="sandbox">Sandbox (Testing)</option>
-                                <option value="production">Production (Live)</option>
+                                <option value="sandbox">Sandbox (Testing via mayar.club)</option>
+                                <option value="production">Production (Live via mayar.id)</option>
                             </select>
                             <p className="text-xs text-muted-foreground">Gunakan mode Sandbox untuk testing sebelum beralih ke Production.</p>
                         </div>
@@ -294,10 +286,10 @@ export default function PengaturanPage() {
                             <Label>Callback / Webhook URL</Label>
                             <Input
                                 readOnly
-                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/doku` : "/api/public/webhook/doku"}
+                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/mayar` : "/api/public/webhook/mayar"}
                                 className="bg-gray-50 text-muted-foreground cursor-default"
                             />
-                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di DOKU Back Office sebagai HTTP Notification URL.</p>
+                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Mayar.id → Pengaturan → Webhooks.</p>
                         </div>
                     </div>
                 </CardContent>

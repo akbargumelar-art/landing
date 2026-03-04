@@ -22,8 +22,8 @@ interface Order {
     customerPhone: string;
     paymentStatus: "pending" | "success" | "failed";
     totalPrice: string | number;
-    dokuPaymentUrl: string;
-    dokuInvoiceNumber: string | null;
+    paymentUrl: string;
+    invoiceNumber: string | null;
     createdAt: string;
     productId: string;
     productName: string;
@@ -146,8 +146,8 @@ export default function PesananPage() {
                                             <Badge variant={order.paymentStatus === 'success' ? 'default' : order.paymentStatus === 'failed' ? 'destructive' : 'secondary'} className={order.paymentStatus === 'success' ? 'bg-green-600' : ''}>
                                                 {order.paymentStatus.toUpperCase()}
                                             </Badge>
-                                            {order.dokuPaymentUrl && order.paymentStatus === 'pending' && (
-                                                <a href={order.dokuPaymentUrl} target="_blank" className="block text-[10px] text-blue-500 hover:underline mt-1 mt-1 flex items-center">
+                                            {order.paymentUrl && order.paymentStatus === 'pending' && (
+                                                <a href={order.paymentUrl} target="_blank" className="block text-[10px] text-blue-500 hover:underline mt-1 mt-1 flex items-center">
                                                     Lihat Link Bayar <ExternalLink className="h-2 w-2 ml-1" />
                                                 </a>
                                             )}

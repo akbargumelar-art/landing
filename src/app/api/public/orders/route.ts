@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { products, orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
-import { createDokuPayment } from "@/lib/doku";
+import { createMayarInvoice } from "@/lib/mayar";
 
 export async function POST(request: Request) {
     try {
@@ -29,9 +29,9 @@ export async function POST(request: Request) {
         const newOrderId = uuid();
 
         // ==============================================================================
-        // DOKU Payment Gateway Integration
+        // Mayar.id Payment Gateway Integration
         // ==============================================================================
-        const dokuResult = await createDokuPayment({
+        const mayarResult = await createMayarInvoice({
             orderId: newOrderId,
             amount: Number(product.price),
             customerPhone: cleanPhone,
@@ -45,15 +45,15 @@ export async function POST(request: Request) {
             customerPhone: cleanPhone,
             totalPrice: product.price,
             paymentStatus: "pending",
-            dokuInvoiceNumber: dokuResult.invoiceNumber,
-            dokuPaymentUrl: dokuResult.paymentUrl,
+            invoiceNumber: mayarResult.invoiceId,
+            paymentUrl: mayarResult.paymentUrl,
             createdAt: new Date(),
         });
 
         return NextResponse.json({
             success: true,
             orderId: newOrderId,
-            paymentUrl: dokuResult.paymentUrl,
+            paymentUrl: mayarResult.paymentUrl,
         });
 
     } catch (error) {

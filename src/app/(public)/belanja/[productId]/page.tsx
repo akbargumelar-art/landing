@@ -122,7 +122,7 @@ export default function ProductDetailPage() {
                         <div className="space-y-4 mb-8">
                             <div className="flex items-start gap-3">
                                 <ShieldCheck className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
-                                <p className="text-sm text-gray-600">Pembayaran terverifikasi aman melalui platform <span className="font-bold">DOKU</span>.</p>
+                                <p className="text-sm text-gray-600">Pembayaran terverifikasi aman melalui platform <span className="font-bold">Mayar</span>.</p>
                             </div>
                             <div className="flex items-start gap-3">
                                 {isVirtual ? <Smartphone className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" /> : <Truck className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />}

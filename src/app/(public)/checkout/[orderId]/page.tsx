@@ -17,7 +17,7 @@ interface Order {
     customerPhone: string;
     paymentStatus: "pending" | "success" | "failed";
     totalPrice: string | number;
-    dokuPaymentUrl: string;
+    paymentUrl: string;
     createdAt: string;
     product: Product | null;
 }
@@ -162,9 +162,9 @@ export default function CheckoutTrackingPage() {
                             {order.paymentStatus === 'pending' && (
                                 <Button
                                     className="w-full text-base font-bold h-14 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg cursor-pointer flex items-center justify-center"
-                                    onClick={() => window.open(order.dokuPaymentUrl, '_blank')}
+                                    onClick={() => window.open(order.paymentUrl, '_blank')}
                                 >
-                                    Bayar Sekarang via DOKU <ExternalLink className="h-4 w-4 ml-2" />
+                                    Bayar Sekarang via Mayar <ExternalLink className="h-4 w-4 ml-2" />
                                 </Button>
                             )}
 
