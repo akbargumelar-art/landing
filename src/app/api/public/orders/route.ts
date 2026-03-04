@@ -38,6 +38,15 @@ export async function POST(request: Request) {
             productName: product.name,
         });
 
+        // If Mayar API failed, return error to user
+        if (!mayarResult.success) {
+            console.error("Mayar invoice creation failed:", mayarResult.error);
+            return NextResponse.json(
+                { error: `Gagal membuat invoice pembayaran: ${mayarResult.error}` },
+                { status: 502 }
+            );
+        }
+
         // Insert Order
         await db.insert(orders).values({
             id: newOrderId,

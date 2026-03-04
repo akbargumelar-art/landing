@@ -80,6 +80,17 @@ export async function createMayarInvoice(
     // --- REAL MAYAR API CALL ---
     try {
         const baseUrl = config.isProduction ? MAYAR_PRODUCTION_URL : MAYAR_SANDBOX_URL;
+        const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || (config.isProduction ? "https://abkciraya.cloud" : "");
+
+        const requestBody = {
+            name: req.productName,
+            amount: Math.round(req.amount),
+            mobile: req.customerPhone,
+            description: `Pembelian ${req.productName} — Order #${req.orderId.slice(0, 8)}`,
+            redirectUrl: `${siteUrl}/checkout/${req.orderId}`,
+        };
+
+        console.log("[Mayar] Creating invoice:", JSON.stringify(requestBody));
 
         const response = await fetch(`${baseUrl}/invoice`, {
             method: "POST",
@@ -87,44 +98,40 @@ export async function createMayarInvoice(
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${config.apiKey}`,
             },
-            body: JSON.stringify({
-                name: req.productName,
-                amount: Math.round(req.amount),
-                mobile: req.customerPhone,
-                description: `Pembelian ${req.productName} — Order #${req.orderId.slice(0, 8)}`,
-                redirect_url: config.isProduction
-                    ? `${process.env.NEXT_PUBLIC_BASE_URL || ""}/checkout/${req.orderId}`
-                    : `/checkout/${req.orderId}`,
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
+        console.log("[Mayar] API Response status:", response.status, "body:", JSON.stringify(data));
 
-        if (response.ok && data.data?.link) {
+        // Try multiple possible response paths for payment URL
+        const paymentUrl = data.data?.link || data.data?.paymentUrl || data.data?.payment_url || data.link;
+        const invoiceId = data.data?.id || data.id;
+
+        if (response.ok && paymentUrl) {
             return {
                 success: true,
-                paymentUrl: data.data.link,
-                invoiceId: data.data.id || `INV-${Date.now()}-${req.orderId.slice(0, 8)}`,
+                paymentUrl: paymentUrl,
+                invoiceId: invoiceId || `INV-${Date.now()}-${req.orderId.slice(0, 8)}`,
             };
         }
 
-        console.error("[Mayar] API Error:", JSON.stringify(data));
-        // Fallback to mock if Mayar API returns error
+        // API returned error — log clearly and still return the error
+        const errorMsg = data.messages || data.message || data.error || JSON.stringify(data);
+        console.error("[Mayar] API Error:", errorMsg);
         return {
-            success: true,
+            success: false,
             paymentUrl: `/checkout/${req.orderId}`,
             invoiceId: `INV-${Date.now()}-${req.orderId.slice(0, 8)}`,
-            error: data.messages || "Mayar API error, using fallback",
+            error: errorMsg,
         };
     } catch (error) {
         console.error("[Mayar] Network Error:", error);
-        // Fallback to mock on network error
-        const fallbackInvoiceId = `INV-${Date.now()}`;
         return {
-            success: true,
+            success: false,
             paymentUrl: `/checkout/${req.orderId}`,
-            invoiceId: fallbackInvoiceId,
-            error: "Network error, using fallback",
+            invoiceId: `INV-${Date.now()}`,
+            error: "Network error",
         };
     }
 }
