@@ -248,6 +248,44 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
+            {/* Active Payment Gateway Selector */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <CreditCard className="h-5 w-5" /> Pilihan Payment Gateway Aktif
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Pilih payment gateway yang digunakan untuk memproses pembayaran order baru.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button
+                            type="button"
+                            onClick={() => updateSetting("payment_gateway_active", "mayar")}
+                            className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${(!settings.payment_gateway_active || settings.payment_gateway_active === "mayar")
+                                    ? "border-red-500 bg-red-50 ring-2 ring-red-200"
+                                    : "border-gray-200 hover:border-gray-300"
+                                }`}
+                        >
+                            <div className="font-bold text-sm">Mayar.id</div>
+                            <p className="text-xs text-muted-foreground mt-1">Invoice-based payment gateway</p>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => updateSetting("payment_gateway_active", "midtrans")}
+                            className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${settings.payment_gateway_active === "midtrans"
+                                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
+                                    : "border-gray-200 hover:border-gray-300"
+                                }`}
+                        >
+                            <div className="font-bold text-sm">Midtrans</div>
+                            <p className="text-xs text-muted-foreground mt-1">Snap API payment gateway</p>
+                        </button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Payment Gateway Mayar.id */}
             <Card>
                 <CardHeader>
@@ -290,6 +328,62 @@ export default function PengaturanPage() {
                                 className="bg-gray-50 text-muted-foreground cursor-default"
                             />
                             <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Mayar.id → Pengaturan → Webhooks.</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Payment Gateway Midtrans */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <CreditCard className="h-5 w-5" /> Payment Gateway (Midtrans)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Konfigurasi integrasi pembayaran Midtrans Snap API untuk halaman belanja.
+                        Dapatkan credentials dari dashboard.midtrans.com → Settings → Access Keys.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Server Key</Label>
+                            <Input
+                                type="password"
+                                value={settings.midtrans_server_key || ""}
+                                onChange={(e) => updateSetting("midtrans_server_key", e.target.value)}
+                                placeholder="SB-Mid-server-xxxx (Sandbox) atau Mid-server-xxxx"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Client Key</Label>
+                            <Input
+                                type="password"
+                                value={settings.midtrans_client_key || ""}
+                                onChange={(e) => updateSetting("midtrans_client_key", e.target.value)}
+                                placeholder="SB-Mid-client-xxxx (Sandbox) atau Mid-client-xxxx"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Mode</Label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={settings.midtrans_mode || "sandbox"}
+                                onChange={(e) => updateSetting("midtrans_mode", e.target.value)}
+                            >
+                                <option value="sandbox">Sandbox (Testing)</option>
+                                <option value="production">Production (Live)</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground">Gunakan mode Sandbox untuk testing sebelum beralih ke Production.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Notification / Webhook URL</Label>
+                            <Input
+                                readOnly
+                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/midtrans` : "/api/public/webhook/midtrans"}
+                                className="bg-gray-50 text-muted-foreground cursor-default"
+                            />
+                            <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Midtrans → Settings → Payment → Notification URL.</p>
                         </div>
                     </div>
                 </CardContent>

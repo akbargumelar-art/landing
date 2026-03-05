@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { products, orders } from "@/db/schema";
+import { products, orders, siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { createMayarInvoice } from "@/lib/mayar";
+import { createMidtransTransaction } from "@/lib/midtrans";
+
+/**
+ * Get the currently active payment gateway from site_settings.
+ * Defaults to "mayar" if not configured.
+ */
+async function getActiveGateway(): Promise<"mayar" | "midtrans"> {
+    const [setting] = await db
+        .select()
+        .from(siteSettings)
+        .where(eq(siteSettings.key, "payment_gateway_active"));
+    const value = setting?.value;
+    if (value === "midtrans") return "midtrans";
+    return "mayar";
+}
 
 export async function POST(request: Request) {
     try {
@@ -27,24 +42,53 @@ export async function POST(request: Request) {
         }
 
         const newOrderId = uuid();
+        const gateway = await getActiveGateway();
 
-        // ==============================================================================
-        // Mayar.id Payment Gateway Integration
-        // ==============================================================================
-        const mayarResult = await createMayarInvoice({
-            orderId: newOrderId,
-            amount: Number(product.price),
-            customerPhone: cleanPhone,
-            productName: product.name,
-        });
+        let paymentUrl: string;
+        let invoiceId: string;
 
-        // If Mayar API failed, return error to user
-        if (!mayarResult.success) {
-            console.error("Mayar invoice creation failed:", mayarResult.error);
-            return NextResponse.json(
-                { error: `Gagal membuat invoice pembayaran: ${mayarResult.error}` },
-                { status: 502 }
-            );
+        if (gateway === "midtrans") {
+            // ==============================================================================
+            // Midtrans Snap Payment Gateway Integration
+            // ==============================================================================
+            const midtransResult = await createMidtransTransaction({
+                orderId: newOrderId,
+                amount: Number(product.price),
+                customerPhone: cleanPhone,
+                productName: product.name,
+            });
+
+            if (!midtransResult.success) {
+                console.error("Midtrans transaction creation failed:", midtransResult.error);
+                return NextResponse.json(
+                    { error: `Gagal membuat transaksi pembayaran: ${midtransResult.error}` },
+                    { status: 502 }
+                );
+            }
+
+            paymentUrl = midtransResult.paymentUrl;
+            invoiceId = newOrderId; // Midtrans uses order_id as the identifier
+        } else {
+            // ==============================================================================
+            // Mayar.id Payment Gateway Integration (default)
+            // ==============================================================================
+            const mayarResult = await createMayarInvoice({
+                orderId: newOrderId,
+                amount: Number(product.price),
+                customerPhone: cleanPhone,
+                productName: product.name,
+            });
+
+            if (!mayarResult.success) {
+                console.error("Mayar invoice creation failed:", mayarResult.error);
+                return NextResponse.json(
+                    { error: `Gagal membuat invoice pembayaran: ${mayarResult.error}` },
+                    { status: 502 }
+                );
+            }
+
+            paymentUrl = mayarResult.paymentUrl;
+            invoiceId = mayarResult.invoiceId;
         }
 
         // Insert Order
@@ -52,17 +96,18 @@ export async function POST(request: Request) {
             id: newOrderId,
             productId: product.id,
             customerPhone: cleanPhone,
+            paymentGateway: gateway,
             totalPrice: product.price,
             paymentStatus: "pending",
-            invoiceNumber: mayarResult.invoiceId,
-            paymentUrl: mayarResult.paymentUrl,
+            invoiceNumber: invoiceId,
+            paymentUrl: paymentUrl,
             createdAt: new Date(),
         });
 
         return NextResponse.json({
             success: true,
             orderId: newOrderId,
-            paymentUrl: mayarResult.paymentUrl,
+            paymentUrl: paymentUrl,
         });
 
     } catch (error) {

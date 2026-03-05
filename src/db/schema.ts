@@ -179,6 +179,7 @@ export const orders = mysqlTable("orders", {
     id: varchar("id", { length: 36 }).primaryKey(),
     customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
     productId: varchar("product_id", { length: 36 }).notNull().references(() => products.id),
+    paymentGateway: mysqlEnum("payment_gateway", ["mayar", "midtrans"]).notNull().default("mayar"),
     paymentStatus: mysqlEnum("payment_status", ["pending", "success", "failed"]).notNull().default("pending"),
     totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull().default("0.00"),
     paymentUrl: text("payment_url"), // The generated payment gateway checkout link

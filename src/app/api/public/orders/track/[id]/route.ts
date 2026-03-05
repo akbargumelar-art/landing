@@ -11,6 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         const [order] = await db.select({
             id: orders.id,
             customerPhone: orders.customerPhone,
+            paymentGateway: orders.paymentGateway,
             paymentStatus: orders.paymentStatus,
             totalPrice: orders.totalPrice,
             paymentUrl: orders.paymentUrl,

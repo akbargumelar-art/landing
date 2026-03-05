@@ -15,6 +15,7 @@ interface Product {
 interface Order {
     id: string;
     customerPhone: string;
+    paymentGateway: "mayar" | "midtrans";
     paymentStatus: "pending" | "success" | "failed";
     totalPrice: string | number;
     paymentUrl: string;
@@ -149,10 +150,10 @@ export default function CheckoutTrackingPage() {
                         <div className="flex flex-col gap-3">
                             {order.paymentStatus === 'pending' && (
                                 <Button
-                                    className="w-full text-base font-bold h-14 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg cursor-pointer flex items-center justify-center"
+                                    className={`w-full text-base font-bold h-14 text-white rounded-xl shadow-lg cursor-pointer flex items-center justify-center ${order.paymentGateway === 'midtrans' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
                                     onClick={() => window.open(order.paymentUrl, '_blank')}
                                 >
-                                    Bayar Sekarang via Mayar <ExternalLink className="h-4 w-4 ml-2" />
+                                    Bayar Sekarang via {order.paymentGateway === 'midtrans' ? 'Midtrans' : 'Mayar'} <ExternalLink className="h-4 w-4 ml-2" />
                                 </Button>
                             )}
 
