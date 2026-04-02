@@ -17,6 +17,7 @@ const navLinks = [
     { href: "/", label: "BERANDA" },
     { href: "/program", label: "PROGRAM" },
     { href: "/belanja", label: "BELANJA" },
+    { href: "/cuan", label: "KALKULATOR CUAN" },
     { href: "/lokasi-kontak", label: "LOKASI & KONTAK" },
 ];
 

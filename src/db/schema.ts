@@ -259,3 +259,44 @@ export const redemptionLogsRelations = relations(redemptionLogs, ({ one }) => ({
     order: one(orders, { fields: [redemptionLogs.orderId], references: [orders.id] }),
     voucher: one(vouchers, { fields: [redemptionLogs.voucherId], references: [vouchers.id] }),
 }));
+
+// ========== Kalkulator Cuan ==========
+
+export const cuanCategories = mysqlTable("cuan_categories", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    createdAt: datetime("created_at").notNull(),
+});
+
+export const cuanBrands = mysqlTable("cuan_brands", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    createdAt: datetime("created_at").notNull(),
+});
+
+export const cuanProducts = mysqlTable("cuan_products", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    categoryId: varchar("category_id", { length: 36 }).notNull().references(() => cuanCategories.id, { onDelete: "cascade" }),
+    brandId: varchar("brand_id", { length: 36 }).notNull().references(() => cuanBrands.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    capitalPrice: decimal("capital_price", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    sellingPrice: decimal("selling_price", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    cashback: decimal("cashback", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    isActive: boolean("is_active").notNull().default(true),
+    isHot: boolean("is_hot").notNull().default(false),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+});
+
+export const cuanCategoriesRelations = relations(cuanCategories, ({ many }) => ({
+    products: many(cuanProducts),
+}));
+
+export const cuanBrandsRelations = relations(cuanBrands, ({ many }) => ({
+    products: many(cuanProducts),
+}));
+
+export const cuanProductsRelations = relations(cuanProducts, ({ one }) => ({
+    category: one(cuanCategories, { fields: [cuanProducts.categoryId], references: [cuanCategories.id] }),
+    brand: one(cuanBrands, { fields: [cuanProducts.brandId], references: [cuanBrands.id] }),
+}));
