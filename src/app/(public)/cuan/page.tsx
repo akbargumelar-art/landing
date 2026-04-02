@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
     CheckCircle2,
     AlertCircle,
     Flame,
+    MessageCircle,
 } from "lucide-react";
 
 interface CuanProduct {
@@ -63,6 +65,7 @@ const getProfitRatio = (p: CuanProduct) => {
 
 export default function KalkulatorCuanPage() {
     const [products, setProducts] = useState<CuanProduct[]>([]);
+    const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [modal, setModal] = useState<string>("");
     const [activeTab, setActiveTab] = useState<"rekomendasi" | "pilih">("rekomendasi");
@@ -81,6 +84,13 @@ export default function KalkulatorCuanPage() {
                 setLoading(false);
             })
             .catch(() => setLoading(false));
+    }, []);
+
+    useEffect(() => {
+        fetch("/api/public/settings")
+            .then((r) => r.json())
+            .then((data: Record<string, string>) => setSettings(data))
+            .catch(() => setSettings({}));
     }, []);
 
     const modalNum = useMemo(() => {
@@ -292,6 +302,8 @@ export default function KalkulatorCuanPage() {
         activeTab === "rekomendasi"
             ? recommendedSummary
             : { totalCapital: cartSummary.totalCapital, totalProfit: cartSummary.totalProfit, remaining: cartSummary.remaining };
+    const whatsappNumber = settings.whatsapp || "+62 851-6882-2280";
+    const whatsappUrl = settings.whatsapp_url || "https://wa.me/6285168822280";
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -302,6 +314,22 @@ export default function KalkulatorCuanPage() {
                     <div className="absolute bottom-10 right-10 w-96 h-96 bg-yellow-300 rounded-full blur-3xl" />
                 </div>
                 <div className="relative max-w-5xl mx-auto px-4 py-16 md:py-24 text-center">
+                    <div className="mb-6 flex justify-center">
+                        <div className="w-full max-w-xl rounded-[32px] border border-white/15 bg-white/95 px-5 py-4 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm md:px-7 md:py-5">
+                            <Image
+                                src="/digiposaja-logo.png"
+                                alt="Logo DigiposAja"
+                                width={5247}
+                                height={2355}
+                                sizes="(max-width: 768px) 280px, 520px"
+                                priority
+                                className="mx-auto h-auto w-full max-w-[300px] md:max-w-[520px]"
+                            />
+                            <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.28em] text-red-600/80 md:text-xs">
+                                DigiposAja Partner Tools
+                            </p>
+                        </div>
+                    </div>
                     <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white/90 text-sm font-semibold mb-6">
                         <Sparkles className="h-4 w-4" />
                         Fitur DigiposAja
@@ -313,6 +341,27 @@ export default function KalkulatorCuanPage() {
                     <p className="text-lg md:text-xl text-red-100 max-w-2xl mx-auto mb-10 leading-relaxed">
                         Hitung potensi keuntunganmu dari setiap transaksi DigiposAja. Masukkan modal, pilih produk, dan lihat estimasi cuan-mu!
                     </p>
+
+                    <div className="mx-auto mb-10 max-w-3xl rounded-3xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-sm shadow-xl">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-[0.25em] text-yellow-200">Cara Daftar DigiposAja</p>
+                                <h2 className="mt-1 text-xl font-black text-white">Hubungi admin via WhatsApp untuk pendaftaran</h2>
+                                <p className="mt-2 text-sm leading-relaxed text-red-50/90">
+                                    Jika ingin mulai jualan dan pakai DigiposAja, langsung chat admin untuk proses daftar dan info aktivasi akun.
+                                </p>
+                            </div>
+                            <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-lg transition-all hover:scale-[1.02] hover:bg-red-50"
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                                Chat Admin WhatsApp
+                            </a>
+                        </div>
+                    </div>
 
                     {/* Modal Input */}
                     <div className="max-w-md mx-auto">
@@ -668,6 +717,31 @@ export default function KalkulatorCuanPage() {
                                             Export ke Excel
                                         </Button>
                                     )}
+
+                                    <Card className="p-5 bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-sm">
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm">
+                                                <MessageCircle className="h-5 w-5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Cara Daftar</p>
+                                                <h4 className="mt-1 text-base font-black text-gray-900">Daftar DigiposAja via admin</h4>
+                                                <p className="mt-2 text-sm text-gray-600">
+                                                    Untuk pendaftaran DigiposAja, hubungi admin di nomor WhatsApp berikut.
+                                                </p>
+                                                <p className="mt-2 text-sm font-bold text-emerald-700">{whatsappNumber}</p>
+                                                <a
+                                                    href={whatsappUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-600"
+                                                >
+                                                    <MessageCircle className="h-4 w-4" />
+                                                    Hubungi Admin
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </Card>
 
                                     {/* Info Card */}
                                     <Card className="p-5 bg-gradient-to-br from-red-50 to-orange-50 border-red-100">
