@@ -362,29 +362,6 @@ export default function KalkulatorCuanPage() {
                             </a>
                         </div>
                     </div>
-
-                    {/* Modal Input */}
-                    <div className="max-w-md mx-auto">
-                        <label className="block text-sm font-bold text-white/80 mb-2 text-left">
-                            Masukkan Modal Awal (Rp)
-                        </label>
-                        <div className="relative">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">
-                                Rp
-                            </div>
-                            <Input
-                                value={modal}
-                                onChange={(e) => handleModalInput(e.target.value)}
-                                placeholder="500.000"
-                                className="w-full pl-12 pr-4 py-6 rounded-2xl text-lg font-bold text-gray-900 bg-white shadow-2xl border-0 focus:ring-4 focus:ring-yellow-300/50"
-                            />
-                        </div>
-                        {modalNum > 0 && (
-                            <p className="text-white/70 text-sm mt-2">
-                                Modal: <span className="font-bold text-white">{formatRupiah(modalNum)}</span>
-                            </p>
-                        )}
-                    </div>
                 </div>
                 {/* Wave Divider */}
                 <div className="wave-divider">
@@ -397,7 +374,40 @@ export default function KalkulatorCuanPage() {
             </section>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 md:pb-12">
+                <div className="relative z-10 -mt-10 mb-8 md:-mt-16 md:mb-10">
+                    <div className="mx-auto max-w-3xl overflow-hidden rounded-[28px] bg-gradient-to-r from-red-600 via-red-500 to-orange-500 shadow-[0_24px_60px_rgba(234,88,12,0.28)]">
+                        <div className="flex items-center gap-3 px-5 pb-3 pt-5 text-white md:px-6">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/18 backdrop-blur-sm">
+                                <Wallet className="h-5 w-5" />
+                            </div>
+                            <div className="text-left">
+                                <p className="text-base font-black leading-tight md:text-lg">Masukkan Modal Awal (Rp)</p>
+                                <p className="text-xs text-white/80 md:text-sm">Isi modal dulu sebelum mulai hitung cuan.</p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-t-[34px] bg-white/92 px-3 pb-4 pt-3 backdrop-blur-sm md:px-4">
+                            <div className="relative">
+                                <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400">
+                                    Rp
+                                </div>
+                                <Input
+                                    value={modal}
+                                    onChange={(e) => handleModalInput(e.target.value)}
+                                    placeholder="500.000"
+                                    className="h-16 rounded-[22px] border-0 bg-white pl-14 pr-4 text-2xl font-black text-slate-700 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)] placeholder:text-slate-400 focus-visible:ring-4 focus-visible:ring-orange-200 md:h-[72px] md:text-[2rem]"
+                                />
+                            </div>
+                            {modalNum > 0 && (
+                                <p className="px-2 pt-3 text-left text-sm font-semibold text-red-600">
+                                    Modal aktif: {formatRupiah(modalNum)}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {modalNum <= 0 ? (
                     <div className="text-center py-20">
                         <div className="w-24 h-24 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
@@ -405,7 +415,7 @@ export default function KalkulatorCuanPage() {
                         </div>
                         <h2 className="text-2xl font-bold text-gray-800 mb-2">Masukkan Modal Awal</h2>
                         <p className="text-muted-foreground max-w-md mx-auto">
-                            Isi nominal modal di atas untuk mulai menghitung potensi keuntunganmu dari transaksi DigiposAja.
+                            Isi nominal modal pada panel di atas untuk mulai menghitung potensi keuntunganmu dari transaksi DigiposAja.
                         </p>
                     </div>
                 ) : loading ? (
