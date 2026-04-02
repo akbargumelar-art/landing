@@ -88,17 +88,33 @@ export default function KalkulatorCuanPage() {
         return parseInt(cleaned) || 0;
     }, [modal]);
 
+    // Interconnected filters: each list is filtered by the other's selection
     const categories = useMemo(() => {
         const catMap = new Map<string, string>();
-        products.forEach((p) => catMap.set(p.categoryId, p.categoryName));
+        const filtered = filterBrand !== "all" ? products.filter((p) => p.brandId === filterBrand) : products;
+        filtered.forEach((p) => catMap.set(p.categoryId, p.categoryName));
         return Array.from(catMap.entries()).map(([id, name]) => ({ id, name }));
-    }, [products]);
+    }, [products, filterBrand]);
 
     const brands = useMemo(() => {
         const brandMap = new Map<string, string>();
-        products.forEach((p) => brandMap.set(p.brandId, p.brandName));
+        const filtered = filterCategory !== "all" ? products.filter((p) => p.categoryId === filterCategory) : products;
+        filtered.forEach((p) => brandMap.set(p.brandId, p.brandName));
         return Array.from(brandMap.entries()).map(([id, name]) => ({ id, name }));
-    }, [products]);
+    }, [products, filterCategory]);
+
+    // Auto-reset filter if current selection is no longer available
+    useEffect(() => {
+        if (filterCategory !== "all" && !categories.find((c) => c.id === filterCategory)) {
+            setFilterCategory("all");
+        }
+    }, [categories, filterCategory]);
+
+    useEffect(() => {
+        if (filterBrand !== "all" && !brands.find((b) => b.id === filterBrand)) {
+            setFilterBrand("all");
+        }
+    }, [brands, filterBrand]);
 
     const filteredProducts = useMemo(() => {
         return products.filter((p) => {
@@ -454,7 +470,40 @@ export default function KalkulatorCuanPage() {
                                     </div>
                                 ) : (
                                     <div>
-                                        {/* Filters */}
+                                        {/* Brand Filter Buttons */}
+                                        <div className="mb-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Filter className="h-4 w-4 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Brand</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => setFilterBrand("all")}
+                                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+                                                        filterBrand === "all"
+                                                            ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-lg shadow-red-200 scale-105"
+                                                            : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 shadow-sm hover:border-red-200"
+                                                    }`}
+                                                >
+                                                    Semua
+                                                </button>
+                                                {brands.map((b) => (
+                                                    <button
+                                                        key={b.id}
+                                                        onClick={() => setFilterBrand(b.id)}
+                                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+                                                            filterBrand === b.id
+                                                                ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-lg shadow-red-200 scale-105"
+                                                                : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 shadow-sm hover:border-red-200"
+                                                        }`}
+                                                    >
+                                                        {b.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Search & Category Filter */}
                                         <div className="flex flex-col sm:flex-row gap-3 mb-6">
                                             <div className="relative flex-1">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -473,16 +522,6 @@ export default function KalkulatorCuanPage() {
                                                 <option value="all">Semua Kategori</option>
                                                 {categories.map((c) => (
                                                     <option key={c.id} value={c.id}>{c.name}</option>
-                                                ))}
-                                            </select>
-                                            <select
-                                                value={filterBrand}
-                                                onChange={(e) => setFilterBrand(e.target.value)}
-                                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white"
-                                            >
-                                                <option value="all">Semua Brand</option>
-                                                {brands.map((b) => (
-                                                    <option key={b.id} value={b.id}>{b.name}</option>
                                                 ))}
                                             </select>
                                         </div>
