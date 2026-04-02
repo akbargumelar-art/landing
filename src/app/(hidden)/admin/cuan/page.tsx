@@ -79,13 +79,17 @@ export default function AdminCuanPage() {
     const [editProductOpen, setEditProductOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+    const [editCategoryOpen, setEditCategoryOpen] = useState(false);
     const [addBrandOpen, setAddBrandOpen] = useState(false);
+    const [editBrandOpen, setEditBrandOpen] = useState(false);
 
     // Form states
     const [form, setForm] = useState({ name: "", categoryId: "", brandId: "", capitalPrice: "", sellingPrice: "", cashback: "", isHot: false });
     const [editForm, setEditForm] = useState({ id: "", name: "", categoryId: "", brandId: "", capitalPrice: "", sellingPrice: "", cashback: "", isHot: false });
     const [newCategory, setNewCategory] = useState("");
+    const [editCategoryForm, setEditCategoryForm] = useState({ id: "", name: "" });
     const [newBrand, setNewBrand] = useState("");
+    const [editBrandForm, setEditBrandForm] = useState({ id: "", name: "" });
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -172,6 +176,28 @@ export default function AdminCuanPage() {
         await fetchAll();
     };
 
+    const handleEditCategory = async () => {
+        if (!editCategoryForm.name.trim()) return;
+        await fetch(`/api/admin/cuan/categories/${editCategoryForm.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: editCategoryForm.name }),
+        });
+        setEditCategoryOpen(false);
+        await fetchAll();
+    };
+
+    const handleDeleteCategory = async (id: string, name: string) => {
+        const count = products.filter(p => p.categoryId === id).length;
+        if (count > 0) {
+            alert(`Tidak bisa hapus kategori "${name}" karena masih digunakan oleh ${count} produk.`);
+            return;
+        }
+        if (!confirm(`Hapus kategori "${name}"?`)) return;
+        await fetch(`/api/admin/cuan/categories/${id}`, { method: "DELETE" });
+        await fetchAll();
+    };
+
     const handleAddBrand = async () => {
         if (!newBrand.trim()) return;
         await fetch("/api/admin/cuan/brands", {
@@ -181,6 +207,28 @@ export default function AdminCuanPage() {
         });
         setNewBrand("");
         setAddBrandOpen(false);
+        await fetchAll();
+    };
+
+    const handleEditBrand = async () => {
+        if (!editBrandForm.name.trim()) return;
+        await fetch(`/api/admin/cuan/brands/${editBrandForm.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: editBrandForm.name }),
+        });
+        setEditBrandOpen(false);
+        await fetchAll();
+    };
+
+    const handleDeleteBrand = async (id: string, name: string) => {
+        const count = products.filter(p => p.brandId === id).length;
+        if (count > 0) {
+            alert(`Tidak bisa hapus brand "${name}" karena masih digunakan oleh ${count} produk.`);
+            return;
+        }
+        if (!confirm(`Hapus brand "${name}"?`)) return;
+        await fetch(`/api/admin/cuan/brands/${id}`, { method: "DELETE" });
         await fetchAll();
     };
 
@@ -507,17 +555,36 @@ export default function AdminCuanPage() {
                         </Dialog>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {categories.map(c => (
-                            <Card key={c.id} className="p-4 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                                    <Layers className="h-5 w-5 text-red-500" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-sm">{c.name}</p>
-                                    <p className="text-xs text-muted-foreground">{products.filter(p => p.categoryId === c.id).length} produk</p>
-                                </div>
-                            </Card>
-                        ))}
+                        {categories.map(c => {
+                            const productCount = products.filter(p => p.categoryId === c.id).length;
+                            return (
+                                <Card key={c.id} className="p-4 flex items-center gap-3 group">
+                                    <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                                        <Layers className="h-5 w-5 text-red-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm truncate">{c.name}</p>
+                                        <p className="text-xs text-muted-foreground">{productCount} produk</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button
+                                            onClick={() => { setEditCategoryForm({ id: c.id, name: c.name }); setEditCategoryOpen(true); }}
+                                            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                                            title="Edit"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteCategory(c.id, c.name)}
+                                            className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer"
+                                            title="Hapus"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </Card>
+                            );
+                        })}
                         {categories.length === 0 && (
                             <p className="text-sm text-muted-foreground col-span-full py-8 text-center">Belum ada kategori</p>
                         )}
@@ -553,23 +620,76 @@ export default function AdminCuanPage() {
                         </Dialog>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {brands.map(b => (
-                            <Card key={b.id} className="p-4 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                                    <Tag className="h-5 w-5 text-blue-500" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-sm">{b.name}</p>
-                                    <p className="text-xs text-muted-foreground">{products.filter(p => p.brandId === b.id).length} produk</p>
-                                </div>
-                            </Card>
-                        ))}
+                        {brands.map(b => {
+                            const productCount = products.filter(p => p.brandId === b.id).length;
+                            return (
+                                <Card key={b.id} className="p-4 flex items-center gap-3 group">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                                        <Tag className="h-5 w-5 text-blue-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm truncate">{b.name}</p>
+                                        <p className="text-xs text-muted-foreground">{productCount} produk</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button
+                                            onClick={() => { setEditBrandForm({ id: b.id, name: b.name }); setEditBrandOpen(true); }}
+                                            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                                            title="Edit"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteBrand(b.id, b.name)}
+                                            className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer"
+                                            title="Hapus"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </Card>
+                            );
+                        })}
                         {brands.length === 0 && (
                             <p className="text-sm text-muted-foreground col-span-full py-8 text-center">Belum ada brand</p>
                         )}
                     </div>
                 </div>
             )}
+
+            {/* Edit Category Dialog */}
+            <Dialog open={editCategoryOpen} onOpenChange={setEditCategoryOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Edit Kategori</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label>Nama Kategori</Label>
+                            <Input value={editCategoryForm.name} onChange={(e) => setEditCategoryForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <Button onClick={handleEditCategory} disabled={!editCategoryForm.name.trim()} className="w-full bg-red-600 hover:bg-red-700 text-white">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Simpan Perubahan
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Brand Dialog */}
+            <Dialog open={editBrandOpen} onOpenChange={setEditBrandOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Edit Brand</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label>Nama Brand</Label>
+                            <Input value={editBrandForm.name} onChange={(e) => setEditBrandForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <Button onClick={handleEditBrand} disabled={!editBrandForm.name.trim()} className="w-full bg-red-600 hover:bg-red-700 text-white">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Simpan Perubahan
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Edit Product Dialog */}
             <Dialog open={editProductOpen} onOpenChange={setEditProductOpen}>
