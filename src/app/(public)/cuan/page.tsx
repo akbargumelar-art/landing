@@ -76,10 +76,28 @@ export default function KalkulatorCuanPage() {
     const [filterBrand, setFilterBrand] = useState("all");
     const [isCalculating, setIsCalculating] = useState(false);
 
-    // Rekomendasi tab filters
-    const [rekoFilterCategory, setRekoFilterCategory] = useState("all");
-    const [rekoFilterBrand, setRekoFilterBrand] = useState("all");
+    // Rekomendasi tab filters (multi-select)
+    const [rekoFilterCategories, setRekoFilterCategories] = useState<Set<string>>(new Set());
+    const [rekoFilterBrands, setRekoFilterBrands] = useState<Set<string>>(new Set());
     const [rekoFilterHot, setRekoFilterHot] = useState(false);
+
+    const toggleRekoCategory = (id: string) => {
+        setRekoFilterCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleRekoBrand = (id: string) => {
+        setRekoFilterBrands(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     useEffect(() => {
         fetch("/api/public/cuan/products")
@@ -180,8 +198,8 @@ export default function KalkulatorCuanPage() {
             const sortedProducts = [...products]
                 .filter((p) => {
                     if (Number(p.capitalPrice) <= 0 || Number(p.capitalPrice) > modalNum) return false;
-                    if (rekoFilterCategory !== "all" && p.categoryId !== rekoFilterCategory) return false;
-                    if (rekoFilterBrand !== "all" && p.brandId !== rekoFilterBrand) return false;
+                    if (rekoFilterCategories.size > 0 && !rekoFilterCategories.has(p.categoryId)) return false;
+                    if (rekoFilterBrands.size > 0 && !rekoFilterBrands.has(p.brandId)) return false;
                     if (rekoFilterHot && !p.isHot) return false;
                     return true;
                 })
@@ -206,7 +224,7 @@ export default function KalkulatorCuanPage() {
             setRecommended(result);
             setIsCalculating(false);
         }, 600);
-    }, [products, modalNum, rekoFilterCategory, rekoFilterBrand, rekoFilterHot]);
+    }, [products, modalNum, rekoFilterCategories, rekoFilterBrands, rekoFilterHot]);
 
     const recommendedSummary = useMemo(() => {
         if (!recommended) return null;
@@ -262,12 +280,12 @@ export default function KalkulatorCuanPage() {
         setSearch("");
         setFilterCategory("all");
         setFilterBrand("all");
-        setRekoFilterCategory("all");
-        setRekoFilterBrand("all");
+        setRekoFilterCategories(new Set());
+        setRekoFilterBrands(new Set());
         setRekoFilterHot(false);
     };
 
-    const rekoActiveFilterCount = (rekoFilterCategory !== "all" ? 1 : 0) + (rekoFilterBrand !== "all" ? 1 : 0) + (rekoFilterHot ? 1 : 0);
+    const rekoActiveFilterCount = rekoFilterCategories.size + rekoFilterBrands.size + (rekoFilterHot ? 1 : 0);
 
     const exportExcel = async (items: CartItem[], summary: { totalCapital: number; totalProfit: number; remaining: number }) => {
         const XLSX = await import("xlsx");
@@ -483,7 +501,7 @@ export default function KalkulatorCuanPage() {
                                                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter Opsional</span>
                                                         {rekoActiveFilterCount > 0 && (
                                                             <button
-                                                                onClick={() => { setRekoFilterCategory("all"); setRekoFilterBrand("all"); setRekoFilterHot(false); }}
+                                                                onClick={() => { setRekoFilterCategories(new Set()); setRekoFilterBrands(new Set()); setRekoFilterHot(false); }}
                                                                 className="text-xs text-red-500 hover:text-red-600 font-semibold cursor-pointer"
                                                             >
                                                                 Reset ({rekoActiveFilterCount})
@@ -491,14 +509,14 @@ export default function KalkulatorCuanPage() {
                                                         )}
                                                     </div>
 
-                                                    {/* Brand Filter */}
+                                                    {/* Brand Filter (multi-select) */}
                                                     <div>
-                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Brand</p>
+                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Brand {rekoFilterBrands.size > 0 && <span className="text-red-500">({rekoFilterBrands.size} dipilih)</span>}</p>
                                                         <div className="flex flex-wrap gap-1.5 justify-center">
                                                             <button
-                                                                onClick={() => setRekoFilterBrand("all")}
+                                                                onClick={() => setRekoFilterBrands(new Set())}
                                                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
-                                                                    rekoFilterBrand === "all"
+                                                                    rekoFilterBrands.size === 0
                                                                         ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
                                                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                                 }`}
@@ -508,9 +526,9 @@ export default function KalkulatorCuanPage() {
                                                             {allBrands.map((b) => (
                                                                 <button
                                                                     key={b.id}
-                                                                    onClick={() => setRekoFilterBrand(b.id)}
+                                                                    onClick={() => toggleRekoBrand(b.id)}
                                                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
-                                                                        rekoFilterBrand === b.id
+                                                                        rekoFilterBrands.has(b.id)
                                                                             ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
                                                                             : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                                     }`}
@@ -521,14 +539,14 @@ export default function KalkulatorCuanPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* Category Filter */}
+                                                    {/* Category Filter (multi-select) */}
                                                     <div>
-                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Kategori</p>
+                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Kategori {rekoFilterCategories.size > 0 && <span className="text-red-500">({rekoFilterCategories.size} dipilih)</span>}</p>
                                                         <div className="flex flex-wrap gap-1.5 justify-center">
                                                             <button
-                                                                onClick={() => setRekoFilterCategory("all")}
+                                                                onClick={() => setRekoFilterCategories(new Set())}
                                                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
-                                                                    rekoFilterCategory === "all"
+                                                                    rekoFilterCategories.size === 0
                                                                         ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
                                                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                                 }`}
@@ -538,9 +556,9 @@ export default function KalkulatorCuanPage() {
                                                             {allCategories.map((c) => (
                                                                 <button
                                                                     key={c.id}
-                                                                    onClick={() => setRekoFilterCategory(c.id)}
+                                                                    onClick={() => toggleRekoCategory(c.id)}
                                                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
-                                                                        rekoFilterCategory === c.id
+                                                                        rekoFilterCategories.has(c.id)
                                                                             ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
                                                                             : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                                     }`}
@@ -732,10 +750,13 @@ export default function KalkulatorCuanPage() {
                                                                         <div>Modal: <span className="font-semibold text-gray-700">{formatRupiah(capital)}</span></div>
                                                                         <div>Jual: <span className="font-semibold text-gray-700">{formatRupiah(Number(product.sellingPrice))}</span></div>
                                                                     </div>
-                                                                    <div className="mt-1 flex items-center gap-1 text-xs">
+                                                                    <div className="mt-1 flex items-center gap-1 text-xs flex-wrap">
                                                                         <TrendingUp className="h-3 w-3 text-emerald-500" />
                                                                         <span className="font-bold text-emerald-600">
                                                                             +{formatRupiah(profit)}
+                                                                        </span>
+                                                                        <span className="font-bold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                                                                            {capital > 0 ? ((profit / capital) * 100).toFixed(1) : 0}%
                                                                         </span>
                                                                         {Number(product.cashback) > 0 && (
                                                                             <span className="text-orange-500 ml-1">(incl. CB {formatRupiah(Number(product.cashback))})</span>
@@ -815,6 +836,11 @@ export default function KalkulatorCuanPage() {
                                                             <TrendingUp className="h-5 w-5" />
                                                             {formatRupiah(currentSummary.totalProfit)}
                                                         </div>
+                                                        {currentSummary.totalCapital > 0 && (
+                                                            <div className="text-sm font-bold text-emerald-500 mt-1">
+                                                                {((currentSummary.totalProfit / currentSummary.totalCapital) * 100).toFixed(1)}% dari modal
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </>
                                             )}
@@ -888,6 +914,7 @@ export default function KalkulatorCuanPage() {
 function ProductResultCard({ item, index }: { item: CartItem; index: number }) {
     const profit = getProfit(item.product) * item.qty;
     const capital = Number(item.product.capitalPrice) * item.qty;
+    const profitPct = capital > 0 ? ((profit / capital) * 100).toFixed(1) : "0";
 
     return (
         <Card className="p-4 bg-white border border-gray-100 hover:shadow-md transition-all duration-300">
@@ -908,15 +935,22 @@ function ProductResultCard({ item, index }: { item: CartItem; index: number }) {
                             {item.product.brandName}
                         </Badge>
                     </div>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                        <span>Modal: {formatRupiah(Number(item.product.capitalPrice))}</span>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                        <span>Modal: <span className="font-semibold text-gray-700">{formatRupiah(Number(item.product.capitalPrice))}</span></span>
+                        <span>Jual: <span className="font-semibold text-blue-600">{formatRupiah(Number(item.product.sellingPrice))}</span></span>
                         <span>×{item.qty}</span>
                         <span className="font-semibold text-gray-700">= {formatRupiah(capital)}</span>
                     </div>
+                    {Number(item.product.cashback) > 0 && (
+                        <div className="mt-1 text-xs text-orange-500">
+                            Cashback: {formatRupiah(Number(item.product.cashback))}/unit
+                        </div>
+                    )}
                 </div>
                 <div className="text-right shrink-0">
                     <div className="text-xs text-muted-foreground">Keuntungan</div>
                     <div className="text-lg font-black text-emerald-600">+{formatRupiah(profit)}</div>
+                    <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md inline-block mt-0.5">{profitPct}%</div>
                 </div>
             </div>
         </Card>
