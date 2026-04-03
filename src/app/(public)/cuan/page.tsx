@@ -315,20 +315,15 @@ export default function KalkulatorCuanPage() {
                 </div>
                 <div className="relative max-w-5xl mx-auto px-4 py-16 md:py-24 text-center">
                     <div className="mb-6 flex justify-center">
-                        <div className="w-full max-w-xl rounded-[32px] border border-white/15 bg-white/95 px-5 py-4 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm md:px-7 md:py-5">
-                            <Image
-                                src="/digiposaja-logo.png"
-                                alt="Logo DigiposAja"
-                                width={5247}
-                                height={2355}
-                                sizes="(max-width: 768px) 280px, 520px"
-                                priority
-                                className="mx-auto h-auto w-full max-w-[300px] md:max-w-[520px]"
-                            />
-                            <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.28em] text-red-600/80 md:text-xs">
-                                DigiposAja Partner Tools
-                            </p>
-                        </div>
+                        <Image
+                            src="/digiposaja-logo.png"
+                            alt="Logo DigiposAja"
+                            width={5247}
+                            height={2355}
+                            sizes="(max-width: 768px) 190px, 260px"
+                            priority
+                            className="h-auto w-full max-w-[190px] drop-shadow-[0_14px_28px_rgba(0,0,0,0.18)] md:max-w-[260px]"
+                        />
                     </div>
                     <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white/90 text-sm font-semibold mb-6">
                         <Sparkles className="h-4 w-4" />
@@ -338,30 +333,9 @@ export default function KalkulatorCuanPage() {
                         Kalkulator{" "}
                         <span className="text-yellow-300">Cuan</span>
                     </h1>
-                    <p className="text-lg md:text-xl text-red-100 max-w-2xl mx-auto mb-10 leading-relaxed">
+                    <p className="text-lg md:text-xl text-red-100 max-w-2xl mx-auto leading-relaxed">
                         Hitung potensi keuntunganmu dari setiap transaksi DigiposAja. Masukkan modal, pilih produk, dan lihat estimasi cuan-mu!
                     </p>
-
-                    <div className="mx-auto mb-10 max-w-3xl rounded-3xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-sm shadow-xl">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.25em] text-yellow-200">Cara Daftar DigiposAja</p>
-                                <h2 className="mt-1 text-xl font-black text-white">Hubungi admin via WhatsApp untuk pendaftaran</h2>
-                                <p className="mt-2 text-sm leading-relaxed text-red-50/90">
-                                    Jika ingin mulai jualan dan pakai DigiposAja, langsung chat admin untuk proses daftar dan info aktivasi akun.
-                                </p>
-                            </div>
-                            <a
-                                href={whatsappUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-lg transition-all hover:scale-[1.02] hover:bg-red-50"
-                            >
-                                <MessageCircle className="h-4 w-4" />
-                                Chat Admin WhatsApp
-                            </a>
-                        </div>
-                    </div>
                 </div>
                 {/* Wave Divider */}
                 <div className="wave-divider">
