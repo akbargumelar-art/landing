@@ -76,6 +76,11 @@ export default function KalkulatorCuanPage() {
     const [filterBrand, setFilterBrand] = useState("all");
     const [isCalculating, setIsCalculating] = useState(false);
 
+    // Rekomendasi tab filters
+    const [rekoFilterCategory, setRekoFilterCategory] = useState("all");
+    const [rekoFilterBrand, setRekoFilterBrand] = useState("all");
+    const [rekoFilterHot, setRekoFilterHot] = useState(false);
+
     useEffect(() => {
         fetch("/api/public/cuan/products")
             .then((r) => r.json())
@@ -112,6 +117,19 @@ export default function KalkulatorCuanPage() {
         filtered.forEach((p) => brandMap.set(p.brandId, p.brandName));
         return Array.from(brandMap.entries()).map(([id, name]) => ({ id, name }));
     }, [products, filterCategory]);
+
+    // All categories & brands for Rekomendasi filter (unlinked)
+    const allCategories = useMemo(() => {
+        const catMap = new Map<string, string>();
+        products.forEach((p) => catMap.set(p.categoryId, p.categoryName));
+        return Array.from(catMap.entries()).map(([id, name]) => ({ id, name }));
+    }, [products]);
+
+    const allBrands = useMemo(() => {
+        const brandMap = new Map<string, string>();
+        products.forEach((p) => brandMap.set(p.brandId, p.brandName));
+        return Array.from(brandMap.entries()).map(([id, name]) => ({ id, name }));
+    }, [products]);
 
     // Auto-reset filter if current selection is no longer available
     useEffect(() => {
@@ -160,7 +178,13 @@ export default function KalkulatorCuanPage() {
 
         setTimeout(() => {
             const sortedProducts = [...products]
-                .filter((p) => Number(p.capitalPrice) > 0 && Number(p.capitalPrice) <= modalNum)
+                .filter((p) => {
+                    if (Number(p.capitalPrice) <= 0 || Number(p.capitalPrice) > modalNum) return false;
+                    if (rekoFilterCategory !== "all" && p.categoryId !== rekoFilterCategory) return false;
+                    if (rekoFilterBrand !== "all" && p.brandId !== rekoFilterBrand) return false;
+                    if (rekoFilterHot && !p.isHot) return false;
+                    return true;
+                })
                 .sort((a, b) => getProfitRatio(b) - getProfitRatio(a));
 
             let remainingBudget = modalNum;
@@ -182,7 +206,7 @@ export default function KalkulatorCuanPage() {
             setRecommended(result);
             setIsCalculating(false);
         }, 600);
-    }, [products, modalNum]);
+    }, [products, modalNum, rekoFilterCategory, rekoFilterBrand, rekoFilterHot]);
 
     const recommendedSummary = useMemo(() => {
         if (!recommended) return null;
@@ -238,7 +262,12 @@ export default function KalkulatorCuanPage() {
         setSearch("");
         setFilterCategory("all");
         setFilterBrand("all");
+        setRekoFilterCategory("all");
+        setRekoFilterBrand("all");
+        setRekoFilterHot(false);
     };
+
+    const rekoActiveFilterCount = (rekoFilterCategory !== "all" ? 1 : 0) + (rekoFilterBrand !== "all" ? 1 : 0) + (rekoFilterHot ? 1 : 0);
 
     const exportExcel = async (items: CartItem[], summary: { totalCapital: number; totalProfit: number; remaining: number }) => {
         const XLSX = await import("xlsx");
@@ -436,31 +465,132 @@ export default function KalkulatorCuanPage() {
                                 {activeTab === "rekomendasi" ? (
                                     <div>
                                         {!recommended ? (
-                                            <Card className="p-8 md:p-12 text-center bg-white border border-gray-100 shadow-sm">
-                                                <div className="w-20 h-20 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                                    <Calculator className="h-10 w-10 text-orange-500" />
+                                            <Card className="p-5 sm:p-8 md:p-12 bg-white border border-gray-100 shadow-sm">
+                                                <div className="text-center">
+                                                    <div className="w-20 h-20 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                                        <Calculator className="h-10 w-10 text-orange-500" />
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-gray-800 mb-2">Siap Hitung Cuan?</h3>
+                                                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                                                        Sistem akan otomatis mencarikan kombinasi produk dengan keuntungan maksimal berdasarkan modal <span className="font-bold text-red-600">{formatRupiah(modalNum)}</span>
+                                                    </p>
                                                 </div>
-                                                <h3 className="text-xl font-bold text-gray-800 mb-2">Siap Hitung Cuan?</h3>
-                                                <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                                                    Sistem akan otomatis mencarikan kombinasi produk dengan keuntungan maksimal berdasarkan modal <span className="font-bold text-red-600">{formatRupiah(modalNum)}</span>
-                                                </p>
-                                                <Button
-                                                    onClick={calculateRecommendation}
-                                                    disabled={isCalculating || products.length === 0}
-                                                    className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white px-8 py-6 rounded-2xl text-base font-bold shadow-lg shadow-red-200 transition-all duration-300 hover:scale-105"
-                                                >
-                                                    {isCalculating ? (
-                                                        <>
-                                                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                                            Menghitung...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Sparkles className="h-5 w-5 mr-2" />
-                                                            Hitungkan Cuan Maksimal
-                                                        </>
+
+                                                {/* Optional Filters */}
+                                                <div className="mb-6 space-y-3">
+                                                    <div className="flex items-center gap-2 justify-center">
+                                                        <Filter className="h-4 w-4 text-gray-400" />
+                                                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter Opsional</span>
+                                                        {rekoActiveFilterCount > 0 && (
+                                                            <button
+                                                                onClick={() => { setRekoFilterCategory("all"); setRekoFilterBrand("all"); setRekoFilterHot(false); }}
+                                                                className="text-xs text-red-500 hover:text-red-600 font-semibold cursor-pointer"
+                                                            >
+                                                                Reset ({rekoActiveFilterCount})
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Brand Filter */}
+                                                    <div>
+                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Brand</p>
+                                                        <div className="flex flex-wrap gap-1.5 justify-center">
+                                                            <button
+                                                                onClick={() => setRekoFilterBrand("all")}
+                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                                                                    rekoFilterBrand === "all"
+                                                                        ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
+                                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                                }`}
+                                                            >
+                                                                Semua
+                                                            </button>
+                                                            {allBrands.map((b) => (
+                                                                <button
+                                                                    key={b.id}
+                                                                    onClick={() => setRekoFilterBrand(b.id)}
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                                                                        rekoFilterBrand === b.id
+                                                                            ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
+                                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                                    }`}
+                                                                >
+                                                                    {b.name}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Category Filter */}
+                                                    <div>
+                                                        <p className="text-xs font-medium text-gray-500 mb-1.5 text-center">Kategori</p>
+                                                        <div className="flex flex-wrap gap-1.5 justify-center">
+                                                            <button
+                                                                onClick={() => setRekoFilterCategory("all")}
+                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                                                                    rekoFilterCategory === "all"
+                                                                        ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
+                                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                                }`}
+                                                            >
+                                                                Semua
+                                                            </button>
+                                                            {allCategories.map((c) => (
+                                                                <button
+                                                                    key={c.id}
+                                                                    onClick={() => setRekoFilterCategory(c.id)}
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                                                                        rekoFilterCategory === c.id
+                                                                            ? "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-md"
+                                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                                    }`}
+                                                                >
+                                                                    {c.name}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Hot Produk Toggle */}
+                                                    <div className="flex justify-center">
+                                                        <button
+                                                            onClick={() => setRekoFilterHot(!rekoFilterHot)}
+                                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                                                                rekoFilterHot
+                                                                    ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-md"
+                                                                    : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                                                            }`}
+                                                        >
+                                                            <Flame className={`h-3.5 w-3.5 ${rekoFilterHot ? "fill-white" : ""}`} />
+                                                            Hot Produk Saja 🔥
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-center">
+                                                    <Button
+                                                        onClick={calculateRecommendation}
+                                                        disabled={isCalculating || products.length === 0}
+                                                        className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white px-8 py-6 rounded-2xl text-base font-bold shadow-lg shadow-red-200 transition-all duration-300 hover:scale-105"
+                                                    >
+                                                        {isCalculating ? (
+                                                            <>
+                                                                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                                                Menghitung...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="h-5 w-5 mr-2" />
+                                                                Hitungkan Cuan Maksimal
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    {rekoActiveFilterCount > 0 && (
+                                                        <p className="text-xs text-gray-500 mt-3">
+                                                            🔍 Menghitung hanya dari produk yang sesuai filter
+                                                        </p>
                                                     )}
-                                                </Button>
+                                                </div>
                                                 {products.length === 0 && (
                                                     <p className="text-sm text-red-500 mt-4 flex items-center justify-center gap-1">
                                                         <AlertCircle className="h-4 w-4" />
