@@ -32,13 +32,14 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Command '$1' tidak ditemukan"
 }
 
-load_env_file() {
-    if [ -f .env ]; then
-        set -a
-        # shellcheck disable=SC1091
-        . ./.env
-        set +a
+read_env_value() {
+    local key="$1"
+
+    if [ ! -f .env ]; then
+        return 0
     fi
+
+    grep -E "^${key}=" .env | head -n 1 | cut -d '=' -f 2-
 }
 
 resolve_port() {
@@ -48,6 +49,13 @@ resolve_port() {
 
     if [ -n "${PORT:-}" ]; then
         APP_PORT="$PORT"
+        return
+    fi
+
+    local env_port
+    env_port="$(read_env_value PORT || true)"
+    if [ -n "$env_port" ]; then
+        APP_PORT="$env_port"
         return
     fi
 
@@ -111,7 +119,6 @@ require_command curl
 require_command ss
 
 cd "$APP_DIR"
-load_env_file
 resolve_port
 
 print_step 1 7 "Pull dari GitHub..."
