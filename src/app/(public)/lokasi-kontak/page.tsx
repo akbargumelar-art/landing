@@ -31,6 +31,8 @@ const defaultOffices: { city: string; address: string; mapUrl: string; gradient:
     },
 ];
 
+const DEFAULT_WA_GREETING = "Halo Kak, saya lihat di website ABK Ciraya.";
+
 const defaultContacts = [
     {
         icon: MessageCircle,
@@ -78,13 +80,17 @@ export default function LokasiKontakPage() {
             .catch(() => setLoading(false));
     }, []);
 
-    // Build contacts from settings with fallback
+    // Build WhatsApp URL with greeting from settings
+    const waGreeting = settings.wa_greeting !== undefined ? settings.wa_greeting : DEFAULT_WA_GREETING;
+    const waBase = settings.whatsapp_url || defaultContacts[0].href;
+    const waWithGreeting = waGreeting ? `${waBase}?text=${encodeURIComponent(waGreeting)}` : waBase;
+
     const contacts = [
         {
             icon: MessageCircle,
             label: "WhatsApp",
             value: settings.whatsapp || defaultContacts[0].value,
-            href: settings.whatsapp_url || defaultContacts[0].href,
+            href: waWithGreeting,
             color: "bg-green-500",
         },
         {
@@ -103,7 +109,7 @@ export default function LokasiKontakPage() {
         },
     ];
 
-    const whatsappCTA = settings.whatsapp_url || defaultContacts[0].href;
+    const whatsappCTA = waWithGreeting;
 
     let offices = defaultOffices;
     if (settings.office_data) {

@@ -12,6 +12,7 @@ const quickLinks = [
 ];
 
 // Default social links (fallback)
+const DEFAULT_WA_GREETING = "Halo Kak, saya lihat di website ABK Ciraya.";
 const defaultSocialLinks = {
     whatsapp: "https://wa.me/6285168822280",
     instagram: "https://www.instagram.com/agrabudikomunika",
@@ -31,10 +32,15 @@ const defaultOfficeAddresses = [
     "Jl. Siliwangi No.45, Purwawinangun, Kec. Kuningan, Kab. Kuningan, Jawa Barat 45512",
 ];
 
+function buildWaUrl(baseUrl: string, greeting: string): string {
+    if (!greeting) return baseUrl;
+    return `${baseUrl}?text=${encodeURIComponent(greeting)}`;
+}
+
 export function Footer() {
     const [logoUrl, setLogoUrl] = useState("");
     const [siteName, setSiteName] = useState("Agrabudi Komunika");
-    const [waUrl, setWaUrl] = useState(defaultSocialLinks.whatsapp);
+    const [waUrl, setWaUrl] = useState(buildWaUrl(defaultSocialLinks.whatsapp, DEFAULT_WA_GREETING));
     const [igUrl, setIgUrl] = useState(defaultSocialLinks.instagram);
     const [fbUrl, setFbUrl] = useState(defaultSocialLinks.facebook);
     const [officeAddresses, setOfficeAddresses] = useState(defaultOfficeAddresses);
@@ -45,7 +51,10 @@ export function Footer() {
             .then((data) => {
                 if (data.logo_url) setLogoUrl(data.logo_url);
                 if (data.site_name) setSiteName(data.site_name);
-                if (data.whatsapp_url) setWaUrl(data.whatsapp_url);
+                // Build WhatsApp URL with greeting from settings
+                const waBase = data.whatsapp_url || defaultSocialLinks.whatsapp;
+                const greeting = data.wa_greeting !== undefined ? data.wa_greeting : DEFAULT_WA_GREETING;
+                setWaUrl(buildWaUrl(waBase, greeting));
                 if (data.instagram_url) setIgUrl(data.instagram_url);
                 if (data.facebook_url) setFbUrl(data.facebook_url);
                 if (data.office_data) {

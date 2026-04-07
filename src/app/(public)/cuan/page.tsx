@@ -350,7 +350,9 @@ export default function KalkulatorCuanPage() {
             ? recommendedSummary
             : { totalCapital: cartSummary.totalCapital, totalProfit: cartSummary.totalProfit, remaining: cartSummary.remaining };
     const whatsappNumber = settings.whatsapp || "+62 851-6882-2280";
-    const whatsappUrl = settings.whatsapp_url || "https://wa.me/6285168822280";
+    const waGreeting = settings.wa_greeting !== undefined ? settings.wa_greeting : "Halo Kak, saya lihat di website ABK Ciraya.";
+    const waBase = settings.whatsapp_url || "https://wa.me/6285168822280";
+    const whatsappUrl = waGreeting ? `${waBase}?text=${encodeURIComponent(waGreeting)}` : waBase;
 
     return (
         <div className="min-h-screen bg-gray-50">

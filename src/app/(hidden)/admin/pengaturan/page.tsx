@@ -173,22 +173,44 @@ export default function PengaturanPage() {
             {/* Contact */}
             <Card>
                 <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Phone className="h-5 w-5" /> Kontak & Sosial Media</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Nomor WhatsApp</Label>
-                        <Input value={settings.whatsapp || ""} onChange={(e) => updateSetting("whatsapp", e.target.value)} />
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Nomor WhatsApp</Label>
+                            <Input value={settings.whatsapp || ""} onChange={(e) => updateSetting("whatsapp", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>URL WhatsApp</Label>
+                            <Input value={settings.whatsapp_url || ""} onChange={(e) => updateSetting("whatsapp_url", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Handle Instagram</Label>
+                            <Input value={settings.instagram_handle || ""} onChange={(e) => updateSetting("instagram_handle", e.target.value)} placeholder="@agrabudikomunika" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>URL Instagram</Label>
+                            <Input value={settings.instagram_url || ""} onChange={(e) => updateSetting("instagram_url", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nama Facebook</Label>
+                            <Input value={settings.facebook_name || ""} onChange={(e) => updateSetting("facebook_name", e.target.value)} placeholder="ABK Ciraya" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>URL Facebook</Label>
+                            <Input value={settings.facebook_url || ""} onChange={(e) => updateSetting("facebook_url", e.target.value)} />
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label>URL WhatsApp</Label>
-                        <Input value={settings.whatsapp_url || ""} onChange={(e) => updateSetting("whatsapp_url", e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>URL Instagram</Label>
-                        <Input value={settings.instagram_url || ""} onChange={(e) => updateSetting("instagram_url", e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>URL Facebook</Label>
-                        <Input value={settings.facebook_url || ""} onChange={(e) => updateSetting("facebook_url", e.target.value)} />
+                    <div className="space-y-2 pt-2 border-t">
+                        <Label>Kalimat Pembuka WhatsApp</Label>
+                        <textarea
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            value={settings.wa_greeting || ""}
+                            onChange={(e) => updateSetting("wa_greeting", e.target.value)}
+                            placeholder="Halo Kak, saya lihat di website ABK Ciraya."
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Pesan ini akan otomatis terisi saat pengunjung klik tombol WhatsApp di halaman Kontak, Footer, dan Kalkulator Cuan. Kosongkan jika tidak ingin menggunakan kalimat pembuka otomatis.
+                        </p>
                     </div>
                 </CardContent>
             </Card>
