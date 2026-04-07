@@ -69,7 +69,7 @@ npx tsx src/db/seed.ts
 
 # 5. Install PM2 & jalankan
 npm install -g pm2
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.js --only abkciraya-web
 pm2 save
 pm2 startup  # Auto-start saat reboot
 ```
@@ -101,7 +101,7 @@ server {
     server_name yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3011;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

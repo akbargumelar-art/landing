@@ -1,7 +1,7 @@
 module.exports = {
     apps: [
         {
-            name: "abk-ciraya",
+            name: "abkciraya-web",
             script: "node_modules/.bin/next",
             args: "start",
             cwd: "./",
@@ -11,7 +11,7 @@ module.exports = {
             max_memory_restart: "512M",
             env: {
                 NODE_ENV: "production",
-                PORT: 3000,
+                PORT: process.env.PORT || 3011,
             },
         },
     ],

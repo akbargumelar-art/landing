@@ -17,7 +17,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3011
 
 # Copy only what's needed
 COPY --from=deps /app/node_modules ./node_modules
@@ -31,6 +31,6 @@ COPY --from=builder /app/src/db ./src/db
 # Create uploads directory
 RUN mkdir -p public/uploads
 
-EXPOSE 3000
+EXPOSE 3011
 
 CMD ["npm", "start"]
