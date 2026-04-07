@@ -74,6 +74,16 @@ pm2 save
 pm2 startup  # Auto-start saat reboot
 ```
 
+Sebelum deploy production, validasi env:
+```bash
+npm run env:check
+```
+
+Checklist minimum production:
+- `BETTER_AUTH_SECRET` minimal 32 karakter
+- `BETTER_AUTH_URL` harus mengarah ke domain production, misalnya `https://abkciraya.cloud`
+- `PORT` harus sama dengan port yang dipakai PM2/Nginx, default repo ini `3011`
+
 ### Opsi B: Docker Compose
 
 ```bash

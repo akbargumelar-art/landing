@@ -114,26 +114,29 @@ cd "$APP_DIR"
 load_env_file
 resolve_port
 
-print_step 1 6 "Pull dari GitHub..."
+print_step 1 7 "Pull dari GitHub..."
 git pull origin "$BRANCH"
 
-print_step 2 6 "Install dependencies..."
+print_step 2 7 "Install dependencies..."
 npm install --legacy-peer-deps
 
-print_step 3 6 "Sinkronisasi database schema..."
+print_step 3 7 "Validasi environment..."
+npm run env:check
+
+print_step 4 7 "Sinkronisasi database schema..."
 npx drizzle-kit push
 
-print_step 4 6 "Build production..."
+print_step 5 7 "Build production..."
 rm -rf .next
 npm run build
 
-print_step 5 6 "Restart aplikasi..."
+print_step 6 7 "Restart aplikasi..."
 stop_pm2_app
 kill_port_if_busy
 start_pm2_app
 pm2 save >/dev/null
 
-print_step 6 6 "Verifikasi aplikasi..."
+print_step 7 7 "Verifikasi aplikasi..."
 verify_port
 verify_http
 
