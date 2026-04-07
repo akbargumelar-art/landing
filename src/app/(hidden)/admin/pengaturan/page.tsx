@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare, CreditCard } from "lucide-react";
-import Image from "next/image";
 
 interface OfficeData {
     city: string;
@@ -30,20 +29,43 @@ const defaultOffices: OfficeData[] = [
     },
 ];
 
+function normalizeSettings(data: unknown): Record<string, string> {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return {};
+    }
+
+    return Object.fromEntries(
+        Object.entries(data as Record<string, unknown>).map(([key, value]) => [
+            key,
+            typeof value === "string" ? value : value == null ? "" : String(value),
+        ])
+    );
+}
+
+function getWebhookUrl(origin: string, path: string) {
+    return origin ? `${origin}${path}` : "";
+}
+
 export default function PengaturanPage() {
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [offices, setOffices] = useState<OfficeData[]>(defaultOffices);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
+    const [origin, setOrigin] = useState("");
+
+    useEffect(() => {
+        setOrigin(window.location.origin);
+    }, []);
 
     useEffect(() => {
         fetch("/api/admin/settings")
             .then((r) => r.json())
             .then((data) => {
-                setSettings(data);
-                if (data.office_data) {
-                    try { setOffices(JSON.parse(data.office_data)); } catch { /* use default */ }
+                const normalizedSettings = normalizeSettings(data);
+                setSettings(normalizedSettings);
+                if (normalizedSettings.office_data) {
+                    try { setOffices(JSON.parse(normalizedSettings.office_data)); } catch { /* use default */ }
                 }
                 setLoading(false);
             })
@@ -134,7 +156,7 @@ export default function PengaturanPage() {
                             <Label>Logo Website</Label>
                             <div className="flex items-center gap-3">
                                 {settings.logo_url ? (
-                                    <Image src={settings.logo_url} alt="Logo" width={48} height={48} className="h-12 w-auto object-contain rounded border" unoptimized={true} />
+                                    <img src={settings.logo_url} alt="Logo" className="h-12 w-auto object-contain rounded border" />
                                 ) : (
                                     <div className="h-12 w-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">No logo</div>
                                 )}
@@ -147,7 +169,7 @@ export default function PengaturanPage() {
                             <Label>Favicon</Label>
                             <div className="flex items-center gap-3">
                                 {settings.favicon_url ? (
-                                    <Image src={settings.favicon_url} alt="Favicon" width={32} height={32} className="h-8 w-8 object-contain rounded border" unoptimized={true} />
+                                    <img src={settings.favicon_url} alt="Favicon" className="h-8 w-8 object-contain rounded border" />
                                 ) : (
                                     <div className="h-8 w-8 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">—</div>
                                 )}
@@ -346,7 +368,7 @@ export default function PengaturanPage() {
                             <Label>Callback / Webhook URL</Label>
                             <Input
                                 readOnly
-                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/mayar` : "/api/public/webhook/mayar"}
+                                value={getWebhookUrl(origin, "/api/public/webhook/mayar")}
                                 className="bg-gray-50 text-muted-foreground cursor-default"
                             />
                             <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Mayar.id → Pengaturan → Webhooks.</p>
@@ -402,7 +424,7 @@ export default function PengaturanPage() {
                             <Label>Notification / Webhook URL</Label>
                             <Input
                                 readOnly
-                                value={typeof window !== "undefined" ? `${window.location.origin}/api/public/webhook/midtrans` : "/api/public/webhook/midtrans"}
+                                value={getWebhookUrl(origin, "/api/public/webhook/midtrans")}
                                 className="bg-gray-50 text-muted-foreground cursor-default"
                             />
                             <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Midtrans → Settings → Payment → Notification URL.</p>
