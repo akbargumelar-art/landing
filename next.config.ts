@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
             },
         ],
     },
+    async redirects() {
+        return [
+            {
+                source: "/belanja/:path*",
+                destination: "/",
+                permanent: false,
+            },
+        ];
+    },
 };
 
 export default nextConfig;
