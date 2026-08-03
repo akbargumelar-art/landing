@@ -470,18 +470,32 @@ Prasyarat: `npm run db:migrate` dijalankan pada salinan backup, lalu
 - Uji ulang alur publik: `/program`, `/program/[slug]`, `/form-undian`, `/mitra/program`.
 - Tabel lama baru dihapus di Fase 5 setelah periode observasi (lihat 3.5 poin 6).
 
-### Fase 4 — IndiHome Enhancement
+### Fase 4 — IndiHome Enhancement (SELESAI)
 
 - Tabel `indihome_locations` + admin CRUD, ganti pemakaian `INDIHOME_LOCATIONS` konstanta.
 - Tabel/kolom banner + admin upload, ganti hero file statis.
 - Sesuaikan halaman publik `/indihome` membaca lokasi & banner dari database, memakai sistem
   desain baru dari Fase 1.
+- Catatan implementasi: yang menentukan bukan dropdown melainkan validasi server. Daftar lokasi
+  juga menjadi gerbang pada `POST /api/public/indihome/leads`, `parseIndihomeProductInput()`,
+  dan filter lead admin — ketiganya ikut dialihkan ke daftar dari database, jika tidak lokasi
+  baru akan ditolak/dibuang diam-diam. Konstanta lama tetap dipertahankan sebagai seed migrasi
+  dan fallback saat database tidak terjangkau.
 
-### Fase 5 — QA Menyeluruh per Role & Dokumentasi
+### Fase 5 — QA Menyeluruh per Role & Dokumentasi (SEBAGIAN)
 
 - Uji manual seluruh matriks akses (Bagian 2.2) dengan akun percobaan per role.
-- Perbarui `docs/session.md` dan dokumentasi terkait.
-- Hapus tabel lama yang sudah sepenuhnya digantikan (lihat 3.5 poin 6).
+  **Terblokir**: butuh MySQL hidup untuk membuat akun uji per role. Checklist siap pakai ada di
+  `docs/qa-role-matrix.md` — tinggal dijalankan begitu database tersedia.
+- Perbarui `docs/session.md` dan dokumentasi terkait. **Selesai.**
+- Hapus tabel lama yang sudah sepenuhnya digantikan (lihat 3.5 poin 6). **Belum**, dan tidak
+  boleh dikerjakan sebelum Fase 3b selesai serta melewati periode observasi.
+
+Satu lubang akses ditemukan saat menyusun checklist dan langsung ditutup:
+`GET /api/admin/mitra/outlets/[id]` tidak memfilter wilayah, padahal endpoint daftarnya
+memfilter — Supervisor/Salesforce bisa membaca detail performa outlet wilayah lain hanya dengan
+tahu id-nya. Dua celah scoping lain (peserta program lintas wilayah, ringkasan agregat) sengaja
+dibiarkan karena butuh keputusan produk; keduanya dicatat di `docs/qa-role-matrix.md`.
 
 ### Technical Risks
 

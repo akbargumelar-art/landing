@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
-import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
@@ -19,6 +19,15 @@ export async function GET(
     const { id } = await params;
     const [outlet] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
     if (!outlet) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
+
+    // The list endpoint filters by territory, so this one must too - otherwise a scoped role
+    // could read any outlet's sensitive performance detail just by knowing its id.
+    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
+        const territoryIds = await getUserTerritoryIds(auth.session.userId);
+        if (!outlet.territoryId || !territoryIds.includes(outlet.territoryId)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+    }
 
     const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
     return NextResponse.json({ outlet, details });
