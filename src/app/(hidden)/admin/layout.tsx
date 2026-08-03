@@ -24,20 +24,45 @@ import {
     Wifi,
 } from "lucide-react";
 
-const sidebarLinks = [
-    { href: "/admin/pengaturan", label: "Pengaturan Website", icon: Settings },
-    { href: "/admin/beranda", label: "Kelola Beranda", icon: Image },
-    { href: "/admin/program", label: "Kelola Program", icon: FileText },
-    { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart },
-    { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
-    { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
-    { href: "/admin/cuan", label: "Master Produk Cuan", icon: Calculator },
-    { href: "/admin/mitra", label: "Portal Mitra Outlet", icon: Store },
-    { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
-    { href: "/admin/form-builder", label: "Kelola Form", icon: FormInput },
-    { href: "/admin/peserta", label: "Data Peserta", icon: Users },
-    { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
-    { href: "/admin/profil", label: "Profil Admin", icon: UserCircle },
+const sidebarGroups = [
+    {
+        title: "Sistem & Konten",
+        links: [
+            { href: "/admin/beranda", label: "Kelola Beranda", icon: Image },
+            { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
+        ]
+    },
+    {
+        title: "Layanan & Portal",
+        links: [
+            { href: "/admin/mitra", label: "Mitra Outlet", icon: Store },
+            { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
+            { href: "/admin/cuan", label: "Kalkulator Cuan", icon: Calculator },
+        ]
+    },
+    {
+        title: "E-Commerce",
+        links: [
+            { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart },
+            { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
+            { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
+        ]
+    },
+    {
+        title: "Event & Form",
+        links: [
+            { href: "/admin/program", label: "Program & Leaderboard", icon: FileText },
+            { href: "/admin/form-builder", label: "Form Pengajuan", icon: FormInput },
+            { href: "/admin/peserta", label: "Data Peserta", icon: Users },
+            { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
+        ]
+    },
+    {
+        title: "Akun",
+        links: [
+            { href: "/admin/profil", label: "Profil Admin", icon: UserCircle },
+        ]
+    }
 ];
 
 export default function AdminLayout({
@@ -50,7 +75,7 @@ export default function AdminLayout({
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    const currentPage = sidebarLinks.find((l) => pathname.startsWith(l.href));
+    const currentPage = sidebarGroups.flatMap((g) => g.links).find((l) => pathname.startsWith(l.href));
 
     const handleLogout = async () => {
         const { signOut } = await import("@/lib/auth-client");
@@ -102,21 +127,30 @@ export default function AdminLayout({
                 </div>
 
                 {/* Nav Links */}
-                <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-                    {sidebarLinks.map((link) => (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={() => setMobileOpen(false)}
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${pathname.startsWith(link.href)
-                                ? "bg-red-50 text-red-600"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                            title={collapsed ? link.label : undefined}
-                        >
-                            <link.icon className="h-5 w-5 shrink-0" />
-                            {!collapsed && <span>{link.label}</span>}
-                        </Link>
+                <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+                    {sidebarGroups.map((group, i) => (
+                        <div key={i} className="space-y-1">
+                            {!collapsed && (
+                                <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-2">
+                                    {group.title}
+                                </p>
+                            )}
+                            {group.links.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    onClick={() => setMobileOpen(false)}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${pathname.startsWith(link.href)
+                                        ? "bg-red-50 text-red-600"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        }`}
+                                    title={collapsed ? link.label : undefined}
+                                >
+                                    <link.icon className="h-5 w-5 shrink-0" />
+                                    {!collapsed && <span>{link.label}</span>}
+                                </Link>
+                            ))}
+                        </div>
                     ))}
                 </nav>
 

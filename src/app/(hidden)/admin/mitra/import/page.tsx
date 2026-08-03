@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { FileSpreadsheet, Loader2, Upload, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +61,7 @@ export default function AdminMitraImportPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Import Data Mitra</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, dan program score.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, program score, dan penambahan outlet baru. Unduh contoh file untuk melihat format kolom yang benar.</p>
             </div>
 
             <Card>
@@ -72,7 +72,15 @@ export default function AdminMitraImportPage() {
                             <option value="whitelist">Whitelist</option>
                             <option value="performance">Performance</option>
                             <option value="program_score">Program Score</option>
+                            <option value="outlet">Outlet Baru</option>
                         </select>
+                        <Button
+                            variant="link"
+                            className="h-auto p-0 text-xs justify-start text-blue-600 h-6"
+                            onClick={() => window.open(`/api/admin/mitra/imports/template?type=${type}`, '_blank')}
+                        >
+                            <Download className="mr-1 h-3 w-3" /> Unduh Contoh File
+                        </Button>
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <Label>File Excel/CSV</Label>

@@ -22,7 +22,7 @@ import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-ut
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ImportType = "whitelist" | "performance" | "program_score";
+type ImportType = "whitelist" | "performance" | "program_score" | "outlet";
 type ImportExecutor = Pick<typeof db, "insert">;
 
 export async function GET() {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const type = String(form.get("type") || "") as ImportType;
     const mode = String(form.get("mode") || "preview");
 
-    if (!file || !["whitelist", "performance", "program_score"].includes(type)) {
+    if (!file || !["whitelist", "performance", "program_score", "outlet"].includes(type)) {
         return NextResponse.json({ error: "File dan tipe import wajib dipilih" }, { status: 400 });
     }
 
@@ -87,6 +87,9 @@ export async function POST(request: Request) {
             }
             if (type === "program_score") {
                 touchedProgramIds = await commitProgramScoreRows(tx, batchId, validation.validRows);
+            }
+            if (type === "outlet") {
+                await commitOutletRows(tx, validation.validRows);
             }
         });
 
@@ -205,6 +208,34 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
             else if (!/^\d{4}-\d{2}$/.test(periodYm)) errors.push({ row: rowNum, message: "Periode harus YYYY-MM" });
             else validRows.push({ ...row, outletId: outlet.id, programId: program.id, paramId: param.id, periodYm });
         }
+
+        if (type === "outlet") {
+            const outletCode = String(row.outletCode || row.kodeOutlet || "");
+            const name = String(row.name || row.nama || "");
+            const phone = normalizePhoneE164(String(row.ownerPhone || row.nomorHp || ""));
+            const territoryName = String(row.territoryName || row.wilayah || "").toLowerCase();
+            const territory = territoryName ? territoryByName.get(territoryName) : null;
+
+            if (!outletCode) errors.push({ row: rowNum, message: "Kode Outlet wajib diisi" });
+            else if (outletByCode.has(outletCode)) errors.push({ row: rowNum, message: "Kode Outlet sudah ada" });
+            else if (!name) errors.push({ row: rowNum, message: "Nama Outlet wajib diisi" });
+            else if (!phone) errors.push({ row: rowNum, message: "Nomor HP wajib diisi" });
+            else if (!territory) errors.push({ row: rowNum, message: "Wilayah tidak ditemukan" });
+            else validRows.push({
+                ...row,
+                outletCode,
+                name,
+                ownerPhone: phone,
+                territoryId: territory.id,
+                rsNumber: String(row.rsNumber || ""),
+                ownerName: String(row.ownerName || ""),
+                kabupaten: String(row.kabupaten || ""),
+                kecamatan: String(row.kecamatan || ""),
+                latitude: row.latitude ? parseFloat(String(row.latitude)) : null,
+                longitude: row.longitude ? parseFloat(String(row.longitude)) : null,
+                address: String(row.address || row.alamat || "")
+            });
+        }
     });
 
     return {
@@ -275,4 +306,25 @@ async function commitProgramScoreRows(executor: ImportExecutor, batchId: string,
     }
 
     return Array.from(touchedProgramIds);
+}
+
+async function commitOutletRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
+    if (rows.length === 0) return;
+    const values = rows.map((row) => ({
+        id: uuid(),
+        outletCode: String(row.outletCode),
+        publicToken: uuid().replace(/-/g, "").slice(0, 16),
+        name: String(row.name),
+        ownerPhone: String(row.ownerPhone),
+        territoryId: String(row.territoryId),
+        rsNumber: String(row.rsNumber || ""),
+        ownerName: String(row.ownerName || ""),
+        kabupaten: String(row.kabupaten || ""),
+        kecamatan: String(row.kecamatan || ""),
+        latitude: typeof row.latitude === "number" ? row.latitude : null,
+        longitude: typeof row.longitude === "number" ? row.longitude : null,
+        status: "ACTIVE" as const,
+        createdAt: new Date(),
+    }));
+    await executor.insert(mitraOutlets).values(values);
 }

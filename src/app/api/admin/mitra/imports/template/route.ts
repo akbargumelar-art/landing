@@ -1,0 +1,91 @@
+import { NextResponse } from "next/server";
+import * as XLSX from "xlsx";
+
+import { requireMitraAccess } from "@/lib/mitra-auth";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type TemplateType = "whitelist" | "performance" | "program_score" | "outlet";
+
+// Contoh baris data untuk setiap tipe import. Baris ini menjadi panduan kolom
+// yang wajib diisi beserta format nilai yang benar.
+const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
+    whitelist: [
+        {
+            phone: "08123456789",
+            name: "Budi Santoso",
+            scope: "OUTLET",
+            outletCode: "OUT-001",
+            territoryName: "",
+            expiresAt: "",
+        },
+        {
+            phone: "08129998887",
+            name: "Siti Aminah",
+            scope: "ALL",
+            outletCode: "",
+            territoryName: "",
+            expiresAt: "2026-12-31",
+        },
+    ],
+    performance: [
+        {
+            outletCode: "OUT-001",
+            metricKey: "sellthru_digipos",
+            periodYm: "2026-08",
+            value: 1500000,
+        },
+    ],
+    program_score: [
+        {
+            outletCode: "OUT-001",
+            programSlug: "program-agustus-2026",
+            paramKey: "recharge",
+            periodYm: "2026-08",
+            rawValue: 500000,
+            points: 50,
+        },
+    ],
+    outlet: [
+        {
+            outletCode: "OUT-100",
+            name: "Outlet Maju Jaya",
+            ownerName: "Ahmad Fauzi",
+            ownerPhone: "08123450000",
+            rsNumber: "RS-100",
+            territoryName: "Cirebon Kota",
+            kabupaten: "Kota Cirebon",
+            kecamatan: "Kesambi",
+            latitude: -6.732,
+            longitude: 108.552,
+        },
+    ],
+};
+
+export async function GET(request: Request) {
+    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { searchParams } = new URL(request.url);
+    const type = String(searchParams.get("type") || "whitelist") as TemplateType;
+
+    const rows = TEMPLATES[type];
+    if (!rows) {
+        return NextResponse.json({ error: "Tipe template tidak dikenal" }, { status: 400 });
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+    return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="template-import-${type}.xlsx"`,
+        },
+    });
+}

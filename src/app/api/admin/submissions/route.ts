@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { formSubmissions } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { dynamicForms, formSubmissions } from "@/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 interface SubValue {
     value: string;
@@ -42,8 +42,25 @@ export async function GET(request: Request) {
         const status = searchParams.get("status");
         const search = searchParams.get("search");
 
+        // Push equality filters down to SQL instead of fetching the whole
+        // table and filtering in memory. Free-text search stays in-memory
+        // below since it spans dynamically joined field values.
+        const conditions = [];
+        if (status) conditions.push(eq(formSubmissions.status, status));
+        if (programId) {
+            const forms = await db
+                .select({ id: dynamicForms.id })
+                .from(dynamicForms)
+                .where(eq(dynamicForms.programId, programId));
+            const formIds = forms.map((f) => f.id);
+            conditions.push(
+                formIds.length > 0 ? inArray(formSubmissions.formId, formIds) : eq(formSubmissions.formId, "__none__")
+            );
+        }
+
         // Fetch using Drizzle Relational Queries
         const dbResult = await db.query.formSubmissions.findMany({
+            where: conditions.length > 0 ? and(...conditions) : undefined,
             with: {
                 form: {
                     with: {
@@ -99,16 +116,10 @@ export async function GET(request: Request) {
             };
         }) as FetchedSubmission[];
 
-        // Apply Filters
+        // status and programId are already applied at the SQL level above.
+        // Only free-text search still needs in-memory filtering since it
+        // spans dynamically joined field values.
         let filtered = result;
-
-        if (status) {
-            filtered = filtered.filter((s: FetchedSubmission) => s.status === status);
-        }
-
-        if (programId) {
-            filtered = filtered.filter((s: FetchedSubmission) => s.form.program?.id === programId);
-        }
 
         if (search) {
             const searchLower = search.toLowerCase();

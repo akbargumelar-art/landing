@@ -18,7 +18,7 @@ const navLinks = [
     { href: "/program", label: "PROGRAM" },
     { href: "/indihome", label: "INDIHOME" },
     { href: "/mitra", label: "MITRA OUTLET" },
-    { href: "/belanja", label: "BELANJA" },
+    // { href: "/belanja", label: "BELANJA" }, // Halaman disembunyikan
     { href: "/cuan", label: "KALKULATOR CUAN" },
     { href: "/lokasi-kontak", label: "LOKASI & KONTAK" },
 ];

@@ -33,7 +33,6 @@ export default function VoucherPage() {
     const fileRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        // Fetch only virtual products
         fetch("/api/admin/products")
             .then((r) => r.json())
             .then((data: Product[]) => {
@@ -64,6 +63,25 @@ export default function VoucherPage() {
         }
     }, [selectedProduct]);
 
+    const generateVoucherTemplate = () => {
+        const codes = Array.from({ length: 50 }, (_, i) =>
+            `VOUCHER-${Date.now().toString(36).toUpperCase().slice(-6)}-${(i + 1).toString().padStart(3, '0')}`
+        );
+
+        const ws = XLSX.utils.aoa_to_sheet([["Kode Voucher"], ...codes.map(c => [c])]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template Voucher");
+
+        const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `template-voucher-${selectedProduct || "semua"}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !selectedProduct) return;
@@ -77,10 +95,8 @@ export default function VoucherPage() {
                 const wb = XLSX.read(bstr, { type: "binary" });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const data = XLSX.utils.sheet_to_json<any>(ws, { header: 1 });
+                const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
 
-                // Assume codes are in the first column
                 const codes = data.map(row => row[0]).filter(Boolean).map(String).map(s => s.trim());
 
                 if (codes.length === 0) {
@@ -104,7 +120,6 @@ export default function VoucherPage() {
                 if (result.success) {
                     alert(`Berhasil mengunggah ${result.inserted} kode voucher.`);
                     fetchVouchers(selectedProduct);
-                    // refresh product selection to show updated stock
                     setProducts(products.map(p => p.id === selectedProduct ? { ...p, stock: p.stock + result.inserted } : p));
                 } else {
                     alert(result.error || "Gagal upload voucher");
@@ -121,7 +136,7 @@ export default function VoucherPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Hapus kode voucher ini secara permanen?")) return;
         await fetch(`/api/admin/vouchers/${id}`, { method: "DELETE" });
-        setVouchers((prev) => prev.filter((v) => v.id !== id));
+        setVouchers((prev) => prev.filter((v => v.id !== id)));
         setProducts(products.map(p => p.id === selectedProduct ? { ...p, stock: Math.max(0, p.stock - 1) } : p));
     };
 
@@ -136,7 +151,6 @@ export default function VoucherPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left col - Selection & Upload */}
                 <div className="md:col-span-1 space-y-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Pilih Produk Virtual</label>
@@ -156,7 +170,7 @@ export default function VoucherPage() {
                         <CardContent className="p-4 space-y-4">
                             <h3 className="font-semibold text-red-900 text-sm">Upload Massal</h3>
                             <p className="text-xs text-red-800">
-                                Unggah file Excel (<strong>.xlsx</strong>) atau <strong>.csv</strong>. Sistem hanya membaca <strong>Kolom A</strong> baris berapapun.
+                                Unggah file Excel (.xlsx) atau .csv. Sistem hanya membaca Kolom A.
                             </p>
 
                             <input
@@ -175,11 +189,20 @@ export default function VoucherPage() {
                                 {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UploadCloud className="h-4 w-4 mr-2" />}
                                 Pilih File CSV / XLSX
                             </Button>
+
+                            <Button
+                                variant="outline"
+                                onClick={generateVoucherTemplate}
+                                disabled={!selectedProduct}
+                                className="w-full border-blue-200 text-blue-600 hover:bg-blue-50"
+                            >
+                                <Ticket className="mr-2 h-4 w-4" />
+                                Unduh Template Voucher
+                            </Button>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Right col - List of Vouchers */}
                 <div className="md:col-span-2">
                     <Card>
                         <CardContent className="p-4">
