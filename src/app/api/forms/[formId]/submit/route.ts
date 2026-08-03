@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { dynamicForms, formFields, formSubmissions, submissionValues } from "@/db/schema";
+import { dynamicForms, formFields, formSubmissions, programs, submissionValues } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { sendWhatsAppNotification } from "@/lib/whatsapp";
+import { DEFAULT_UNDIAN_TEMPLATE, sendTemplatedWhatsApp } from "@/lib/whatsapp";
 
 // POST submit form
 export async function POST(
@@ -158,15 +158,36 @@ export async function POST(
             });
         }
 
-        // --- Trigger WhatsApp Notification (Non-blocking) ---
-        // Fire-and-forget: do not await this block so it doesn't slow down the response
+        // --- Notifikasi WhatsApp (tidak memblokir respons) ---
+        // Template diambil dari program yang menaungi form ini, bukan dari setting global.
+        // Setting global hanya menyimpan koneksi gateway; isi pesan tiap fitur berbeda.
         if (participantPhone !== "-") {
-            sendWhatsAppNotification(participantPhone, {
-                name: participantName,
-                programName: form.title || "Program kami"
-            }).catch((err) => {
-                console.error("WhatsApp integration block error", err);
-            });
+            const [program] = await db
+                .select({
+                    title: programs.title,
+                    waTemplate: programs.waTemplate,
+                    waNotifyEnabled: programs.waNotifyEnabled,
+                })
+                .from(programs)
+                .where(eq(programs.id, form.programId))
+                .limit(1);
+
+            const template = program?.waTemplate?.trim() || DEFAULT_UNDIAN_TEMPLATE;
+
+            if (program?.waNotifyEnabled === false) {
+                console.log(`[WA] Notifikasi dimatikan untuk program ${program?.title || form.programId}`);
+            } else {
+                sendTemplatedWhatsApp(participantPhone, template, {
+                    name: participantName,
+                    programName: program?.title || form.title || "Program kami",
+                }).then((result) => {
+                    if (!result.ok) {
+                        console.error(`[WA] Notifikasi pendaftaran gagal untuk ${participantPhone}: ${result.error}`);
+                    }
+                }).catch((err) => {
+                    console.error("[WA] Exception saat mengirim notifikasi pendaftaran", err);
+                });
+            }
         }
         // ----------------------------------------------------
 

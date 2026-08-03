@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload, ImageIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload, ImageIcon, MessageSquare } from "lucide-react";
 import Image from "next/image";
 
 interface Program {
@@ -28,6 +28,8 @@ interface Program {
     prizes: string;
     status: string;
     sortOrder: number;
+    waTemplate: string | null;
+    waNotifyEnabled: boolean;
 }
 
 interface Prize {
@@ -38,6 +40,7 @@ interface Prize {
 const emptyProgram: Partial<Program> = {
     title: "", description: "", thumbnail: "", category: "pelanggan",
     period: "", content: "", terms: "[]", mechanics: "[]", gallery: "[]", prizes: "[]", status: "draft",
+    waTemplate: "", waNotifyEnabled: true,
 };
 
 export default function ProgramPage() {
@@ -260,6 +263,34 @@ export default function ProgramPage() {
                         <div className="space-y-2">
                             <Label>Periode Berlaku</Label>
                             <Input value={editProgram.period || ""} onChange={(e) => setEditProgram({ ...editProgram, period: e.target.value })} placeholder="1 Januari - 31 Maret 2026" />
+                        </div>
+
+                        {/* Notifikasi WhatsApp khusus program ini. Koneksi gateway-nya umum,
+                            diatur sekali di halaman Pengaturan. */}
+                        <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Notifikasi WhatsApp Pendaftar</Label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 accent-red-600"
+                                        checked={editProgram.waNotifyEnabled !== false}
+                                        onChange={(e) => setEditProgram({ ...editProgram, waNotifyEnabled: e.target.checked })}
+                                    />
+                                    Aktif
+                                </label>
+                            </div>
+                            <Textarea
+                                rows={3}
+                                value={editProgram.waTemplate || ""}
+                                onChange={(e) => setEditProgram({ ...editProgram, waTemplate: e.target.value })}
+                                placeholder="Halo {nama}, pendaftaran Anda untuk {program} sudah kami terima. Terima kasih."
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Placeholder: <code>&#123;nama&#125;</code> nama pendaftar, <code>&#123;program&#125;</code> judul program.
+                                Dikosongkan berarti memakai template bawaan. Koneksi WhatsApp diatur di
+                                halaman Pengaturan dan berlaku untuk seluruh aplikasi.
+                            </p>
                         </div>
 
                         {/* Thumbnail Upload */}

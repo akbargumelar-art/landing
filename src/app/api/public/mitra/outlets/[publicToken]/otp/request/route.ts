@@ -5,7 +5,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { mitraOtpRequests } from "@/db/schema";
 import { findMatchingWhitelist, getMitraOutletRecordByToken, writeWhitelistUsage } from "@/lib/mitra-data";
-import { sendWhatsAppNotification } from "@/lib/whatsapp";
+import { getOtpTemplate, sendTemplatedWhatsApp } from "@/lib/whatsapp";
 import {
     addMinutes,
     createOtpHash,
@@ -95,13 +95,20 @@ export async function POST(
         ip,
     });
 
-    await sendWhatsAppNotification(phoneE164, {
+    const otpTemplate = await getOtpTemplate();
+    const sent = await sendTemplatedWhatsApp(phoneE164, otpTemplate, {
         name: whitelist.name || outlet.name,
         programName: "Portal Mitra Outlet",
         otp: code,
         outlet: outlet.name,
         expires: "5 menit",
     });
+
+    if (!sent.ok) {
+        // Balasan ke pengunjung tetap generik agar tidak membocorkan status nomor,
+        // tetapi kegagalannya dicatat supaya admin bisa menelusurinya.
+        console.error("[OTP] Gagal mengirim OTP via WAHA:", sent.error);
+    }
 
     return NextResponse.json({ message: GENERIC_MESSAGE });
 }

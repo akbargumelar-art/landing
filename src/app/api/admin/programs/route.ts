@@ -57,6 +57,8 @@ export async function POST(request: Request) {
             gallery: body.gallery || "[]",
             prizes: body.prizes || "[]",
             status: body.status || "draft",
+            waTemplate: body.waTemplate?.trim() || null,
+            waNotifyEnabled: body.waNotifyEnabled !== false,
             sortOrder: (maxResult?.maxOrder ?? -1) + 1,
             createdAt: new Date(),
         });

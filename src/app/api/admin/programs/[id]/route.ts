@@ -55,6 +55,8 @@ export async function PUT(
             gallery: body.gallery,
             prizes: body.prizes,
             status: body.status,
+            waTemplate: body.waTemplate?.trim() || null,
+            waNotifyEnabled: body.waNotifyEnabled !== false,
             slug: body.slug,
         }).where(eq(programs.id, id));
 

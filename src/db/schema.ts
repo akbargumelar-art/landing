@@ -126,6 +126,11 @@ export const programs = mysqlTable("programs", {
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 
+    // Template WhatsApp khusus program ini. Koneksi gateway-nya tetap yang umum di
+    // Pengaturan; hanya isi pesannya yang per program, karena placeholder tiap fitur berbeda.
+    waTemplate: text("wa_template"),
+    waNotifyEnabled: boolean("wa_notify_enabled").notNull().default(true),
+
     mode: mysqlEnum("mode", ["UNDIAN", "PERFORMANCE"]).notNull().default("UNDIAN"),
     // PERFORMANCE-only fields, carried over from the old mitra_programs table.
     mechanismMd: text("mechanism_md"),

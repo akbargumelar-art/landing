@@ -54,6 +54,9 @@ export default function PengaturanPage() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [origin, setOrigin] = useState("");
+    const [wahaTestPhone, setWahaTestPhone] = useState("");
+    const [wahaTesting, setWahaTesting] = useState(false);
+    const [wahaResult, setWahaResult] = useState<{ ok: boolean; lines: string[] } | null>(null);
 
     useEffect(() => {
         setOrigin(window.location.origin);
@@ -91,6 +94,49 @@ export default function PengaturanPage() {
             if (data.url) updateSetting(key, data.url);
         };
         input.click();
+    };
+
+    const runWahaTest = async () => {
+        setWahaTesting(true);
+        setWahaResult(null);
+        try {
+            const res = await fetch("/api/admin/settings/waha-test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: wahaTestPhone.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setWahaResult({ ok: false, lines: [data.error || "Tes koneksi gagal dijalankan."] });
+                return;
+            }
+
+            const d = data.diagnostics || {};
+            const lines: string[] = [];
+
+            if (!d.configured) {
+                lines.push("Endpoint WAHA belum diisi. Isi lalu simpan pengaturan dulu.");
+            } else {
+                lines.push(`Endpoint: ${d.endpoint}`);
+                lines.push(`Session: ${d.session}${d.sessionStatus ? ` (${d.sessionStatus})` : ""}`);
+                lines.push(`API key: ${d.hasToken ? "terisi" : "kosong"}`);
+                lines.push(d.reachable ? "Server WAHA dapat dihubungi." : "Server WAHA TIDAK dapat dihubungi.");
+            }
+            if (d.error) lines.push(d.error);
+
+            if (data.sent) {
+                lines.push(data.sent.ok
+                    ? `Pesan uji terkirim ke ${wahaTestPhone.trim()}. Cek WhatsApp nomor tersebut.`
+                    : `Pesan uji gagal: ${data.sent.error}`);
+            }
+
+            const ok = Boolean(d.configured && d.reachable && !d.error && (!data.sent || data.sent.ok));
+            setWahaResult({ ok, lines });
+        } catch {
+            setWahaResult({ ok: false, lines: ["Tidak dapat menghubungi server aplikasi."] });
+        } finally {
+            setWahaTesting(false);
+        }
     };
 
     // Office CRUD
@@ -242,13 +288,15 @@ export default function PengaturanPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5" /> Integrasi & Notifikasi WhatsApp API
+                        <MessageSquare className="h-5 w-5" /> WhatsApp Gateway (WAHA)
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Pengaturan ini digunakan untuk mengirim pesan notifikasi WhatsApp otomatis kepada pendaftar.
-                        Jika dibiarkan kosong, fitur notifikasi tidak akan berjalan.
+                        Koneksi WhatsApp untuk <strong>seluruh aplikasi</strong>: OTP Database Mitra Outlet,
+                        notifikasi pendaftaran program, dan fitur lain berikutnya. Isi pesannya diatur
+                        terpisah per fitur — template program undian ada di halaman Kelola Program.
+                        Jika endpoint dikosongkan, seluruh pengiriman WhatsApp berhenti.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -278,17 +326,43 @@ export default function PengaturanPage() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label>Template Pesan Notifikasi</Label>
+                        <Label>Template Pesan OTP (Database Mitra Outlet)</Label>
                         <textarea
-                            className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            value={settings.wa_gw_template || ""}
-                            onChange={(e) => updateSetting("wa_gw_template", e.target.value)}
-                            placeholder="Halo {nama}, pendaftaran Anda untuk {program} berhasil."
+                            className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            value={settings.wa_otp_template || ""}
+                            onChange={(e) => updateSetting("wa_otp_template", e.target.value)}
+                            placeholder="Kode OTP Portal Mitra Outlet {outlet}: {otp}. Berlaku {expires}."
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                            Gunakan <code>&#123;nama&#125;</code> untuk nama peserta, dan <code>&#123;program&#125;</code> untuk judul program pendaftaran.
-                            Variabel lain akan menyusul sesuai label di formulir.
+                            Placeholder: <code>&#123;otp&#125;</code>, <code>&#123;outlet&#125;</code>, <code>&#123;expires&#125;</code>.
+                            Dikosongkan berarti memakai template bawaan.
                         </p>
+                    </div>
+
+                    <div className="rounded-lg border bg-gray-50 p-4 space-y-3">
+                        <div>
+                            <p className="text-sm font-semibold">Tes Koneksi</p>
+                            <p className="text-xs text-muted-foreground">
+                                Memeriksa server dan status session WAHA. Isi nomor bila ingin sekalian
+                                mengirim pesan uji. <strong>Simpan pengaturan dulu</strong> sebelum menguji.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                                value={wahaTestPhone}
+                                onChange={(e) => setWahaTestPhone(e.target.value)}
+                                placeholder="Nomor tujuan uji (opsional), mis. 081234567890"
+                            />
+                            <Button type="button" variant="outline" onClick={runWahaTest} disabled={wahaTesting} className="shrink-0">
+                                {wahaTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                                Tes Koneksi
+                            </Button>
+                        </div>
+                        {wahaResult && (
+                            <div className={`rounded-md border px-3 py-2 text-sm ${wahaResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`} role="status">
+                                {wahaResult.lines.map((line, index) => <p key={index}>{line}</p>)}
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
