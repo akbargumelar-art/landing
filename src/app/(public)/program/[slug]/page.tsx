@@ -146,7 +146,7 @@ export default function ProgramDetailPage() {
                 <div className="text-center">
                     <h1 className="text-2xl font-bold mb-4">Program Tidak Ditemukan</h1>
                     <Link href="/program">
-                        <Button variant="outline" className="btn-pill cursor-pointer">
+                        <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Kembali ke Daftar Program
                         </Button>
@@ -165,7 +165,6 @@ export default function ProgramDetailPage() {
             <section className="h-[360px] md:h-[480px] bg-gradient-to-br from-red-600 via-red-500 to-orange-500 relative overflow-hidden flex items-center">
                 <div className="absolute inset-0">
                     <div className="absolute top-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-                    <div className="absolute top-20 left-1/4 w-16 h-16 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />
                 </div>
                 <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
                     <Link href="/program" className="inline-flex items-center text-white/80 hover:text-white text-sm mb-6 transition-colors font-medium">
@@ -179,11 +178,6 @@ export default function ProgramDetailPage() {
                         <Calendar className="h-5 w-5" />
                         <span>{program.period}</span>
                     </div>
-                </div>
-                <div className="wave-divider">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.11,130.83,141.14,321.39,56.44Z" fill="#ffffff" />
-                    </svg>
                 </div>
             </section>
 

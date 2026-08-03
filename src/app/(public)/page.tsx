@@ -39,19 +39,6 @@ import {
     Calendar,
 } from "lucide-react";
 
-function WaveDivider({ fill = "#ffffff", flip = false }: { fill?: string; flip?: boolean }) {
-    return (
-        <div className={flip ? "wave-divider-top" : "wave-divider"}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                <path
-                    d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.11,130.83,141.14,321.39,56.44Z"
-                    fill={fill}
-                />
-            </svg>
-        </div>
-    );
-}
-
 function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     const [current, setCurrent] = useState(0);
 
@@ -105,15 +92,10 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                                     <div className="absolute inset-0 bg-black/50 z-0" />
                                 </>
                             )}
-                            {/* Decorative elements */}
+                            {/* Decorative accent */}
                             <div className="absolute inset-0 overflow-hidden">
-                                <div className="absolute top-10 right-10 w-80 h-80 bg-white/5 rounded-full blur-3xl animate-float" />
-                                <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-float-delayed" />
-                                <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-white/3 rounded-full blur-3xl" />
-                                {/* Geometric shapes */}
-                                <div className="absolute top-20 right-[20%] w-20 h-20 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />
-                                <div className="absolute bottom-32 right-[30%] w-14 h-14 border-2 border-white/10 rounded-full animate-float-delayed" />
-                                <div className="absolute top-1/2 left-[15%] w-8 h-8 bg-white/10 rounded-lg rotate-45" />
+                                <div className="absolute top-10 right-10 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+                                <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
                             </div>
 
                             <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
@@ -127,7 +109,7 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                                     <Link href={slide.ctaLink}>
                                         <Button
                                             size="lg"
-                                            className="btn-pill bg-white text-red-600 hover:bg-gray-100 shadow-xl text-base font-bold px-10 py-3 h-auto hover:shadow-2xl transition-all duration-300 cursor-pointer"
+                                            className="bg-white text-red-600 hover:bg-gray-100 shadow-lg text-base font-bold px-10 py-3 h-auto hover:shadow-xl transition-all duration-300 cursor-pointer"
                                         >
                                             {slide.cta}
                                             <ArrowRight className="ml-2 h-5 w-5" />
@@ -139,9 +121,6 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                     </div>
                 ))}
             </div>
-
-            {/* Wave divider at bottom */}
-            <WaveDivider fill="#ffffff" />
 
             {/* Navigation arrows */}
             <button
@@ -359,7 +338,7 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
                                     {program.description}
                                 </p>
                                 <Link href={`/program/${program.slug}`}>
-                                    <Button variant="outline" size="sm" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
+                                    <Button variant="outline" size="sm" className="w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
                                         Lihat Detail
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </Button>
@@ -371,7 +350,7 @@ function ProgramPreview({ programs }: { programs: Program[] }) {
 
                 <div className="text-center mt-10">
                     <Link href="/program">
-                        <Button variant="outline" size="lg" className="btn-pill font-semibold px-8 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
+                        <Button variant="outline" size="lg" className="font-semibold px-8 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
                             Lihat Semua Program
                             <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
@@ -515,7 +494,7 @@ function LokasiKantor() {
 
                 <div className="text-center mt-10">
                     <Link href="/lokasi-kontak">
-                        <Button variant="outline" size="lg" className="btn-pill font-semibold px-8 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
+                        <Button variant="outline" size="lg" className="font-semibold px-8 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
                             Semua Lokasi & Kontak
                             <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
@@ -531,20 +510,10 @@ function MitraSection() {
         <section className="relative overflow-hidden">
             {/* Red-Orange Gradient Background */}
             <div className="bg-gradient-to-r from-red-600 via-red-500 to-orange-500 py-24 relative">
-                {/* Wave top */}
-                <div className="wave-divider-top">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path
-                            d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.11,130.83,141.14,321.39,56.44Z"
-                            fill="#f8f8f8"
-                        />
-                    </svg>
-                </div>
-
                 {/* Decorative */}
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
                 <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
-                <div className="absolute top-20 left-1/3 w-16 h-16 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />
+                <div className="absolute top-20 left-1/3 w-16 h-16 border-2 border-white/10 rounded-2xl rotate-12" />
 
                 <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="max-w-3xl mx-auto text-center">
@@ -565,7 +534,7 @@ function MitraSection() {
                             >
                                 <Button
                                     size="lg"
-                                    className="btn-pill bg-white text-red-600 hover:bg-gray-100 shadow-xl text-base font-bold px-10 h-auto py-3 hover:shadow-2xl transition-all duration-300 cursor-pointer"
+                                    className="bg-white text-red-600 hover:bg-gray-100 shadow-lg text-base font-bold px-10 h-auto py-3 hover:shadow-xl transition-all duration-300 cursor-pointer"
                                 >
                                     Portal Mitra Outlet
                                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -574,7 +543,7 @@ function MitraSection() {
                             <Link href="/lokasi-kontak">
                                 <Button
                                     size="lg"
-                                    className="btn-pill border-2 border-white bg-transparent text-white hover:bg-white hover:text-red-600 text-base font-bold px-10 h-auto py-3 transition-all duration-300 cursor-pointer"
+                                    className="border-2 border-white bg-transparent text-white hover:bg-white hover:text-red-600 text-base font-bold px-10 h-auto py-3 transition-all duration-300 cursor-pointer"
                                 >
                                     Hubungi Kami
                                 </Button>

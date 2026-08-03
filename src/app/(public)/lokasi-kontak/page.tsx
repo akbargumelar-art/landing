@@ -142,8 +142,6 @@ export default function LokasiKontakPage() {
                 <div className="absolute inset-0">
                     <div className="absolute top-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
                     <div className="absolute bottom-10 left-10 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-                    <div className="absolute top-16 left-1/4 w-14 h-14 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />
-                    <div className="absolute bottom-20 right-1/3 w-10 h-10 border-2 border-white/10 rounded-full animate-float-delayed" />
                 </div>
                 <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center w-full">
                     <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white mb-4">
@@ -152,15 +150,6 @@ export default function LokasiKontakPage() {
                     <p className="text-lg md:text-xl text-white/85 max-w-2xl mx-auto">
                         Temukan kantor kami atau hubungi melalui media sosial
                     </p>
-                </div>
-                {/* Wave divider */}
-                <div className="wave-divider">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path
-                            d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.11,130.83,141.14,321.39,56.44Z"
-                            fill="#ffffff"
-                        />
-                    </svg>
                 </div>
             </section>
 
@@ -220,7 +209,7 @@ export default function LokasiKontakPage() {
                                     </p>
                                     <div className="mt-auto pt-4">
                                         <a href={office.mapUrl} target="_blank" rel="noopener noreferrer">
-                                            <Button variant="outline" className="btn-pill w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
+                                            <Button variant="outline" className="w-full font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 cursor-pointer">
                                                 <MapPin className="mr-2 h-4 w-4" />
                                                 Lihat di Google Maps
                                                 <ExternalLink className="ml-2 h-3.5 w-3.5" />
@@ -279,7 +268,7 @@ export default function LokasiKontakPage() {
                         <a href={whatsappCTA} target="_blank" rel="noopener noreferrer">
                             <Button
                                 size="lg"
-                                className="btn-pill bg-green-600 hover:bg-green-700 text-white shadow-xl text-base font-bold px-10 h-auto py-3 hover:shadow-2xl transition-all duration-300 cursor-pointer"
+                                className="bg-green-600 hover:bg-green-700 text-white shadow-lg text-base font-bold px-10 h-auto py-3 hover:shadow-xl transition-all duration-300 cursor-pointer"
                             >
                                 <Phone className="mr-2 h-5 w-5" />
                                 Chat via WhatsApp

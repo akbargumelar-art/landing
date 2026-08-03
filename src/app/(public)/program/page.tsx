@@ -75,8 +75,6 @@ export default function ProgramPage() {
                 <div className="absolute inset-0">
                     <div className="absolute top-10 right-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
                     <div className="absolute bottom-10 left-10 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-                    <div className="absolute top-20 left-1/3 w-16 h-16 border-2 border-white/10 rounded-2xl rotate-12 animate-float" />
-                    <div className="absolute bottom-16 right-1/4 w-10 h-10 border-2 border-white/10 rounded-full animate-float-delayed" />
                 </div>
                 <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center w-full">
                     <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white mb-4">
@@ -86,15 +84,6 @@ export default function ProgramPage() {
                         Temukan berbagai program menarik dan promo terbaru dari Telkomsel
                         melalui ABK Ciraya
                     </p>
-                </div>
-                {/* Wave divider */}
-                <div className="wave-divider">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path
-                            d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.11,130.83,141.14,321.39,56.44Z"
-                            fill="#ffffff"
-                        />
-                    </svg>
                 </div>
             </section>
 
@@ -186,7 +175,7 @@ export default function ProgramPage() {
                                             {program.description}
                                         </p>
                                         <Link href={program.href}>
-                                            <Button className="btn-pill w-full font-semibold cursor-pointer">
+                                            <Button className="w-full font-semibold cursor-pointer">
                                                 Lihat Detail
                                                 <ArrowRight className="ml-2 h-4 w-4" />
                                             </Button>
