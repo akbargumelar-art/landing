@@ -46,3 +46,31 @@ export async function PUT(
     const [updated] = await db.select().from(mitraWhitelistNumbers).where(eq(mitraWhitelistNumbers.id, id));
     return NextResponse.json(updated);
 }
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const [existing] = await db.select().from(mitraWhitelistNumbers).where(eq(mitraWhitelistNumbers.id, id)).limit(1);
+
+    if (!existing) {
+        return NextResponse.json({ error: "Whitelist tidak ditemukan" }, { status: 404 });
+    }
+
+    await db.delete(mitraWhitelistNumbers).where(eq(mitraWhitelistNumbers.id, id));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE",
+        entity: "mitra_whitelist",
+        entityId: id,
+        diff: { phoneE164: existing.phoneE164, scope: existing.scope },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true });
+}

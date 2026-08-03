@@ -88,3 +88,32 @@ export async function PUT(
     const [updated] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
     return NextResponse.json(updated);
 }
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const [existing] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
+
+    if (!existing) {
+        return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
+    }
+
+    // Detail, metrics, program participation, and OTP rows all cascade from mitra_outlets.
+    await db.delete(mitraOutlets).where(eq(mitraOutlets.id, id));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE",
+        entity: "mitra_outlet",
+        entityId: id,
+        diff: { outletCode: existing.outletCode, name: existing.name },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true });
+}

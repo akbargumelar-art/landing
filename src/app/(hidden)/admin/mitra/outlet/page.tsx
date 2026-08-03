@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,8 @@ export default function AdminMitraOutletPage() {
     const [editOutlet, setEditOutlet] = React.useState<Record<string, unknown> | null>(null);
     const [editDetails, setEditDetails] = React.useState<Record<string, Record<string, string | number>>>({});
     const [editSaving, setEditSaving] = React.useState(false);
+    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+    const [deleting, setDeleting] = React.useState(false);
     const [form, setForm] = React.useState({
         outletCode: "",
         name: "",
@@ -53,6 +55,7 @@ export default function AdminMitraOutletPage() {
 
     const load = React.useCallback(() => {
         setLoading(true);
+        setSelectedIds([]);
         fetch(`/api/admin/mitra/outlets?q=${encodeURIComponent(q)}&pageSize=50`)
             .then((res) => res.json())
             .then((data) => {
@@ -63,6 +66,38 @@ export default function AdminMitraOutletPage() {
     }, [q]);
 
     React.useEffect(() => { load(); }, [load]);
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    };
+
+    const deleteOne = async (outlet: Outlet) => {
+        if (!window.confirm(`Hapus outlet ${outlet.name} (${outlet.outletCode})? Data detail, performa, dan keikutsertaan program outlet ini ikut terhapus permanen.`)) return;
+        const res = await fetch(`/api/admin/mitra/outlets/${outlet.id}`, { method: "DELETE" });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "Gagal menghapus outlet.");
+            return;
+        }
+        load();
+    };
+
+    const deleteSelected = async () => {
+        if (!window.confirm(`Hapus ${selectedIds.length} outlet terpilih? Data detail, performa, dan keikutsertaan program outlet tersebut ikut terhapus permanen.`)) return;
+        setDeleting(true);
+        const res = await fetch("/api/admin/mitra/outlets", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: selectedIds }),
+        });
+        setDeleting(false);
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "Gagal menghapus outlet.");
+            return;
+        }
+        load();
+    };
 
     const save = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -233,21 +268,50 @@ export default function AdminMitraOutletPage() {
                             <Search className="h-4 w-4" />
                         </Button>
                     </div>
+
+                    {selectedIds.length > 0 && (
+                        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                            <span className="text-sm font-semibold text-red-700">{selectedIds.length} outlet dipilih</span>
+                            <Button variant="outline" size="sm" onClick={deleteSelected} disabled={deleting}>
+                                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4 text-red-600" />}
+                                Hapus terpilih
+                            </Button>
+                        </div>
+                    )}
+
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-10">
+                                    <input
+                                        type="checkbox"
+                                        aria-label="Pilih semua outlet"
+                                        className="h-4 w-4 accent-red-600"
+                                        checked={outlets.length > 0 && selectedIds.length === outlets.length}
+                                        onChange={(event) => setSelectedIds(event.target.checked ? outlets.map((outlet) => outlet.id) : [])}
+                                    />
+                                </TableHead>
                                 <TableHead>Outlet</TableHead>
                                 <TableHead>Wilayah</TableHead>
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="text-right">QR</TableHead>
+                                <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
                             ) : outlets.length ? outlets.map((outlet) => (
                                 <TableRow key={outlet.id}>
+                                    <TableCell>
+                                        <input
+                                            type="checkbox"
+                                            aria-label={`Pilih ${outlet.name}`}
+                                            className="h-4 w-4 accent-red-600"
+                                            checked={selectedIds.includes(outlet.id)}
+                                            onChange={() => toggleSelected(outlet.id)}
+                                        />
+                                    </TableCell>
                                     <TableCell>
                                         <p className="font-semibold">{outlet.name}</p>
                                         <p className="text-xs text-muted-foreground">{outlet.outletCode}</p>
@@ -269,11 +333,14 @@ export default function AdminMitraOutletPage() {
                                             <Link href={`/api/public/mitra/outlets/${outlet.publicToken}/qr?format=card`} target="_blank" className="rounded-md border p-2" title="Kartu QR 90 x 55 mm">
                                                 <Download className="h-4 w-4" />
                                             </Link>
+                                            <button onClick={() => deleteOne(outlet)} className="rounded-md border p-2" title="Hapus outlet" aria-label="Hapus outlet">
+                                                <Trash2 className="h-4 w-4 text-red-600" />
+                                            </button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             )) : (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Belum ada outlet.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Belum ada outlet.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

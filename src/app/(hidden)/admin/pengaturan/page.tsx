@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare, CreditCard } from "lucide-react";
+import { WhitelistOtpSettings } from "@/components/admin/whitelist-otp-settings";
 
 interface OfficeData {
     city: string;
@@ -291,6 +292,8 @@ export default function PengaturanPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <WhitelistOtpSettings />
 
             {/* Active Payment Gateway Selector */}
             <Card>

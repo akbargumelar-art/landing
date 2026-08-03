@@ -23,6 +23,7 @@ import {
     Store,
     Wifi,
     UserCog,
+    Trophy,
 } from "lucide-react";
 
 type AdminRole = "SUPER_ADMIN" | "ADMIN_INPUT" | "MANAGER" | "SUPERVISOR" | "SALESFORCE";
@@ -39,7 +40,7 @@ const sidebarGroups = [
     {
         title: "Layanan & Portal",
         links: [
-            { href: "/admin/mitra", label: "Mitra Outlet", icon: Store },
+            { href: "/admin/mitra", label: "Database Mitra Outlet", icon: Store },
             { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
             { href: "/admin/cuan", label: "Kalkulator Cuan", icon: Calculator },
         ]
@@ -55,7 +56,8 @@ const sidebarGroups = [
     {
         title: "Event & Form",
         links: [
-            { href: "/admin/program", label: "Program & Leaderboard", icon: FileText },
+            { href: "/admin/program", label: "Program Undian", icon: FileText },
+            { href: "/admin/mitra/program", label: "Program Mitra Outlet", icon: Trophy },
             { href: "/admin/form-builder", label: "Form Pengajuan", icon: FormInput },
             { href: "/admin/peserta", label: "Data Peserta", icon: Users },
             { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
@@ -92,7 +94,13 @@ export default function AdminLayout({
         links: group.links.filter((link) => !("roles" in link) || !role || (link.roles as AdminRole[]).includes(role)),
     })).filter((group) => group.links.length > 0);
 
-    const currentPage = visibleGroups.flatMap((g) => g.links).find((l) => pathname.startsWith(l.href));
+    // Match the most specific href: /admin/mitra/program must not resolve to /admin/mitra.
+    const activeHref = visibleGroups
+        .flatMap((g) => g.links)
+        .filter((l) => pathname === l.href || pathname.startsWith(`${l.href}/`))
+        .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
+    const currentPage = visibleGroups.flatMap((g) => g.links).find((l) => l.href === activeHref);
 
     const handleLogout = async () => {
         const { signOut } = await import("@/lib/auth-client");
@@ -157,7 +165,7 @@ export default function AdminLayout({
                                     key={link.href}
                                     href={link.href}
                                     onClick={() => setMobileOpen(false)}
-                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${pathname.startsWith(link.href)
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${link.href === activeHref
                                         ? "bg-red-50 text-red-600"
                                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                         }`}

@@ -1,6 +1,5 @@
 import { db } from "@/db";
 import { siteSettings } from "@/db/schema";
-import { eq } from "drizzle-orm"; // Lint issue 3f52cbf6 might occur, but it's a known typings hiccup in the project
 
 export interface WAHAData {
     name: string;
@@ -37,11 +36,13 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
     try {
         if (!to) return;
 
-        // 1. Fetch WAHA Settings from DB
+        // 1. Fetch WAHA Settings from DB.
+        // Read every row rather than filtering by `type`: the admin UI derives a row's type
+        // from its key name, so a future field like `wa_gw_url` would be stored as "image"
+        // and silently drop out of the WAHA config.
         const settingsRaw = await db
             .select({ key: siteSettings.key, value: siteSettings.value })
-            .from(siteSettings)
-            .where(eq(siteSettings.type, "text")); // wa_gw_endpoint, wa_gw_token, wa_gw_template are type="text"
+            .from(siteSettings);
 
         const settings = settingsRaw.reduce((acc: Record<string, string>, curr: { key: string, value: string }) => {
             acc[curr.key] = curr.value;

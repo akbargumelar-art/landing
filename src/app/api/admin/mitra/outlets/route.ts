@@ -145,3 +145,37 @@ export async function POST(request: Request) {
     const [created] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id));
     return NextResponse.json(created, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const body = await request.json().catch(() => ({}));
+    const ids = Array.isArray(body.ids) ? (body.ids as unknown[]).map(String).filter(Boolean) : [];
+
+    if (ids.length === 0) {
+        return NextResponse.json({ error: "Pilih minimal satu outlet" }, { status: 400 });
+    }
+
+    // Detail, metrics, program participation, and OTP rows all cascade from mitra_outlets.
+    const targets = await db
+        .select({ id: mitraOutlets.id, outletCode: mitraOutlets.outletCode })
+        .from(mitraOutlets)
+        .where(inArray(mitraOutlets.id, ids));
+
+    if (targets.length === 0) {
+        return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
+    }
+
+    await db.delete(mitraOutlets).where(inArray(mitraOutlets.id, targets.map((row) => row.id)));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE_BULK",
+        entity: "mitra_outlet",
+        diff: { count: targets.length, outletCodes: targets.map((row) => row.outletCode) },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true, deleted: targets.length });
+}

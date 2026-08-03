@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
@@ -10,7 +10,8 @@ import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    const auth = await requireRole(["SUPER_ADMIN"]);
+    // Manager is view-only on Pengaturan (see prd-total-revamp.md 2.2); writes stay Super Admin.
+    const auth = await requireRole(["SUPER_ADMIN", "MANAGER"]);
     if (auth.error) return auth.error;
 
     const whitelist = await db
@@ -44,8 +45,15 @@ export async function POST(request: Request) {
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
-    const phoneE164 = normalizePhoneE164(String(body.phoneE164 || body.phone || ""));
     const scope = body.scope || "ALL";
+
+    // Bulk add: `phones` is a newline/comma separated list or an array of numbers.
+    // Every row shares the same scope, so scope validation below runs once for all of them.
+    if (body.phones !== undefined) {
+        return handleBulkCreate(request, body, scope, auth.session?.userId);
+    }
+
+    const phoneE164 = normalizePhoneE164(String(body.phoneE164 || body.phone || ""));
 
     if (!phoneE164) {
         return NextResponse.json({ error: "Nomor WhatsApp wajib diisi" }, { status: 400 });
@@ -82,4 +90,74 @@ export async function POST(request: Request) {
 
     const [created] = await db.select().from(mitraWhitelistNumbers).where(eq(mitraWhitelistNumbers.id, id));
     return NextResponse.json(created, { status: 201 });
+}
+
+async function handleBulkCreate(
+    request: Request,
+    body: Record<string, unknown>,
+    scope: string,
+    userId?: string
+) {
+    if (scope === "OUTLET" && !body.outletId) {
+        return NextResponse.json({ error: "Scope OUTLET membutuhkan outlet" }, { status: 400 });
+    }
+    if (scope === "TERRITORY" && !body.territoryId) {
+        return NextResponse.json({ error: "Scope TERRITORY membutuhkan wilayah" }, { status: 400 });
+    }
+
+    const rawList = Array.isArray(body.phones)
+        ? (body.phones as unknown[]).map(String)
+        : String(body.phones || "").split(/[\n,;]+/);
+
+    const invalid: string[] = [];
+    const normalized: string[] = [];
+    for (const raw of rawList) {
+        const trimmed = raw.trim();
+        if (!trimmed) continue;
+        const phone = normalizePhoneE164(trimmed);
+        if (phone) normalized.push(phone);
+        else invalid.push(trimmed);
+    }
+
+    const unique = Array.from(new Set(normalized));
+    if (unique.length === 0) {
+        return NextResponse.json({ error: "Tidak ada nomor WhatsApp yang valid" }, { status: 400 });
+    }
+
+    const existing = await db
+        .select({ phoneE164: mitraWhitelistNumbers.phoneE164 })
+        .from(mitraWhitelistNumbers)
+        .where(inArray(mitraWhitelistNumbers.phoneE164, unique));
+    const existingSet = new Set(existing.map((row) => row.phoneE164));
+    const toInsert = unique.filter((phone) => !existingSet.has(phone));
+
+    if (toInsert.length > 0) {
+        const now = new Date();
+        await db.insert(mitraWhitelistNumbers).values(toInsert.map((phoneE164) => ({
+            id: uuid(),
+            phoneE164,
+            name: null,
+            scope: scope as "ALL" | "OUTLET" | "TERRITORY",
+            outletId: scope === "OUTLET" ? String(body.outletId) : null,
+            territoryId: scope === "TERRITORY" ? String(body.territoryId) : null,
+            isActive: true,
+            createdBy: userId,
+            expiresAt: body.expiresAt ? new Date(String(body.expiresAt)) : null,
+            createdAt: now,
+        })));
+
+        await writeAdminAuditLog({
+            userId,
+            action: "CREATE_BULK",
+            entity: "mitra_whitelist",
+            diff: { scope, added: toInsert.length, skippedExisting: existingSet.size, invalid: invalid.length },
+            ip: getClientIp(request),
+        });
+    }
+
+    return NextResponse.json({
+        added: toInsert.length,
+        skippedExisting: unique.length - toInsert.length,
+        invalid,
+    }, { status: 201 });
 }

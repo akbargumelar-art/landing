@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Activity, ClipboardList, Database, FileSpreadsheet, KeyRound, LayoutDashboard, MessageCircle, QrCode, ShieldCheck, Trash2, Trophy, Users, UserCog } from "lucide-react";
+import { Activity, ClipboardList, Database, FileSpreadsheet, LayoutDashboard, MessageCircle, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 
 interface Summary {
     outlets: number;
-    activePrograms: number;
     whitelistNumbers: number;
     otpEvents: number;
     imports: number;
@@ -30,12 +29,10 @@ interface HealthStatus {
 }
 
 const modules = [
-    { href: "/admin/mitra/outlet", label: "Outlet", icon: Users, text: "CRUD outlet, QR single, token publik." },
-    { href: "/admin/mitra/whitelist", label: "Whitelist", icon: KeyRound, text: "Nomor OTP dan scope akses." },
-    { href: "/admin/mitra/performance", label: "Performance", icon: Activity, text: "Metric dan input performansi." },
-    { href: "/admin/mitra/program", label: "Program", icon: Trophy, text: "Program builder dan leaderboard." },
-    { href: "/admin/mitra/import", label: "Import", icon: FileSpreadsheet, text: "Preview, validasi, commit, history." },
-    { href: "/admin/mitra/qr", label: "QR Bulk", icon: QrCode, text: "Export kartu QR 2 x 5 A4." },
+    { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Users, text: "Tambah, edit, hapus outlet dan QR satuan." },
+    { href: "/admin/mitra/import", label: "Upload Data", icon: FileSpreadsheet, text: "Import outlet dan performa: preview, validasi, commit." },
+    { href: "/admin/mitra/performance", label: "Performance", icon: Activity, text: "Metric dan input performansi outlet." },
+    { href: "/admin/mitra/qr", label: "QR Bulk", icon: QrCode, text: "Export kartu QR 2 x 5 per lembar A4." },
     { href: "/admin/mitra/audit", label: "Audit", icon: ClipboardList, text: "Jejak perubahan dan export." },
 ];
 
@@ -92,8 +89,7 @@ export default function AdminMitraPage() {
 
     const stats = [
         { label: "Outlet", value: summary?.outlets ?? 0 },
-        { label: "Program Aktif", value: summary?.activePrograms ?? 0 },
-        { label: "Whitelist", value: summary?.whitelistNumbers ?? 0 },
+        { label: "Whitelist OTP", value: summary?.whitelistNumbers ?? 0 },
         { label: "Event OTP", value: summary?.otpEvents ?? 0 },
         { label: "Import", value: summary?.imports ?? 0 },
         { label: "Metric", value: summary?.metrics ?? 0 },
@@ -103,8 +99,8 @@ export default function AdminMitraPage() {
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground">Portal Mitra Outlet</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">Operasional outlet, QR, OTP, performansi, program, dan audit.</p>
+                    <h1 className="text-2xl font-bold text-foreground">Database Mitra Outlet</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">Data outlet, upload, QR, performansi, dan audit. Program dikelola di menu Event &amp; Form, whitelist OTP di Pengaturan.</p>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
                     <ShieldCheck className="h-4 w-4" />
@@ -112,7 +108,7 @@ export default function AdminMitraPage() {
                 </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {stats.map((stat) => (
                     <Card key={stat.label}>
                         <CardContent className="p-4">
