@@ -65,6 +65,11 @@ yarn-error.log*
 /coverage/
 
 # =========================
+# Scratch output (build/lint/dev logs written during local runs)
+# =========================
+/tmp/
+
+# =========================
 # TypeScript
 # =========================
 *.tsbuildinfo
