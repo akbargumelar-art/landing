@@ -251,3 +251,118 @@ ini dideploy tanpa menjalankan migrasi `0003` lebih dulu, seluruh panel admin ak
 - Screenshot headless Chrome untuk perubahan visual publik.
 - Yang **tidak** terverifikasi: seluruh SQL migrasi (`0003`, `0004`, `0005`) beserta
   backfill-nya, karena tidak ada database yang bisa dijalankan di mesin ini.
+
+## 2026-08-04 - Pembersihan Keamanan, Kesiapan Deploy, dan Push ke GitHub
+
+Lanjutan dari entri di atas. Seluruh pekerjaan Fase 0-4 beserta perbaikan di bawah sudah
+**di-push ke `origin/main`**; `main` sinkron dengan remote pada `e51f487`.
+
+### Dua endpoint debug tanpa autentikasi (`70bdc64`)
+
+Ditemukan saat audit kelengkapan backend sebelum push. Keduanya berada di luar `/api/admin`,
+sehingga matcher middleware (`/admin`, `/api/admin`, `/portal-admin`) tidak pernah mencakupnya,
+dan keduanya juga tidak punya pengecekan sendiri. Dibuktikan bisa diakses **tanpa cookie apa
+pun** lewat dev server:
+
+- `GET /api/debug` - membuang 5 submission terbaru beserta seluruh nilai field: nama peserta,
+  nomor HP, dan apa pun yang dikumpulkan form. Di mesin ini hanya membalas 500 karena MySQL
+  mati; terhadap database hidup ia menjawab 200 berisi data tersebut kepada siapa pun yang
+  tahu alamatnya.
+- `GET /api/test-waha` - membalas **200** dan mengirim WhatsApp lewat gateway perusahaan ke
+  nomor apa pun dari query string, dengan satu nomor pribadi ter-hardcode sebagai default.
+  Praktisnya open relay: pesan keluar gratis, ditagihkan ke dan dikirim atas nama nomor
+  perusahaan.
+
+Keduanya sisa development tanpa kegunaan produksi, jadi **dihapus**, bukan sekadar dipagari.
+Ikut dihapus `/api/public/outlets`, stub mati yang mengembalikan `[]` untuk fitur outlet lama
+yang sisi adminnya sudah dibuang lebih dulu.
+
+Tombstone `/api/auth/{me,login,logout}` **dipertahankan**: ketiganya sengaja mengembalikan 410
+sambil menunjuk pengganti better-auth.
+
+### Perapian repo
+
+- `/tmp/` di-gitignore (isinya hanya log build/lint/dev lokal).
+- `.agents/skills/` dan `integrasi-landing-page.md` mulai dilacak. Keduanya diperiksa terhadap
+  kredensial sebelum di-stage: hanya ada penyebutan katanya dalam prosa, tidak ada nilai
+  rahasia. Dipastikan pula tidak ada `.env`, `.pem`, atau `.key` yang ikut terdorong.
+- Audit route: tidak ada endpoint yang dipanggil frontend tetapi tidak ada implementasinya,
+  dan tidak ada TODO/FIXME tersisa di `src`.
+
+### Kesiapan deploy (`e51f487`)
+
+**Backup otomatis sebelum migrasi.** Ini celah paling berbahaya sebelumnya: `deploy.sh`
+menerapkan migrasi secara otomatis di tengah alur deploy, tetapi **tidak melakukan backup sama
+sekali**. Artinya menjalankan `bash deploy.sh` akan mengeksekusi backfill Fase 3a yang belum
+teruji ke data production tanpa pengawasan dan tanpa titik pemulihan. Sekarang:
+
+- `mysqldump` dijalankan sebelum `db:migrate`; deploy dibatalkan bila dump gagal atau kosong,
+  jadi migrasi tidak pernah berjalan tanpa titik pemulihan.
+- Bila migrasi gagal, perintah restore (`gunzip -c ... | mysql ...`) untuk backup yang baru
+  dibuat langsung dicetak.
+- Backup di-gzip ke `/var/backups/abkciraya-db` (bisa diganti lewat `BACKUP_DIR`) dan disisakan
+  10 terbaru agar disk VPS tidak penuh.
+- Password dikirim lewat `MYSQL_PWD`, bukan argumen CLI, supaya tidak muncul di daftar proses;
+  URL diurai tanpa dicetak ke layar.
+- Parser `DATABASE_URL` diuji untuk bentuk `user:pass@host:port/db` dan bentuk tanpa password
+  `root:@localhost:3306/db`, plus `bash -n`.
+- `mysqldump` dan `gzip` ditambahkan ke preflight `require_command`.
+- Penomoran langkah deploy menjadi 8 langkah.
+
+### KOREKSI: overflow mobile Beranda tidak pernah ada
+
+Entri Fase 1 di atas sempat mencatat adanya horizontal overflow di tampilan mobile Beranda.
+**Itu keliru dan sudah dikoreksi di tempatnya.** Kesimpulan lama ditarik dari screenshot
+headless Chrome; ternyata artefak pengukuran, karena `--window-size` menentukan lebar
+tangkapan gambar dan bukan lebar layout viewport, sehingga halaman dirender lebih lebar lalu
+dipotong.
+
+Pengukuran ulang memakai Chrome DevTools Protocol (`Emulation.setDeviceMetricsOverride` +
+`Runtime.evaluate`, membandingkan `scrollWidth` dengan `clientWidth` dan mendaftar elemen yang
+melewati viewport) menunjukkan Beranda **nol overflow** pada 320/360/390/414 px.
+
+Yang benar-benar overflow justru `/program`: 6 px pada 390 px, karena tiga tombol filter
+kategori berada dalam flex row tanpa wrap. Diperbaiki dengan `flex-wrap`, lalu diukur ulang -
+`scrollWidth` sama dengan `clientWidth` di 320/360/390 px. Halaman `/indihome`, `/lokasi-kontak`,
+dan `/cuan` diukur bersih.
+
+**Pelajaran metode: screenshot headless tidak sahih untuk menilai overflow horizontal; ukur
+lewat CDP.**
+
+### Performa dan konfigurasi
+
+- Index ditambahkan pada `form_submissions.form_id`, `.status`, dan `.submitted_at`
+  (migrasi `0006`). Audit sebelumnya sudah mendorong filter tersebut ke SQL tetapi tidak
+  pernah menambahkan index-nya, sehingga MySQL tetap melakukan full scan.
+- `ADMIN_BOOTSTRAP_SUPER_ADMIN_EMAIL` dan `NEXT_PUBLIC_BASE_URL` didokumentasikan di
+  `.env.example`. Keduanya dibaca kode tetapi belum tercatat; keduanya punya fallback sehingga
+  tidak wajib diisi.
+
+### Yang WAJIB dilakukan saat deploy
+
+1. **Uji migrasi ke salinan backup lebih dulu.** Empat migrasi (`0003`, `0004`, `0005`, `0006`)
+   belum pernah dijalankan ke database mana pun. Backup otomatis kini melindungi bila gagal,
+   tetapi lebih baik ketahuan di database uji daripada saat deploy.
+2. **Setelah migrasi, atur role di `/admin/users`.** Backfill `0003` memberi `SUPER_ADMIN`
+   kepada setiap user yang belum punya profil Mitra - disengaja agar tidak ada yang mendadak
+   terkunci. Konsekuensinya, **sampai role diturunkan satu per satu, semua orang masih Admin
+   Super dan seluruh RBAC belum berefek.** Langkah ini manual karena hanya pemilik aplikasi
+   yang tahu siapa seharusnya berperan apa.
+3. Jalankan `node scripts/verify-program-migration.mjs` sebelum mempertimbangkan Fase 3b.
+4. Jalankan `docs/qa-role-matrix.md` untuk QA Fase 5.
+
+### Status akhir sesi
+
+| Fase | Status |
+|---|---|
+| 0 RBAC dan Kelola User | Selesai, sudah dipush |
+| 1 Desain publik | Selesai, terverifikasi via CDP |
+| 2 Mitra Outlet dan Whitelist | Selesai, sudah dipush |
+| 3a Skema program terpadu | Selesai, **SQL belum diuji** |
+| 3b Cutover kode program | **Ditunda**, skema terpadu menganggur sehingga menundanya tidak merusak apa pun |
+| 4 IndiHome | Selesai, sudah dipush |
+| 5 QA per role | Dokumentasi selesai, **QA terblokir** butuh DB |
+
+Yang tetap **tidak** terverifikasi di sesi ini: seluruh SQL migrasi (`0003`-`0006`) beserta
+backfill-nya, karena mesin ini tidak punya MySQL server, Docker, maupun MariaDB - hanya klien
+(MySQL Workbench, HeidiSQL).
