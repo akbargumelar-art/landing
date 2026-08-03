@@ -259,7 +259,7 @@ function QuickAccessSection({ quickCards }: { quickCards: QuickCard[] | null }) 
         { icon: Zap, label: "Hot Promo", color: "from-red-500 to-red-600", link: "/program" },
         { icon: Gift, label: "Undian Berhadiah", color: "from-orange-500 to-red-500", link: "/program" },
         { icon: Shield, label: "Paket Hemat", color: "from-red-600 to-red-700", link: "/program" },
-        { icon: Users, label: "Mitra Outlet", color: "from-red-500 to-orange-500", link: "/program" },
+        { icon: Users, label: "Mitra Outlet", color: "from-red-500 to-orange-500", link: "/mitra" },
     ];
 
     const displayItems = quickCards && quickCards.length > 0 ? quickCards : defaultItems;
@@ -549,7 +549,7 @@ function MitraSection() {
                 <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="max-w-3xl mx-auto text-center">
                         <span className="inline-block text-white/80 text-sm font-bold uppercase tracking-widest mb-3">
-                            Program Mitra Outlet
+                            Direktori Mitra Outlet
                         </span>
                         <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">
                             Bergabung Jadi Mitra Outlet Kami
@@ -561,16 +561,14 @@ function MitraSection() {
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <a
-                                href="https://poin.abkciraya.cloud"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href="/mitra"
                             >
                                 <Button
                                     size="lg"
                                     className="btn-pill bg-white text-red-600 hover:bg-gray-100 shadow-xl text-base font-bold px-10 h-auto py-3 hover:shadow-2xl transition-all duration-300 cursor-pointer"
                                 >
-                                    Gabung Mitra Outlet
-                                    <ExternalLink className="ml-2 h-5 w-5" />
+                                    Portal Mitra Outlet
+                                    <ArrowRight className="ml-2 h-5 w-5" />
                                 </Button>
                             </a>
                             <Link href="/lokasi-kontak">

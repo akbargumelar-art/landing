@@ -48,10 +48,10 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
             return acc;
         }, {} as Record<string, string>);
 
-        const endpoint = settings["wa_gw_endpoint"];
-        const token = settings["wa_gw_token"];
-        const template = settings["wa_gw_template"];
-        const sessionName = settings["wa_gw_session"] || "default";
+        const endpoint = settings["wa_gw_endpoint"] || process.env.WAHA_BASE_URL;
+        const token = settings["wa_gw_token"] || process.env.WAHA_API_KEY;
+        const template = settings["wa_gw_template"] || "Kode OTP Portal Mitra Outlet {outlet}: {otp}. Berlaku {expires}.";
+        const sessionName = settings["wa_gw_session"] || process.env.WAHA_SESSION || "default";
 
         // 2. Abort if integration is not configured
         if (!endpoint || !template) {
@@ -67,6 +67,12 @@ export async function sendWhatsAppNotification(to: string, data: WAHAData): Prom
         finalMessage = finalMessage.replace(/{nama}/gi, data.name || "");
         finalMessage = finalMessage.replace(/{nama\s+lengkap}/gi, data.name || "");
         finalMessage = finalMessage.replace(/{program}/gi, data.programName || "");
+        for (const [key, value] of Object.entries(data)) {
+            finalMessage = finalMessage.replace(
+                new RegExp(`{${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}}`, "gi"),
+                String(value ?? "")
+            );
+        }
 
         // 5. Build Headers
         const headers: Record<string, string> = {

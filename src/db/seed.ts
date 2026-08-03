@@ -1,7 +1,30 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { eq } from "drizzle-orm";
 import mysql from "mysql2/promise";
-import { siteSettings, heroSlides, programs, user, account, dynamicForms, formFields, formSubmissions, submissionValues, winners } from "./schema";
+import {
+    siteSettings,
+    heroSlides,
+    programs,
+    user,
+    account,
+    dynamicForms,
+    formFields,
+    formSubmissions,
+    submissionValues,
+    winners,
+    mitraUserProfiles,
+    mitraTerritories,
+    mitraOutlets,
+    mitraOutletDetails,
+    mitraWhitelistNumbers,
+    mitraMetricDefs,
+    mitraOutletMetrics,
+    mitraPrograms,
+    mitraProgramParams,
+    mitraProgramParticipants,
+    mitraProgramScores,
+    mitraProgramLeaderboard,
+} from "./schema";
 import { v4 as uuid } from "uuid";
 import { scryptSync, randomBytes } from "crypto";
 import { programs as mockPrograms, heroSlides as mockSlides } from "../lib/mock-data";
@@ -460,6 +483,173 @@ async function seed() {
         }
     } catch (err) {
         console.log("⚠️ Failed to seed Kalkulator Cuan:", err);
+    }
+
+    // 7. Seed Portal Mitra Outlet data
+    console.log("\nSeeding Portal Mitra Outlet...");
+    try {
+        const existingMitraOutlets = await db.select().from(mitraOutlets).limit(1);
+        const [adminUser] = await db.select().from(user).where(eq(user.email, "admin@abkciraya.com")).limit(1);
+
+        if (adminUser) {
+            try {
+                await db.insert(mitraUserProfiles).values({
+                    userId: adminUser.id,
+                    phone: "+6285168822280",
+                    role: "MANAGER",
+                    isActive: true,
+                    createdAt: new Date(),
+                });
+                console.log("  OK mitra manager profile created");
+            } catch {
+                console.log("  Mitra manager profile already exists");
+            }
+        }
+
+        if (existingMitraOutlets.length > 0) {
+            console.log("  Portal Mitra already contains data, skipping sample data.");
+        } else {
+            const regionId = uuid();
+            const clusterCirebonId = uuid();
+            const areaKesambiId = uuid();
+            const areaKuninganId = uuid();
+
+            await db.insert(mitraTerritories).values([
+                { id: regionId, name: "Region Cirebon Raya", type: "REGION", parentId: null, createdAt: new Date() },
+                { id: clusterCirebonId, name: "Cluster Cirebon Kuningan", type: "CLUSTER", parentId: regionId, createdAt: new Date() },
+                { id: areaKesambiId, name: "Area Kesambi", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
+                { id: areaKuninganId, name: "Area Kuningan Kota", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
+            ]);
+
+            const outletAId = uuid();
+            const outletBId = uuid();
+            await db.insert(mitraOutlets).values([
+                {
+                    id: outletAId,
+                    outletCode: "MO-CBN-001",
+                    publicToken: "demo-cirebon-outlet",
+                    rsNumber: "RS-001",
+                    name: "Outlet Mitra Kesambi",
+                    ownerName: "Dewi Rahayu",
+                    ownerPhone: "+6281234567890",
+                    tap: "TAP Cirebon",
+                    salesforce: "SF Cirebon 1",
+                    kabupaten: "Kota Cirebon",
+                    kecamatan: "Kesambi",
+                    longitude: 108.549,
+                    latitude: -6.732,
+                    locationUrl: "https://www.google.com/maps/search/Kesambi+Cirebon",
+                    territoryId: areaKesambiId,
+                    category: "FISIK",
+                    pjpDay: "Senin",
+                    pjpType: "F1",
+                    branding: "Telkomsel",
+                    status: "ACTIVE",
+                    createdAt: new Date(),
+                },
+                {
+                    id: outletBId,
+                    outletCode: "MO-KNG-001",
+                    publicToken: "demo-kuningan-outlet",
+                    rsNumber: "RS-002",
+                    name: "Outlet Mitra Kuningan",
+                    ownerName: "Agus Salim",
+                    ownerPhone: "+6282234567890",
+                    tap: "TAP Kuningan",
+                    salesforce: "SF Kuningan 1",
+                    kabupaten: "Kab. Kuningan",
+                    kecamatan: "Kuningan",
+                    longitude: 108.482,
+                    latitude: -6.975,
+                    locationUrl: "https://www.google.com/maps/search/Kuningan+Jawa+Barat",
+                    territoryId: areaKuninganId,
+                    category: "Non FISIK",
+                    pjpDay: "Rabu",
+                    pjpType: "F3",
+                    branding: "Telkomsel",
+                    status: "ACTIVE",
+                    createdAt: new Date(),
+                },
+            ]);
+
+            await db.insert(mitraOutletDetails).values([
+                {
+                    outletId: outletAId,
+                    sellthruDigiposJson: { st_perdana_telkomsel_m_qty: 120, st_perdana_telkomsel_m_rev: 2400000 },
+                    sellthruNotaJson: { st_nota_perdana_telkomsel_m_qty: 96, st_nota_perdana_telkomsel_m_rev: 1920000 },
+                    rechargeDigiposJson: { omzet_m_qty: 450, omzet_m_rev: 12500000 },
+                },
+                {
+                    outletId: outletBId,
+                    sellthruDigiposJson: { st_perdana_telkomsel_m_qty: 86, st_perdana_telkomsel_m_rev: 1720000 },
+                    sellthruNotaJson: { st_nota_perdana_telkomsel_m_qty: 72, st_nota_perdana_telkomsel_m_rev: 1440000 },
+                    rechargeDigiposJson: { omzet_m_qty: 390, omzet_m_rev: 9800000 },
+                },
+            ]);
+
+            await db.insert(mitraWhitelistNumbers).values([
+                { id: uuid(), phoneE164: "+6281234567890", name: "Dewi Rahayu", scope: "OUTLET", outletId: outletAId, isActive: true, createdBy: adminUser?.id, createdAt: new Date() },
+                { id: uuid(), phoneE164: "+6285168822280", name: "Manager ABK", scope: "ALL", isActive: true, createdBy: adminUser?.id, createdAt: new Date() },
+            ]);
+
+            const omzetMetricId = uuid();
+            await db.insert(mitraMetricDefs).values({
+                id: omzetMetricId,
+                key: "omzet",
+                label: "Omzet",
+                unit: "Rp",
+                aggregation: "SUM",
+                isPublic: false,
+                createdAt: new Date(),
+            });
+
+            await db.insert(mitraOutletMetrics).values([
+                { id: uuid(), outletId: outletAId, metricDefId: omzetMetricId, periodYm: "2026-08", value: "12500000.00", createdAt: new Date() },
+                { id: uuid(), outletId: outletBId, metricDefId: omzetMetricId, periodYm: "2026-08", value: "9800000.00", createdAt: new Date() },
+            ]);
+
+            const programId = uuid();
+            const paramId = uuid();
+            await db.insert(mitraPrograms).values({
+                id: programId,
+                name: "Mitra Champion Agustus",
+                slug: "mitra-champion-agustus",
+                descriptionMd: "Program ranking outlet mitra berdasarkan poin omzet dan aktivitas penjualan.",
+                mechanismMd: "Outlet dengan poin tertinggi akan masuk leaderboard dan berpeluang menjadi pemenang.",
+                periodStart: new Date("2026-08-01"),
+                periodEnd: new Date("2026-08-31"),
+                status: "ACTIVE",
+                rankingMode: "POINT",
+                isPublic: true,
+                createdAt: new Date(),
+            });
+            await db.insert(mitraProgramParams).values({
+                id: paramId,
+                programId,
+                key: "omzet",
+                label: "Omzet",
+                unit: "Rp",
+                weight: "1.0000",
+                aggregation: "SUM",
+                sortOrder: 0,
+            });
+            await db.insert(mitraProgramParticipants).values([
+                { programId, outletId: outletAId, joinedAt: new Date("2026-08-01") },
+                { programId, outletId: outletBId, joinedAt: new Date("2026-08-01") },
+            ]);
+            await db.insert(mitraProgramScores).values([
+                { id: uuid(), programId, outletId: outletAId, paramId, rawValue: "12500000.00", points: "12500000.00", periodYm: "2026-08" },
+                { id: uuid(), programId, outletId: outletBId, paramId, rawValue: "9800000.00", points: "9800000.00", periodYm: "2026-08" },
+            ]);
+            await db.insert(mitraProgramLeaderboard).values([
+                { id: uuid(), programId, outletId: outletAId, totalPoints: "12500000.00", rank: 1, computedAt: new Date() },
+                { id: uuid(), programId, outletId: outletBId, totalPoints: "9800000.00", rank: 2, computedAt: new Date() },
+            ]);
+
+            console.log("  OK Portal Mitra sample data created");
+        }
+    } catch (err) {
+        console.log("  Failed to seed Portal Mitra Outlet:", err);
     }
 
     console.log("\n🎉 Seed complete!");

@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 const quickLinks = [
     { href: "/", label: "Beranda" },
     { href: "/program", label: "Program" },
+    { href: "/indihome", label: "IndiHome" },
+    { href: "/mitra", label: "Portal Mitra" },
     { href: "/lokasi-kontak", label: "Lokasi & Kontak" },
 ];
 

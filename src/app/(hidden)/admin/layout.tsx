@@ -20,6 +20,8 @@ import {
     Ticket,
     Inbox,
     Calculator,
+    Store,
+    Wifi,
 } from "lucide-react";
 
 const sidebarLinks = [
@@ -30,6 +32,8 @@ const sidebarLinks = [
     { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
     { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
     { href: "/admin/cuan", label: "Master Produk Cuan", icon: Calculator },
+    { href: "/admin/mitra", label: "Portal Mitra Outlet", icon: Store },
+    { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
     { href: "/admin/form-builder", label: "Kelola Form", icon: FormInput },
     { href: "/admin/peserta", label: "Data Peserta", icon: Users },
     { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },

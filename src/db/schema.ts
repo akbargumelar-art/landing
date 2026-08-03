@@ -7,7 +7,12 @@ import {
     datetime,
     timestamp,
     decimal,
-    mysqlEnum
+    double,
+    index,
+    json,
+    mysqlEnum,
+    primaryKey,
+    uniqueIndex
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
@@ -136,6 +141,48 @@ export const formSubmissions = mysqlTable("form_submissions", {
     participantPhone: varchar("participant_phone", { length: 255 }).notNull().default("-"),
     submittedAt: datetime("submitted_at").notNull(),
 });
+
+export const indihomeProducts = mysqlTable("indihome_products", {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    speedMbps: int("speed_mbps").notNull(),
+    monthlyPrice: decimal("monthly_price", { precision: 12, scale: 2 }).notNull(),
+    description: text("description").notNull(),
+    features: json("features").$type<string[]>().notNull(),
+    locations: json("locations").$type<string[]>().notNull(),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("indihome_products_active_idx").on(table.isActive),
+    index("indihome_products_sort_idx").on(table.sortOrder),
+]);
+
+export const indihomeLeads = mysqlTable("indihome_leads", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    fullName: varchar("full_name", { length: 255 }).notNull(),
+    phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
+    email: varchar("email", { length: 255 }),
+    location: varchar("location", { length: 120 }).notNull(),
+    district: varchar("district", { length: 120 }).notNull(),
+    address: text("address").notNull(),
+    packageId: varchar("package_id", { length: 80 }).notNull(),
+    packageName: varchar("package_name", { length: 255 }).notNull(),
+    status: mysqlEnum("status", ["NEW", "CONTACTED", "SURVEY", "SUBMITTED", "CLOSED", "CANCELLED"]).notNull().default("NEW"),
+    consent: boolean("consent").notNull(),
+    source: varchar("source", { length: 80 }).notNull().default("landing_indihome"),
+    ip: varchar("ip", { length: 120 }),
+    userAgent: text("user_agent"),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("indihome_leads_phone_idx").on(table.phoneE164),
+    index("indihome_leads_location_idx").on(table.location),
+    index("indihome_leads_status_idx").on(table.status),
+    index("indihome_leads_created_idx").on(table.createdAt),
+]);
 
 export const submissionValues = mysqlTable("submission_values", {
     id: varchar("id", { length: 36 }).primaryKey(),
@@ -299,4 +346,358 @@ export const cuanBrandsRelations = relations(cuanBrands, ({ many }) => ({
 export const cuanProductsRelations = relations(cuanProducts, ({ one }) => ({
     category: one(cuanCategories, { fields: [cuanProducts.categoryId], references: [cuanCategories.id] }),
     brand: one(cuanBrands, { fields: [cuanProducts.brandId], references: [cuanBrands.id] }),
+}));
+
+// ========== Portal Mitra Outlet ==========
+
+export type MitraRole = "MANAGER" | "ADMIN" | "LEADER";
+export type MitraDetailGroup = Record<string, number>;
+
+export const mitraUserProfiles = mysqlTable("mitra_user_profiles", {
+    userId: varchar("user_id", { length: 36 }).primaryKey().references(() => user.id, { onDelete: "cascade" }),
+    phone: varchar("phone", { length: 50 }),
+    role: mysqlEnum("role", ["MANAGER", "ADMIN", "LEADER"]).notNull().default("MANAGER"),
+    isActive: boolean("is_active").notNull().default(true),
+    lastLoginAt: datetime("last_login_at"),
+    failedLoginAttempts: int("failed_login_attempts").notNull().default(0),
+    lastFailedLoginAt: datetime("last_failed_login_at"),
+    lockedUntil: datetime("locked_until"),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_user_profiles_role_idx").on(table.role),
+]);
+
+export const mitraTerritories = mysqlTable("mitra_territories", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: mysqlEnum("type", ["REGION", "CLUSTER", "AREA"]).notNull(),
+    parentId: varchar("parent_id", { length: 36 }),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_territories_parent_idx").on(table.parentId),
+    index("mitra_territories_type_idx").on(table.type),
+]);
+
+export const mitraUserTerritories = mysqlTable("mitra_user_territories", {
+    userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
+    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.territoryId], name: "mitra_user_territories_pk" }),
+    index("mitra_user_territories_territory_idx").on(table.territoryId),
+]);
+
+export const mitraOutlets = mysqlTable("mitra_outlets", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletCode: varchar("outlet_code", { length: 100 }).notNull().unique(),
+    publicToken: varchar("public_token", { length: 80 }).notNull().unique(),
+    rsNumber: varchar("rs_number", { length: 100 }).notNull().default(""),
+    name: varchar("name", { length: 255 }).notNull(),
+    ownerName: varchar("owner_name", { length: 255 }).notNull(),
+    ownerPhone: varchar("owner_phone", { length: 50 }).notNull(),
+    tap: varchar("tap", { length: 255 }).notNull().default(""),
+    salesforce: varchar("salesforce", { length: 255 }).notNull().default(""),
+    kabupaten: varchar("kabupaten", { length: 255 }).notNull().default(""),
+    kecamatan: varchar("kecamatan", { length: 255 }).notNull().default(""),
+    longitude: double("longitude"),
+    latitude: double("latitude"),
+    locationUrl: varchar("location_url", { length: 500 }),
+    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "set null" }),
+    category: varchar("category", { length: 50 }).notNull().default("FISIK"),
+    pjpDay: varchar("pjp_day", { length: 50 }).notNull().default("Senin"),
+    pjpType: varchar("pjp_type", { length: 20 }).notNull().default("F1"),
+    branding: varchar("branding", { length: 100 }).notNull().default(""),
+    status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).notNull().default("ACTIVE"),
+    photoUrl: varchar("photo_url", { length: 500 }),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_outlets_public_token_idx").on(table.publicToken),
+    index("mitra_outlets_name_idx").on(table.name),
+    index("mitra_outlets_owner_phone_idx").on(table.ownerPhone),
+    index("mitra_outlets_territory_idx").on(table.territoryId),
+    index("mitra_outlets_status_idx").on(table.status),
+]);
+
+export const mitraOutletDetails = mysqlTable("mitra_outlet_details", {
+    outletId: varchar("outlet_id", { length: 36 }).primaryKey().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    sellthruDigiposJson: json("sellthru_digipos_json").$type<MitraDetailGroup>(),
+    sellthruNotaJson: json("sellthru_nota_json").$type<MitraDetailGroup>(),
+    rechargeDigiposJson: json("recharge_digipos_json").$type<MitraDetailGroup>(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+});
+
+export const mitraMetricDefs = mysqlTable("mitra_metric_defs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    key: varchar("key", { length: 120 }).notNull().unique(),
+    label: varchar("label", { length: 255 }).notNull(),
+    unit: varchar("unit", { length: 50 }),
+    aggregation: mysqlEnum("aggregation", ["SUM", "AVG", "LAST"]).notNull().default("SUM"),
+    isPublic: boolean("is_public").notNull().default(false),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_metric_defs_public_idx").on(table.isPublic),
+]);
+
+export const mitraOutletMetrics = mysqlTable("mitra_outlet_metrics", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    metricDefId: varchar("metric_def_id", { length: 36 }).notNull().references(() => mitraMetricDefs.id, { onDelete: "cascade" }),
+    periodYm: varchar("period_ym", { length: 7 }).notNull(),
+    value: decimal("value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    sourceBatchId: varchar("source_batch_id", { length: 36 }),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_outlet_metrics_unique_idx").on(table.outletId, table.metricDefId, table.periodYm),
+    index("mitra_outlet_metrics_period_idx").on(table.periodYm),
+    index("mitra_outlet_metrics_batch_idx").on(table.sourceBatchId),
+]);
+
+export const mitraImportBatches = mysqlTable("mitra_import_batches", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    type: varchar("type", { length: 50 }).notNull(),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    rowCount: int("row_count").notNull().default(0),
+    status: mysqlEnum("status", ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "ROLLED_BACK"]).notNull().default("PENDING"),
+    errorLog: json("error_log").$type<unknown[]>(),
+    previewJson: json("preview_json").$type<unknown[]>(),
+    rollbackJson: json("rollback_json").$type<unknown[]>(),
+    createdBy: varchar("created_by", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
+    createdAt: datetime("created_at").notNull(),
+    rolledBackAt: datetime("rolled_back_at"),
+}, (table) => [
+    index("mitra_import_batches_type_idx").on(table.type),
+    index("mitra_import_batches_status_idx").on(table.status),
+]);
+
+export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
+    name: varchar("name", { length: 255 }),
+    scope: mysqlEnum("scope", ["ALL", "OUTLET", "TERRITORY"]).notNull().default("ALL"),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "cascade" }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: varchar("created_by", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
+    sourceBatchId: varchar("source_batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
+    expiresAt: datetime("expires_at"),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_whitelist_phone_idx").on(table.phoneE164),
+    index("mitra_whitelist_scope_idx").on(table.scope),
+    index("mitra_whitelist_outlet_idx").on(table.outletId),
+    index("mitra_whitelist_territory_idx").on(table.territoryId),
+]);
+
+export const mitraOtpRequests = mysqlTable("mitra_otp_requests", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    whitelistId: varchar("whitelist_id", { length: 36 }).references(() => mitraWhitelistNumbers.id, { onDelete: "set null" }),
+    codeHash: varchar("code_hash", { length: 255 }).notNull(),
+    codeSalt: varchar("code_salt", { length: 255 }).notNull(),
+    purpose: mysqlEnum("purpose", ["OUTLET_DETAIL"]).notNull().default("OUTLET_DETAIL"),
+    attempts: int("attempts").notNull().default(0),
+    expiresAt: datetime("expires_at").notNull(),
+    verifiedAt: datetime("verified_at"),
+    ip: varchar("ip", { length: 120 }),
+    userAgent: text("user_agent"),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_otp_phone_idx").on(table.phoneE164),
+    index("mitra_otp_outlet_idx").on(table.outletId),
+    index("mitra_otp_created_idx").on(table.createdAt),
+]);
+
+export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+    phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    expiresAt: datetime("expires_at").notNull(),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_detail_sessions_outlet_idx").on(table.outletId),
+    index("mitra_detail_sessions_expiry_idx").on(table.expiresAt),
+]);
+
+export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    whitelistId: varchar("whitelist_id", { length: 36 }).references(() => mitraWhitelistNumbers.id, { onDelete: "set null" }),
+    phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    action: mysqlEnum("action", ["OTP_REQUESTED", "OTP_VERIFIED", "OTP_REJECTED"]).notNull(),
+    ip: varchar("ip", { length: 120 }),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_whitelist_usage_phone_idx").on(table.phoneE164),
+    index("mitra_whitelist_usage_outlet_idx").on(table.outletId),
+]);
+
+export const mitraPrograms = mysqlTable("mitra_programs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().unique(),
+    descriptionMd: text("description_md"),
+    mechanismMd: text("mechanism_md"),
+    periodStart: datetime("period_start").notNull(),
+    periodEnd: datetime("period_end").notNull(),
+    status: mysqlEnum("status", ["DRAFT", "ACTIVE", "ENDED", "PUBLISHED"]).notNull().default("DRAFT"),
+    rankingMode: mysqlEnum("ranking_mode", ["POINT", "RANK"]).notNull().default("POINT"),
+    tieBreaker: varchar("tie_breaker", { length: 120 }),
+    isPublic: boolean("is_public").notNull().default(false),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_programs_public_idx").on(table.isPublic),
+    index("mitra_programs_status_idx").on(table.status),
+]);
+
+export const mitraProgramParams = mysqlTable("mitra_program_params", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    key: varchar("key", { length: 120 }).notNull(),
+    label: varchar("label", { length: 255 }).notNull(),
+    unit: varchar("unit", { length: 50 }),
+    weight: decimal("weight", { precision: 10, scale: 4 }).notNull().default("1.0000"),
+    aggregation: mysqlEnum("aggregation", ["SUM", "AVG", "LAST"]).notNull().default("SUM"),
+    sortOrder: int("sort_order").notNull().default(0),
+}, (table) => [
+    uniqueIndex("mitra_program_params_unique_idx").on(table.programId, table.key),
+    index("mitra_program_params_program_idx").on(table.programId),
+]);
+
+export const mitraProgramParticipants = mysqlTable("mitra_program_participants", {
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    joinedAt: datetime("joined_at").notNull(),
+}, (table) => [
+    primaryKey({ columns: [table.programId, table.outletId], name: "mitra_program_participants_pk" }),
+    index("mitra_program_participants_outlet_idx").on(table.outletId),
+]);
+
+export const mitraProgramScores = mysqlTable("mitra_program_scores", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
+    rawValue: decimal("raw_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    points: decimal("points", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    periodYm: varchar("period_ym", { length: 7 }).notNull(),
+    batchId: varchar("batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_program_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.periodYm),
+    index("mitra_program_scores_outlet_idx").on(table.outletId),
+    index("mitra_program_scores_batch_idx").on(table.batchId),
+]);
+
+export const mitraProgramLeaderboard = mysqlTable("mitra_program_leaderboard", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    totalPoints: decimal("total_points", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    rank: int("rank").notNull(),
+    prevRank: int("prev_rank"),
+    computedAt: datetime("computed_at").notNull(),
+}, (table) => [
+    uniqueIndex("mitra_program_leaderboard_unique_idx").on(table.programId, table.outletId),
+    index("mitra_program_leaderboard_rank_idx").on(table.programId, table.rank),
+]);
+
+export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    rank: int("rank").notNull(),
+    prizeLabel: varchar("prize_label", { length: 255 }),
+    isPublished: boolean("is_published").notNull().default(false),
+}, (table) => [
+    index("mitra_program_winners_program_idx").on(table.programId),
+    index("mitra_program_winners_public_idx").on(table.isPublished),
+]);
+
+export const mitraAuditLogs = mysqlTable("mitra_audit_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    userId: varchar("user_id", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 80 }).notNull(),
+    entity: varchar("entity", { length: 120 }).notNull(),
+    entityId: varchar("entity_id", { length: 36 }),
+    diffJson: json("diff_json").$type<Record<string, unknown>>(),
+    ip: varchar("ip", { length: 120 }),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_audit_user_idx").on(table.userId),
+    index("mitra_audit_entity_idx").on(table.entity, table.entityId),
+    index("mitra_audit_created_idx").on(table.createdAt),
+]);
+
+export const mitraUserProfilesRelations = relations(mitraUserProfiles, ({ one }) => ({
+    user: one(user, { fields: [mitraUserProfiles.userId], references: [user.id] }),
+}));
+
+export const mitraTerritoriesRelations = relations(mitraTerritories, ({ many }) => ({
+    userTerritories: many(mitraUserTerritories),
+    outlets: many(mitraOutlets),
+}));
+
+export const mitraUserTerritoriesRelations = relations(mitraUserTerritories, ({ one }) => ({
+    user: one(user, { fields: [mitraUserTerritories.userId], references: [user.id] }),
+    territory: one(mitraTerritories, { fields: [mitraUserTerritories.territoryId], references: [mitraTerritories.id] }),
+}));
+
+export const mitraOutletsRelations = relations(mitraOutlets, ({ one, many }) => ({
+    territory: one(mitraTerritories, { fields: [mitraOutlets.territoryId], references: [mitraTerritories.id] }),
+    details: one(mitraOutletDetails),
+    metrics: many(mitraOutletMetrics),
+    programParticipants: many(mitraProgramParticipants),
+    leaderboardRows: many(mitraProgramLeaderboard),
+}));
+
+export const mitraOutletDetailsRelations = relations(mitraOutletDetails, ({ one }) => ({
+    outlet: one(mitraOutlets, { fields: [mitraOutletDetails.outletId], references: [mitraOutlets.id] }),
+}));
+
+export const mitraMetricDefsRelations = relations(mitraMetricDefs, ({ many }) => ({
+    metrics: many(mitraOutletMetrics),
+}));
+
+export const mitraOutletMetricsRelations = relations(mitraOutletMetrics, ({ one }) => ({
+    outlet: one(mitraOutlets, { fields: [mitraOutletMetrics.outletId], references: [mitraOutlets.id] }),
+    metricDef: one(mitraMetricDefs, { fields: [mitraOutletMetrics.metricDefId], references: [mitraMetricDefs.id] }),
+}));
+
+export const mitraProgramsRelations = relations(mitraPrograms, ({ many }) => ({
+    params: many(mitraProgramParams),
+    participants: many(mitraProgramParticipants),
+    leaderboard: many(mitraProgramLeaderboard),
+    winners: many(mitraProgramWinners),
+}));
+
+export const mitraProgramParamsRelations = relations(mitraProgramParams, ({ one, many }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramParams.programId], references: [mitraPrograms.id] }),
+    scores: many(mitraProgramScores),
+}));
+
+export const mitraProgramParticipantsRelations = relations(mitraProgramParticipants, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramParticipants.programId], references: [mitraPrograms.id] }),
+    outlet: one(mitraOutlets, { fields: [mitraProgramParticipants.outletId], references: [mitraOutlets.id] }),
+}));
+
+export const mitraProgramScoresRelations = relations(mitraProgramScores, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramScores.programId], references: [mitraPrograms.id] }),
+    outlet: one(mitraOutlets, { fields: [mitraProgramScores.outletId], references: [mitraOutlets.id] }),
+    param: one(mitraProgramParams, { fields: [mitraProgramScores.paramId], references: [mitraProgramParams.id] }),
+}));
+
+export const mitraProgramLeaderboardRelations = relations(mitraProgramLeaderboard, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramLeaderboard.programId], references: [mitraPrograms.id] }),
+    outlet: one(mitraOutlets, { fields: [mitraProgramLeaderboard.outletId], references: [mitraOutlets.id] }),
+}));
+
+export const mitraProgramWinnersRelations = relations(mitraProgramWinners, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramWinners.programId], references: [mitraPrograms.id] }),
+    outlet: one(mitraOutlets, { fields: [mitraProgramWinners.outletId], references: [mitraOutlets.id] }),
 }));

@@ -130,12 +130,12 @@ npm install --legacy-peer-deps
 print_step 3 7 "Validasi environment..."
 npm run env:check
 
-print_step 4 7 "Sinkronisasi database schema..."
-npx drizzle-kit push
-
-print_step 5 7 "Build production..."
+print_step 4 7 "Build production..."
 rm -rf .next
 npm run build
+
+print_step 5 7 "Terapkan migrasi database terversi..."
+npm run db:migrate
 
 print_step 6 7 "Restart aplikasi..."
 stop_pm2_app

@@ -15,6 +15,21 @@ interface Program {
     period: string;
     thumbnail?: string;
     category: string;
+    href: string;
+}
+
+interface MitraProgram {
+    id: string;
+    slug: string;
+    name: string;
+    descriptionMd?: string;
+    periodStart: string;
+    periodEnd: string;
+}
+
+function formatMitraPeriod(start: string, end: string) {
+    const formatter = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`;
 }
 
 export default function ProgramPage() {
@@ -23,13 +38,30 @@ export default function ProgramPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     React.useEffect(() => {
-        fetch("/api/public/programs")
-            .then((res) => res.json())
-            .then((data) => {
-                if (Array.isArray(data)) setPrograms(data);
-                setIsLoading(false);
-            })
-            .catch(() => setIsLoading(false));
+        Promise.allSettled([
+            fetch("/api/public/programs").then((res) => res.ok ? res.json() : []),
+            fetch("/api/public/mitra/programs").then((res) => res.ok ? res.json() : { programs: [] }),
+        ]).then(([legacyResult, mitraResult]) => {
+            const legacyPrograms = legacyResult.status === "fulfilled" && Array.isArray(legacyResult.value)
+                ? legacyResult.value.map((program: Omit<Program, "href">) => ({ ...program, href: `/program/${program.slug}` }))
+                : [];
+            const mitraPrograms: MitraProgram[] = mitraResult.status === "fulfilled" && Array.isArray(mitraResult.value?.programs)
+                ? mitraResult.value.programs
+                : [];
+            const normalizedMitra: Program[] = mitraPrograms.map((program) => ({
+                id: `mitra:${program.id}`,
+                slug: program.slug,
+                title: program.name,
+                description: program.descriptionMd || "Program dan leaderboard Mitra Outlet ABK Ciraya.",
+                period: formatMitraPeriod(program.periodStart, program.periodEnd),
+                category: "mitra",
+                href: `/mitra/program/${program.slug}`,
+            }));
+            const mitraSlugs = new Set(normalizedMitra.map((program) => program.slug));
+            const convergedLegacy = legacyPrograms.filter((program: Program) => !(program.category === "mitra" && mitraSlugs.has(program.slug)));
+            setPrograms([...convergedLegacy, ...normalizedMitra]);
+            setIsLoading(false);
+        });
     }, []);
 
     const filtered = filterCategory
@@ -99,8 +131,13 @@ export default function ProgramPage() {
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
                         </div>
                     ) : (
-                        <div className="flex flex-wrap justify-center gap-8">
-                            {filtered.map((program) => (
+                        filtered.length === 0 ? (
+                            <div className="rounded-lg border bg-white px-5 py-12 text-center text-sm text-muted-foreground">
+                                Belum ada program pada kategori ini.
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap justify-center gap-8">
+                                {filtered.map((program) => (
                                 <Card
                                     key={program.id}
                                     className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] overflow-hidden group border-0 shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
@@ -148,7 +185,7 @@ export default function ProgramPage() {
                                         <p className="text-sm text-muted-foreground line-clamp-3 mb-6">
                                             {program.description}
                                         </p>
-                                        <Link href={`/program/${program.slug}`}>
+                                        <Link href={program.href}>
                                             <Button className="btn-pill w-full font-semibold cursor-pointer">
                                                 Lihat Detail
                                                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -156,8 +193,9 @@ export default function ProgramPage() {
                                         </Link>
                                     </CardContent>
                                 </Card>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )
                     )}
                 </div>
             </section>

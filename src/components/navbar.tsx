@@ -16,6 +16,8 @@ import {
 const navLinks = [
     { href: "/", label: "BERANDA" },
     { href: "/program", label: "PROGRAM" },
+    { href: "/indihome", label: "INDIHOME" },
+    { href: "/mitra", label: "MITRA OUTLET" },
     { href: "/belanja", label: "BELANJA" },
     { href: "/cuan", label: "KALKULATOR CUAN" },
     { href: "/lokasi-kontak", label: "LOKASI & KONTAK" },
@@ -80,7 +82,7 @@ export function Navbar() {
                     </Link>
 
                     {/* Desktop Nav */}
-                    <nav className="hidden md:flex items-center gap-1">
+                    <nav className="hidden xl:flex items-center gap-1">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.href}
@@ -104,7 +106,7 @@ export function Navbar() {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="md:hidden"
+                                className="xl:hidden"
                                 aria-label="Open menu"
                             >
                                 <Menu className="h-5 w-5" />

@@ -63,9 +63,8 @@ nano .env  # Isi credentials production
 # 3. Build production
 npm run build
 
-# 4. Push schema & seed
-npx drizzle-kit push
-npx tsx src/db/seed.ts
+# 4. Terapkan migrasi database terversi
+npm run db:migrate
 
 # 5. Install PM2 & jalankan
 npm install -g pm2
@@ -98,9 +97,8 @@ nano .env  # Gunakan DATABASE_URL=mysql://root:rootpassword@db:3306/abk_ciraya
 # 3. Jalankan
 docker compose up -d --build
 
-# 4. Push schema & seed (setelah container berjalan)
-docker compose exec app npx drizzle-kit push
-docker compose exec app npx tsx src/db/seed.ts
+# 4. Terapkan migrasi (setelah container berjalan)
+docker compose exec app npm run db:migrate
 ```
 
 ### Nginx Reverse Proxy
@@ -139,6 +137,7 @@ sudo certbot --nginx -d yourdomain.com
 | `npm start` | Jalankan production server |
 | `npm run db:push` | Push schema ke database |
 | `npm run db:generate` | Generate migration files |
+| `npm run db:migrate` | Terapkan migrasi SQL yang belum dijalankan |
 | `npm run db:seed` | Seed data awal |
 | `npm run db:studio` | Buka Drizzle Studio |
 

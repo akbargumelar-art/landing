@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { indihomeProducts } from "@/db/schema";
+import { parseIndihomeProductInput } from "@/lib/indihome-admin";
+import { requireMitraAccess } from "@/lib/mitra-auth";
+
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const parsed = parseIndihomeProductInput(body);
+    if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
+    await db.update(indihomeProducts).set(parsed.values).where(eq(indihomeProducts.id, id));
+    const [product] = await db.select().from(indihomeProducts).where(eq(indihomeProducts.id, id));
+    if (!product) return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+    return NextResponse.json({ product });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireMitraAccess(["MANAGER"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    await db.delete(indihomeProducts).where(eq(indihomeProducts.id, id));
+    return NextResponse.json({ success: true });
+}
