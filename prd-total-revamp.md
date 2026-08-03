@@ -431,11 +431,44 @@ perombakan struktural:
 
 ### Fase 3 — Unifikasi Program (paling berisiko, karena migrasi data dua sistem)
 
-- Desain final skema `programs` terpadu (`mode`, detail per mode).
-- Migrasi data `programs`+`mitra_programs` → `programs` baru, `winners`+`mitra_program_winners` →
-  `program_winners`.
+Fase ini sengaja dipecah dua langkah karena melibatkan data production yang wajib dibawa
+(lihat 3.5). Langkah 3a tidak mengubah perilaku aplikasi sama sekali; langkah 3b baru
+mengalihkan kode, dan **hanya boleh dikerjakan setelah 3a diverifikasi terhadap database
+sungguhan**.
+
+**Fase 3a — Skema + backfill (SELESAI, tetapi belum diverifikasi terhadap database)**
+
+- Skema terpadu: kolom `mode` (`UNDIAN`/`PERFORMANCE`) plus kolom khusus performance
+  (`mechanism_md`, `period_start`, `period_end`, `ranking_mode`, `tie_breaker`, `is_public`)
+  ditambahkan ke `programs` sebagai kolom nullable, dan tabel `program_winners` dibuat.
+  Dipilih kolom bertipe kuat, bukan satu kolom JSON `config`, supaya `period_start`/`period_end`
+  tetap bisa difilter dan diindeks di level SQL.
+- Migrasi `drizzle/0004_unified_program_schema.sql` bersifat **aditif murni**: tidak ada
+  `DROP`, dan `mitra_programs`, `winners`, serta `mitra_program_winners` tetap utuh sehingga
+  langkah ini reversibel. Seluruh statement backfill dibuat aman dijalankan berulang.
+- Tabrakan slug ditangani eksplisit. `programs.slug` bersifat UNIQUE, sementara baris undian
+  lama dengan `category='mitra'` memang sengaja membayangi program Mitra ber-slug sama
+  (halaman `/program` sudah menyaringnya). Pada backfill, baris Mitra memperoleh slug
+  kanonik dan baris legacy yang membayangi di-rename (`-undian-legacy`) lalu diarsipkan —
+  tidak ada baris yang dihapus.
+- `id` dari `mitra_programs` dipertahankan saat disalin ke `programs`, sehingga
+  `mitra_program_params`/`participants`/`scores`/`leaderboard` tetap menunjuk id yang valid.
+  Pemindahan constraint FK anak ke `programs` menyusul di 3b.
+- `scripts/verify-program-migration.mjs` memverifikasi jumlah baris dan integritas
+  (acceptance criteria "diverifikasi jumlah baris"), keluar dengan status non-nol bila ada
+  yang gagal sehingga bisa dipakai sebagai gerbang sebelum cutover.
+
+**Fase 3b — Cutover kode (BELUM dikerjakan, menunggu verifikasi 3a)**
+
+Prasyarat: `npm run db:migrate` dijalankan pada salinan backup, lalu
+`node scripts/verify-program-migration.mjs` lulus seluruhnya.
+
+- Alihkan ±30 file yang membaca/menulis `programs`, `mitra_programs`, `winners`, dan
+  `mitra_program_winners` agar memakai tabel terpadu.
+- Pindahkan constraint FK `mitra_program_*` ke `programs`.
 - Satu halaman admin Program di grup Event & Form untuk kedua mode.
 - Uji ulang alur publik: `/program`, `/program/[slug]`, `/form-undian`, `/mitra/program`.
+- Tabel lama baru dihapus di Fase 5 setelah periode observasi (lihat 3.5 poin 6).
 
 ### Fase 4 — IndiHome Enhancement
 

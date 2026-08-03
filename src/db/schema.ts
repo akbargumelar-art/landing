@@ -91,6 +91,13 @@ export const heroSlides = mysqlTable("hero_slides", {
     createdAt: datetime("created_at").notNull(),
 });
 
+export type ProgramMode = "UNDIAN" | "PERFORMANCE";
+
+// Unified program table (prd-total-revamp.md 2.4). `mode` distinguishes the two engines
+// that used to live in separate tables:
+//   UNDIAN      - entrants register through dynamic_forms, winner drawn from submissions
+//   PERFORMANCE - outlets score via imports, ranked on program_leaderboard
+// The PERFORMANCE-only columns below are nullable so pre-existing UNDIAN rows are unaffected.
 export const programs = mysqlTable("programs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
@@ -108,7 +115,47 @@ export const programs = mysqlTable("programs", {
     sortOrder: int("sort_order").notNull().default(0),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
-});
+
+    mode: mysqlEnum("mode", ["UNDIAN", "PERFORMANCE"]).notNull().default("UNDIAN"),
+    // PERFORMANCE-only fields, carried over from the old mitra_programs table.
+    mechanismMd: text("mechanism_md"),
+    periodStart: datetime("period_start"),
+    periodEnd: datetime("period_end"),
+    rankingMode: mysqlEnum("ranking_mode", ["POINT", "RANK"]),
+    tieBreaker: varchar("tie_breaker", { length: 120 }),
+    isPublic: boolean("is_public").notNull().default(false),
+}, (table) => [
+    index("programs_mode_idx").on(table.mode),
+    index("programs_public_idx").on(table.isPublic),
+]);
+
+// Unified winners table. Exactly one of submissionId (UNDIAN) or outletId (PERFORMANCE)
+// is populated, matching the parent program's mode.
+export const programWinners = mysqlTable("program_winners", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => programs.id, { onDelete: "cascade" }),
+    mode: mysqlEnum("mode", ["UNDIAN", "PERFORMANCE"]).notNull(),
+
+    // UNDIAN branch
+    submissionId: varchar("submission_id", { length: 36 }),
+    name: varchar("name", { length: 255 }).notNull().default(""),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    outlet: varchar("outlet", { length: 255 }).notNull().default(""),
+    period: varchar("period", { length: 100 }).notNull().default(""),
+    photoUrl: varchar("photo_url", { length: 500 }).notNull().default(""),
+    prizeName: varchar("prize_name", { length: 255 }).notNull().default(""),
+    drawnAt: datetime("drawn_at"),
+
+    // PERFORMANCE branch
+    outletId: varchar("outlet_id", { length: 36 }),
+    rank: int("rank"),
+    isPublished: boolean("is_published").notNull().default(false),
+}, (table) => [
+    index("program_winners_program_idx").on(table.programId),
+    index("program_winners_mode_idx").on(table.mode),
+    index("program_winners_public_idx").on(table.isPublished),
+    uniqueIndex("program_winners_submission_idx").on(table.submissionId),
+]);
 
 export const dynamicForms = mysqlTable("dynamic_forms", {
     id: varchar("id", { length: 36 }).primaryKey(),

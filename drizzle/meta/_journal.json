@@ -29,6 +29,13 @@
       "when": 1785770474621,
       "tag": "0003_admin_rbac_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1785778452978,
+      "tag": "0004_unified_program_schema",
+      "breakpoints": true
     }
   ]
 }
