@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
 import { parseIndihomeProductInput } from "@/lib/indihome-admin";
+import { getActiveIndihomeLocations } from "@/lib/indihome-data";
 import { requireRole } from "@/lib/admin-auth";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -11,7 +12,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
-    const parsed = parseIndihomeProductInput(body);
+    const parsed = parseIndihomeProductInput(body, await getActiveIndihomeLocations());
     if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
     try {

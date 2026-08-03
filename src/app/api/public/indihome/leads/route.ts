@@ -3,7 +3,7 @@ import { and, count, eq, gte } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { indihomeLeads, indihomeProducts } from "@/db/schema";
-import { isIndihomeLocation } from "@/lib/indihome-products";
+import { isActiveIndihomeLocation } from "@/lib/indihome-data";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         if (email && !EMAIL_PATTERN.test(email)) {
             return NextResponse.json({ error: "Alamat email belum valid." }, { status: 400 });
         }
-        if (!isIndihomeLocation(location)) {
+        if (!(await isActiveIndihomeLocation(location))) {
             return NextResponse.json({ error: "Pilih lokasi pemasangan yang tersedia." }, { status: 400 });
         }
         if (district.length < 3 || district.length > 120 || address.length < 10 || address.length > 2_000) {

@@ -1,3 +1,8 @@
+/**
+ * Seed/fallback coverage areas. Since Fase 4 the live list lives in `indihome_locations`
+ * and is managed from the admin - see `getActiveIndihomeLocations()`. These values are
+ * only used to seed that table and to keep the page usable if the database is unreachable.
+ */
 export const INDIHOME_LOCATIONS = [
     "Kota Cirebon",
     "Kabupaten Cirebon",
@@ -13,7 +18,8 @@ export type IndihomeProduct = {
     monthlyPrice: number;
     description: string;
     features: string[];
-    locations: IndihomeLocation[];
+    // Plain strings: coverage areas are database-driven and no longer a closed set.
+    locations: string[];
     featured?: boolean;
 };
 

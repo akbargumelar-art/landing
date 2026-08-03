@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Eye, FileText, Loader2, Pencil, Plus, Search, Trash2, Wifi } from "lucide-react";
+import { CheckCircle2, Eye, FileText, Loader2, MapPin, Pencil, Plus, Search, Trash2, Wifi } from "lucide-react";
+import { IndihomeLocationsBanner } from "@/components/admin/indihome-locations-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -68,7 +69,8 @@ const statusLabels: Record<IndihomeLeadStatus, string> = {
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 export default function AdminIndihomePage() {
-    const [tab, setTab] = useState<"products" | "leads">("products");
+    const [tab, setTab] = useState<"products" | "leads" | "settings">("products");
+    const [locationOptions, setLocationOptions] = useState<string[]>([...INDIHOME_LOCATIONS]);
     const [products, setProducts] = useState<AdminProduct[]>([]);
     const [leads, setLeads] = useState<IndihomeLead[]>([]);
     const [loading, setLoading] = useState(true);
@@ -88,6 +90,17 @@ export default function AdminIndihomePage() {
         setProducts(data.products || []);
     }, []);
 
+    // Coverage areas are database-driven since Fase 4; the constant is only a fallback.
+    const loadLocations = useCallback(async () => {
+        const response = await fetch("/api/admin/indihome/locations");
+        if (!response.ok) return;
+        const data = await response.json();
+        const names = (data.locations || [])
+            .filter((row: { isActive: boolean }) => row.isActive)
+            .map((row: { name: string }) => row.name);
+        if (names.length > 0) setLocationOptions(names);
+    }, []);
+
     const loadLeads = useCallback(async () => {
         const params = new URLSearchParams();
         if (query.trim()) params.set("q", query.trim());
@@ -100,13 +113,13 @@ export default function AdminIndihomePage() {
     }, [locationFilter, query, statusFilter]);
 
     useEffect(() => {
-        Promise.all([loadProducts(), loadLeads()])
+        Promise.all([loadProducts(), loadLeads(), loadLocations()])
             .catch((error) => setMessage(error instanceof Error ? error.message : "Data gagal dimuat."))
             .finally(() => setLoading(false));
-    }, [loadLeads, loadProducts]);
+    }, [loadLeads, loadProducts, loadLocations]);
 
     function openAddProduct() {
-        setDraft({ ...emptyProduct, locations: [...INDIHOME_LOCATIONS] });
+        setDraft({ ...emptyProduct, locations: [...locationOptions] });
         setProductDialog(true);
         setMessage("");
     }
@@ -194,7 +207,8 @@ export default function AdminIndihomePage() {
             </div>
 
             <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
-                <button type="button" onClick={() => setTab("products")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "products" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><Wifi className="h-4 w-4" /> Produk & Lokasi</button>
+                <button type="button" onClick={() => setTab("products")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "products" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><Wifi className="h-4 w-4" /> Produk</button>
+                <button type="button" onClick={() => setTab("settings")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "settings" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><MapPin className="h-4 w-4" /> Lokasi &amp; Banner</button>
                 <button type="button" onClick={() => setTab("leads")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "leads" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><FileText className="h-4 w-4" /> Form Langganan <span className={`rounded-full px-2 py-0.5 text-xs ${tab === "leads" ? "bg-white/20" : "bg-gray-100"}`}>{leads.length}</span></button>
             </div>
 
@@ -228,11 +242,13 @@ export default function AdminIndihomePage() {
                         </div>
                     )}
                 </section>
+            ) : tab === "settings" ? (
+                <IndihomeLocationsBanner />
             ) : (
                 <section className="space-y-4">
                     <form onSubmit={(event) => { event.preventDefault(); loadLeads().catch((error) => setMessage(error.message)); }} className="grid gap-3 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[1fr_220px_220px_auto]">
                         <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Cari nama, WhatsApp, kecamatan" /></div>
-                        <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"><option value="">Semua lokasi</option>{INDIHOME_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}</select>
+                        <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"><option value="">Semua lokasi</option>{locationOptions.map((location) => <option key={location} value={location}>{location}</option>)}</select>
                         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"><option value="">Semua status</option>{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select>
                         <Button type="submit" variant="outline" className="rounded-lg"><Search className="mr-2 h-4 w-4" /> Terapkan</Button>
                     </form>
@@ -262,7 +278,7 @@ export default function AdminIndihomePage() {
                             <div className="space-y-2 sm:col-span-2"><Label htmlFor="description">Deskripsi</Label><Textarea id="description" required minLength={10} rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></div>
                             <div className="space-y-2 sm:col-span-2"><Label htmlFor="features">Fitur paket <span className="font-normal text-muted-foreground">(satu per baris)</span></Label><Textarea id="features" required rows={4} value={draft.featuresText} onChange={(event) => setDraft({ ...draft, featuresText: event.target.value })} /></div>
                         </div>
-                        <fieldset><legend className="text-sm font-medium">Lokasi tersedia</legend><div className="mt-3 grid gap-3 sm:grid-cols-3">{INDIHOME_LOCATIONS.map((location) => <label key={location} className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 p-3 text-sm"><input type="checkbox" checked={draft.locations.includes(location)} onChange={() => toggleLocation(location)} className="h-4 w-4 accent-red-600" /> {location}</label>)}</div></fieldset>
+                        <fieldset><legend className="text-sm font-medium">Lokasi tersedia</legend><div className="mt-3 grid gap-3 sm:grid-cols-3">{locationOptions.map((location) => <label key={location} className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 p-3 text-sm"><input type="checkbox" checked={draft.locations.includes(location)} onChange={() => toggleLocation(location)} className="h-4 w-4 accent-red-600" /> {location}</label>)}</div></fieldset>
                         <div className="grid gap-4 sm:grid-cols-3">
                             <div className="space-y-2"><Label htmlFor="sort">Urutan</Label><Input id="sort" type="number" value={draft.sortOrder} onChange={(event) => setDraft({ ...draft, sortOrder: Number(event.target.value) })} /></div>
                             <label className="flex items-center gap-2 pt-7 text-sm font-medium"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => setDraft({ ...draft, isFeatured: event.target.checked })} className="h-4 w-4 accent-red-600" /> Tandai terpopuler</label>

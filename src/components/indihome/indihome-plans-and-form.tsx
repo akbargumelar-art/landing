@@ -20,7 +20,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     INDIHOME_LOCATIONS,
     INDIHOME_PRODUCTS,
-    type IndihomeLocation,
     type IndihomeProduct,
 } from "@/lib/indihome-products";
 
@@ -47,7 +46,8 @@ const initialForm: FormState = {
 };
 
 export function IndihomePlansAndForm() {
-    const [location, setLocation] = useState<IndihomeLocation>(INDIHOME_LOCATIONS[0]);
+    const [locations, setLocations] = useState<string[]>([...INDIHOME_LOCATIONS]);
+    const [location, setLocation] = useState<string>(INDIHOME_LOCATIONS[0]);
     const [packageId, setPackageId] = useState("internet-100");
     const [products, setProducts] = useState<IndihomeProduct[]>(INDIHOME_PRODUCTS);
     const [form, setForm] = useState<FormState>(initialForm);
@@ -70,11 +70,17 @@ export function IndihomePlansAndForm() {
                 if (Array.isArray(data?.products) && data.products.length > 0) {
                     setProducts(data.products);
                 }
+                if (Array.isArray(data?.locations) && data.locations.length > 0) {
+                    setLocations(data.locations);
+                    // The default selection came from the constants; move to a live one if
+                    // the configured areas no longer include it.
+                    setLocation((current) => data.locations.includes(current) ? current : data.locations[0]);
+                }
             })
             .catch(() => undefined);
     }, []);
 
-    function updateLocation(nextLocation: IndihomeLocation) {
+    function updateLocation(nextLocation: string) {
         setLocation(nextLocation);
         const stillAvailable = products.some(
             (product) => product.id === packageId && product.locations.includes(nextLocation),
@@ -145,10 +151,10 @@ export function IndihomePlansAndForm() {
                         <select
                             id="location-filter"
                             value={location}
-                            onChange={(event) => updateLocation(event.target.value as IndihomeLocation)}
+                            onChange={(event) => updateLocation(event.target.value)}
                             className="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-100"
                         >
-                            {INDIHOME_LOCATIONS.map((item) => (
+                            {locations.map((item) => (
                                 <option key={item} value={item}>{item}</option>
                             ))}
                         </select>

@@ -36,6 +36,13 @@
       "when": 1785778452978,
       "tag": "0004_unified_program_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1785778977391,
+      "tag": "0005_indihome_locations_banners",
+      "breakpoints": true
     }
   ]
 }

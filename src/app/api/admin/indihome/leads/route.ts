@@ -3,7 +3,6 @@ import { and, desc, eq, like, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeLeads } from "@/db/schema";
 import { isIndihomeLeadStatus } from "@/lib/indihome-admin";
-import { isIndihomeLocation } from "@/lib/indihome-products";
 import { requireRole } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +26,9 @@ export async function GET(request: Request) {
         if (queryFilter) filters.push(queryFilter);
     }
     if (isIndihomeLeadStatus(status)) filters.push(eq(indihomeLeads.status, status));
-    if (isIndihomeLocation(location)) filters.push(eq(indihomeLeads.location, location));
+    // Filter on the stored value directly: locations are managed in the database now, and
+    // a whitelist check would silently ignore filters for newly added or renamed areas.
+    if (location) filters.push(eq(indihomeLeads.location, location.slice(0, 120)));
 
     try {
         const leads = await db

@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
 import { parseIndihomeProductInput } from "@/lib/indihome-admin";
+import { getActiveIndihomeLocations } from "@/lib/indihome-data";
 import { requireRole } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
-    const parsed = parseIndihomeProductInput(body);
+    const parsed = parseIndihomeProductInput(body, await getActiveIndihomeLocations());
     if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
     try {

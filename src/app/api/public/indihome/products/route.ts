@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
-import { INDIHOME_PRODUCTS } from "@/lib/indihome-products";
+import { INDIHOME_LOCATIONS, INDIHOME_PRODUCTS } from "@/lib/indihome-products";
+import { getActiveIndihomeLocations } from "@/lib/indihome-data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+    // Locations ship alongside the catalog so the public page needs a single round trip.
+    // getActiveIndihomeLocations already falls back to the constants on its own.
+    const locations = await getActiveIndihomeLocations();
+
     try {
         const products = await db
             .select()
@@ -26,6 +31,7 @@ export async function GET() {
                     locations: product.locations,
                     featured: product.isFeatured,
                 })),
+                locations,
                 source: "database",
             });
         }
@@ -33,5 +39,9 @@ export async function GET() {
         // Keep the public catalog usable while a new deployment is waiting for migration.
     }
 
-    return NextResponse.json({ products: INDIHOME_PRODUCTS, source: "fallback" });
+    return NextResponse.json({
+        products: INDIHOME_PRODUCTS,
+        locations: locations.length > 0 ? locations : [...INDIHOME_LOCATIONS],
+        source: "fallback",
+    });
 }

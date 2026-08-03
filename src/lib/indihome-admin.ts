@@ -1,5 +1,3 @@
-import { INDIHOME_LOCATIONS } from "@/lib/indihome-products";
-
 export const INDIHOME_LEAD_STATUSES = [
     "NEW",
     "CONTACTED",
@@ -11,7 +9,12 @@ export const INDIHOME_LEAD_STATUSES = [
 
 export type IndihomeLeadStatus = (typeof INDIHOME_LEAD_STATUSES)[number];
 
-export function parseIndihomeProductInput(body: Record<string, unknown>) {
+/**
+ * `allowedLocations` is passed in by the caller (read from indihome_locations) instead of
+ * being checked against a hardcoded list, so a location added from the admin can be
+ * assigned to a package straight away.
+ */
+export function parseIndihomeProductInput(body: Record<string, unknown>, allowedLocations: string[]) {
     const name = String(body.name || "").trim();
     const speedMbps = Number(body.speedMbps);
     const monthlyPrice = Number(body.monthlyPrice);
@@ -20,9 +23,7 @@ export function parseIndihomeProductInput(body: Record<string, unknown>) {
         ? body.features.map((item) => String(item).trim()).filter(Boolean).slice(0, 12)
         : [];
     const locations = Array.isArray(body.locations)
-        ? body.locations
-            .map(String)
-            .filter((item) => INDIHOME_LOCATIONS.some((location) => location === item))
+        ? body.locations.map(String).filter((item) => allowedLocations.includes(item))
         : [];
 
     if (name.length < 3 || name.length > 255) return { error: "Nama paket belum valid." } as const;

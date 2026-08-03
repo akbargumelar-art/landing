@@ -231,6 +231,37 @@ export const indihomeLeads = mysqlTable("indihome_leads", {
     index("indihome_leads_created_idx").on(table.createdAt),
 ]);
 
+// Replaces the INDIHOME_LOCATIONS constant so new coverage areas no longer need a code
+// deploy (prd-total-revamp.md 2.7). The constant stays in the codebase as a seed source
+// and as a fallback when the database is unreachable.
+export const indihomeLocations = mysqlTable("indihome_locations", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 120 }).notNull().unique(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("indihome_locations_active_idx").on(table.isActive),
+    index("indihome_locations_sort_idx").on(table.sortOrder),
+]);
+
+// Modelled on hero_slides so the IndiHome hero can grow into a multi-banner slider later.
+// Today the public page renders the active banner with the lowest sort order.
+export const indihomeBanners = mysqlTable("indihome_banners", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    imageUrl: varchar("image_url", { length: 500 }).notNull().default(""),
+    headline: varchar("headline", { length: 255 }).notNull().default(""),
+    subheadline: varchar("subheadline", { length: 500 }).notNull().default(""),
+    ctaText: varchar("cta_text", { length: 255 }).notNull().default(""),
+    ctaLink: varchar("cta_link", { length: 500 }).notNull().default(""),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("indihome_banners_active_idx").on(table.isActive),
+    index("indihome_banners_sort_idx").on(table.sortOrder),
+]);
+
 export const submissionValues = mysqlTable("submission_values", {
     id: varchar("id", { length: 36 }).primaryKey(),
     submissionId: varchar("submission_id", { length: 36 }).notNull().references(() => formSubmissions.id, { onDelete: "cascade" }),
