@@ -10,6 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
+import {
+    DEFAULT_OUTLET_BRANDING,
+    DEFAULT_OUTLET_CATEGORY,
+    DEFAULT_PJP_DAY,
+    DEFAULT_PJP_TYPE,
+    OUTLET_BRANDINGS,
+    OUTLET_CATEGORIES,
+    PJP_DAYS,
+    PJP_TYPES,
+    buildOutletMapsUrl,
+} from "@/lib/mitra-outlet-options";
 
 interface Outlet {
     id: string;
@@ -48,9 +59,10 @@ export default function AdminMitraOutletPage() {
         kabupaten: "",
         kecamatan: "",
         territoryId: "",
-        category: "FISIK",
-        pjpDay: "Senin",
-        pjpType: "F1",
+        category: String(DEFAULT_OUTLET_CATEGORY),
+        pjpDay: String(DEFAULT_PJP_DAY),
+        pjpType: String(DEFAULT_PJP_TYPE),
+        branding: String(DEFAULT_OUTLET_BRANDING),
     });
 
     const load = React.useCallback(() => {
@@ -108,7 +120,11 @@ export default function AdminMitraOutletPage() {
             body: JSON.stringify(form),
         });
         if (res.ok) {
-            setForm({ outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "", territoryId: "", category: "FISIK", pjpDay: "Senin", pjpType: "F1" });
+            setForm({
+                outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "", territoryId: "",
+                category: String(DEFAULT_OUTLET_CATEGORY), pjpDay: String(DEFAULT_PJP_DAY),
+                pjpType: String(DEFAULT_PJP_TYPE), branding: String(DEFAULT_OUTLET_BRANDING),
+            });
             load();
         } else {
             const data = await res.json().catch(() => ({}));
@@ -132,6 +148,12 @@ export default function AdminMitraOutletPage() {
     const updateEditField = (key: string, value: string) => {
         setEditOutlet((previous) => previous ? { ...previous, [key]: value } : previous);
     };
+
+    // Pratinjau tautan lokasi mengikuti koordinat yang sedang diketik, sama seperti
+    // yang nanti disimpan server.
+    const mapsPreview = editOutlet
+        ? buildOutletMapsUrl(Number(editOutlet.latitude), Number(editOutlet.longitude))
+        : "";
 
     const updateDetailField = (storageKey: string, key: string, value: string) => {
         setEditDetails((previous) => ({
@@ -183,6 +205,30 @@ export default function AdminMitraOutletPage() {
                                 {territories.map((territory) => <option key={territory.id} value={territory.id}>{territory.name}</option>)}
                             </select>
                         </div>
+                        <div className="space-y-2">
+                            <Label>Kategori Outlet</Label>
+                            <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                {OUTLET_CATEGORIES.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Hari PJP</Label>
+                            <select value={form.pjpDay} onChange={(event) => setForm((prev) => ({ ...prev, pjpDay: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                {PJP_DAYS.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Tipe PJP</Label>
+                            <select value={form.pjpType} onChange={(event) => setForm((prev) => ({ ...prev, pjpType: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                {PJP_TYPES.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Branding Outlet</Label>
+                            <select value={form.branding} onChange={(event) => setForm((prev) => ({ ...prev, branding: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                {OUTLET_BRANDINGS.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </div>
                         <div className="flex items-end">
                             <Button disabled={saving} className="w-full">
                                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -208,10 +254,9 @@ export default function AdminMitraOutletPage() {
 
                         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
                             {[
-                                ["outletCode", "Kode Outlet"], ["rsNumber", "Nomor RS"], ["name", "Nama Outlet"], ["ownerName", "Owner"],
-                                ["ownerPhone", "WA Owner"], ["tap", "TAP"], ["salesforce", "Salesforce"], ["kabupaten", "Kabupaten"],
-                                ["kecamatan", "Kecamatan"], ["longitude", "Longitude"], ["latitude", "Latitude"], ["locationUrl", "URL Lokasi"],
-                                ["branding", "Branding"], ["photoUrl", "URL Foto"], ["pjpDay", "Hari PJP"], ["pjpType", "Tipe PJP"],
+                                ["outletCode", "ID Digipos"], ["rsNumber", "Nomor RS"], ["name", "Nama Outlet"], ["ownerName", "Nama Owner"],
+                                ["ownerPhone", "Nomor Owner"], ["tap", "TAP (nama cabang)"], ["salesforce", "Salesforce"], ["kabupaten", "Kabupaten"],
+                                ["kecamatan", "Kecamatan"], ["longitude", "Longitude"], ["latitude", "Latitude"], ["photoUrl", "URL Foto"],
                             ].map(([key, label]) => (
                                 <Field key={key} label={label} value={String(editOutlet[key] ?? "")} onChange={(value) => updateEditField(key, value)} />
                             ))}
@@ -223,9 +268,28 @@ export default function AdminMitraOutletPage() {
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <Label>Kategori</Label>
-                                <select value={String(editOutlet.category || "FISIK")} onChange={(event) => updateEditField("category", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
-                                    <option value="FISIK">FISIK</option><option value="DIGITAL">DIGITAL</option><option value="HYBRID">HYBRID</option>
+                                <Label>Kategori Outlet</Label>
+                                <select value={String(editOutlet.category || DEFAULT_OUTLET_CATEGORY)} onChange={(event) => updateEditField("category", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
+                                    {OUTLET_CATEGORIES.map((option) => <option key={option} value={option}>{option}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Hari PJP</Label>
+                                <select value={String(editOutlet.pjpDay || DEFAULT_PJP_DAY)} onChange={(event) => updateEditField("pjpDay", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
+                                    {PJP_DAYS.map((option) => <option key={option} value={option}>{option}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Tipe PJP</Label>
+                                <select value={String(editOutlet.pjpType || DEFAULT_PJP_TYPE)} onChange={(event) => updateEditField("pjpType", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
+                                    {PJP_TYPES.map((option) => <option key={option} value={option}>{option}</option>)}
+                                </select>
+                                <p className="text-xs text-muted-foreground">Jumlah kunjungan wajib salesforce per bulan.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Branding Outlet</Label>
+                                <select value={String(editOutlet.branding || DEFAULT_OUTLET_BRANDING)} onChange={(event) => updateEditField("branding", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
+                                    {OUTLET_BRANDINGS.map((option) => <option key={option} value={option}>{option}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -233,6 +297,17 @@ export default function AdminMitraOutletPage() {
                                 <select value={String(editOutlet.status || "ACTIVE")} onChange={(event) => updateEditField("status", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
                                     <option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="SUSPENDED">SUSPENDED</option>
                                 </select>
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label>Lokasi (Google Maps)</Label>
+                                {mapsPreview ? (
+                                    <a href={mapsPreview} target="_blank" rel="noreferrer" className="block truncate text-sm text-blue-600 underline">
+                                        {mapsPreview}
+                                    </a>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Isi Longitude dan Latitude untuk membuat tautan otomatis.</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">Dibuat otomatis dari koordinat, tidak perlu diketik.</p>
                             </div>
                         </div>
 

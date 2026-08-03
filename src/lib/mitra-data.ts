@@ -1,6 +1,8 @@
 import { and, asc, count, desc, eq, gt, inArray, like, or, sql } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
+import { resolveOutletMapsUrl } from "@/lib/mitra-outlet-options";
+
 import { db } from "@/db";
 import {
     mitraDetailSessions,
@@ -142,7 +144,8 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             salesforce: outletRecord.salesforce,
             longitude: outletRecord.longitude,
             latitude: outletRecord.latitude,
-            locationUrl: outletRecord.locationUrl,
+            // Diturunkan dari koordinat supaya tautan selalu cocok dengan lat/long tersimpan.
+            locationUrl: resolveOutletMapsUrl(outletRecord.latitude, outletRecord.longitude, outletRecord.locationUrl),
             territoryId: outletRecord.territoryId,
         },
         detailSession,

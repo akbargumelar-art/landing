@@ -18,6 +18,13 @@ import {
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
+import {
+    buildOutletMapsUrl,
+    normalizeOutletBranding,
+    normalizeOutletCategory,
+    normalizePjpDay,
+    normalizePjpType,
+} from "@/lib/mitra-outlet-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -229,11 +236,16 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
                 territoryId: territory.id,
                 rsNumber: String(row.rsNumber || ""),
                 ownerName: String(row.ownerName || ""),
+                tap: String(row.tap || ""),
+                salesforce: String(row.salesforce || ""),
                 kabupaten: String(row.kabupaten || ""),
                 kecamatan: String(row.kecamatan || ""),
                 latitude: row.latitude ? parseFloat(String(row.latitude)) : null,
                 longitude: row.longitude ? parseFloat(String(row.longitude)) : null,
-                address: String(row.address || row.alamat || "")
+                category: row.category,
+                pjpDay: row.pjpDay,
+                pjpType: row.pjpType,
+                branding: row.branding,
             });
         }
     });
@@ -310,21 +322,34 @@ async function commitProgramScoreRows(executor: ImportExecutor, batchId: string,
 
 async function commitOutletRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
     if (rows.length === 0) return;
-    const values = rows.map((row) => ({
-        id: uuid(),
-        outletCode: String(row.outletCode),
-        publicToken: uuid().replace(/-/g, "").slice(0, 16),
-        name: String(row.name),
-        ownerPhone: String(row.ownerPhone),
-        territoryId: String(row.territoryId),
-        rsNumber: String(row.rsNumber || ""),
-        ownerName: String(row.ownerName || ""),
-        kabupaten: String(row.kabupaten || ""),
-        kecamatan: String(row.kecamatan || ""),
-        latitude: typeof row.latitude === "number" ? row.latitude : null,
-        longitude: typeof row.longitude === "number" ? row.longitude : null,
-        status: "ACTIVE" as const,
-        createdAt: new Date(),
-    }));
+    const values = rows.map((row) => {
+        const latitude = typeof row.latitude === "number" ? row.latitude : null;
+        const longitude = typeof row.longitude === "number" ? row.longitude : null;
+        return {
+            id: uuid(),
+            outletCode: String(row.outletCode),
+            publicToken: uuid().replace(/-/g, "").slice(0, 16),
+            name: String(row.name),
+            ownerPhone: String(row.ownerPhone),
+            territoryId: String(row.territoryId),
+            rsNumber: String(row.rsNumber || ""),
+            ownerName: String(row.ownerName || ""),
+            tap: String(row.tap || ""),
+            salesforce: String(row.salesforce || ""),
+            kabupaten: String(row.kabupaten || ""),
+            kecamatan: String(row.kecamatan || ""),
+            latitude,
+            longitude,
+            locationUrl: buildOutletMapsUrl(latitude, longitude) || null,
+            // Sel yang kosong atau tidak dikenal jatuh ke default, supaya satu nilai keliru
+            // tidak menggagalkan seluruh baris import.
+            category: normalizeOutletCategory(row.category),
+            pjpDay: normalizePjpDay(row.pjpDay),
+            pjpType: normalizePjpType(row.pjpType),
+            branding: normalizeOutletBranding(row.branding),
+            status: "ACTIVE" as const,
+            createdAt: new Date(),
+        };
+    });
     await executor.insert(mitraOutlets).values(values);
 }

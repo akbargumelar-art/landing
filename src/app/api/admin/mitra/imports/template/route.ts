@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
 import { requireRole } from "@/lib/admin-auth";
+import {
+    OUTLET_BRANDINGS,
+    OUTLET_CATEGORIES,
+    PJP_DAYS,
+    PJP_TYPES,
+} from "@/lib/mitra-outlet-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,15 +56,21 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
     outlet: [
         {
             outletCode: "OUT-100",
+            rsNumber: "RS-100",
             name: "Outlet Maju Jaya",
             ownerName: "Ahmad Fauzi",
             ownerPhone: "08123450000",
-            rsNumber: "RS-100",
+            tap: "TAP Cirebon Kota",
+            salesforce: "Budi Salesforce",
             territoryName: "Cirebon Kota",
             kabupaten: "Kota Cirebon",
             kecamatan: "Kesambi",
             latitude: -6.732,
             longitude: 108.552,
+            category: "FISIK",
+            pjpDay: "Senin",
+            pjpType: "F4",
+            branding: "Telkomsel",
         },
     ],
 };
@@ -78,6 +90,19 @@ export async function GET(request: Request) {
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+    if (type === "outlet") {
+        // Lembar bantu berisi pilihan yang sah, supaya pengisi file tidak menebak-nebak.
+        // Nilai di luar daftar tidak menggagalkan import - ia jatuh ke default.
+        const maxRows = Math.max(OUTLET_CATEGORIES.length, PJP_DAYS.length, PJP_TYPES.length, OUTLET_BRANDINGS.length);
+        const optionRows = Array.from({ length: maxRows }, (_, index) => ({
+            "Kategori Outlet": OUTLET_CATEGORIES[index] ?? "",
+            "Hari PJP": PJP_DAYS[index] ?? "",
+            "Tipe PJP": PJP_TYPES[index] ?? "",
+            "Branding Outlet": OUTLET_BRANDINGS[index] ?? "",
+        }));
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(optionRows), "Pilihan");
+    }
 
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
 

@@ -15,6 +15,16 @@ import {
     uniqueIndex
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
+import {
+    DEFAULT_OUTLET_BRANDING,
+    DEFAULT_OUTLET_CATEGORY,
+    DEFAULT_PJP_DAY,
+    DEFAULT_PJP_TYPE,
+    OUTLET_BRANDINGS,
+    OUTLET_CATEGORIES,
+    PJP_DAYS,
+    PJP_TYPES,
+} from "@/lib/mitra-outlet-options";
 
 // ========== better-auth core tables ==========
 
@@ -486,12 +496,14 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     kecamatan: varchar("kecamatan", { length: 255 }).notNull().default(""),
     longitude: double("longitude"),
     latitude: double("latitude"),
+    // Diturunkan dari latitude/longitude (lihat resolveOutletMapsUrl). Kolom tetap ada
+    // supaya tautan manual pada data lama tidak hilang saat koordinat belum diisi.
     locationUrl: varchar("location_url", { length: 500 }),
     territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "set null" }),
-    category: varchar("category", { length: 50 }).notNull().default("FISIK"),
-    pjpDay: varchar("pjp_day", { length: 50 }).notNull().default("Senin"),
-    pjpType: varchar("pjp_type", { length: 20 }).notNull().default("F1"),
-    branding: varchar("branding", { length: 100 }).notNull().default(""),
+    category: mysqlEnum("category", OUTLET_CATEGORIES).notNull().default(DEFAULT_OUTLET_CATEGORY),
+    pjpDay: mysqlEnum("pjp_day", PJP_DAYS).notNull().default(DEFAULT_PJP_DAY),
+    pjpType: mysqlEnum("pjp_type", PJP_TYPES).notNull().default(DEFAULT_PJP_TYPE),
+    branding: mysqlEnum("branding", OUTLET_BRANDINGS).notNull().default(DEFAULT_OUTLET_BRANDING),
     status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).notNull().default("ACTIVE"),
     photoUrl: varchar("photo_url", { length: 500 }),
     createdAt: datetime("created_at").notNull(),

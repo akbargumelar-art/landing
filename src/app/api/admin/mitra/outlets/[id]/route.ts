@@ -6,6 +6,13 @@ import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
 import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
+import {
+    normalizeOutletBranding,
+    normalizeOutletCategory,
+    normalizePjpDay,
+    normalizePjpType,
+    resolveOutletMapsUrl,
+} from "@/lib/mitra-outlet-options";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +53,9 @@ export async function PUT(
 
     if (!existing) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
 
+    const longitude = body.longitude === "" ? null : body.longitude === undefined ? existing.longitude : Number(body.longitude);
+    const latitude = body.latitude === "" ? null : body.latitude === undefined ? existing.latitude : Number(body.latitude);
+
     await db.update(mitraOutlets).set({
         outletCode: body.outletCode ?? existing.outletCode,
         publicToken: body.regenerateToken ? generatePublicToken() : existing.publicToken,
@@ -57,14 +67,16 @@ export async function PUT(
         salesforce: body.salesforce ?? existing.salesforce,
         kabupaten: body.kabupaten ?? existing.kabupaten,
         kecamatan: body.kecamatan ?? existing.kecamatan,
-        longitude: body.longitude === "" ? null : body.longitude === undefined ? existing.longitude : Number(body.longitude),
-        latitude: body.latitude === "" ? null : body.latitude === undefined ? existing.latitude : Number(body.latitude),
-        locationUrl: body.locationUrl === "" ? null : body.locationUrl ?? existing.locationUrl,
+        longitude,
+        latitude,
+        // Koordinat adalah sumber kebenaran tautan lokasi; nilai lama hanya dipakai
+        // selama koordinat masih kosong.
+        locationUrl: resolveOutletMapsUrl(latitude, longitude, existing.locationUrl) || null,
         territoryId: body.territoryId === "" ? null : body.territoryId ?? existing.territoryId,
-        category: body.category ?? existing.category,
-        pjpDay: body.pjpDay ?? existing.pjpDay,
-        pjpType: body.pjpType ?? existing.pjpType,
-        branding: body.branding ?? existing.branding,
+        category: normalizeOutletCategory(body.category ?? existing.category),
+        pjpDay: normalizePjpDay(body.pjpDay ?? existing.pjpDay),
+        pjpType: normalizePjpType(body.pjpType ?? existing.pjpType),
+        branding: normalizeOutletBranding(body.branding ?? existing.branding),
         status: body.status ?? existing.status,
         photoUrl: body.photoUrl === "" ? null : body.photoUrl ?? existing.photoUrl,
     }).where(eq(mitraOutlets.id, id));

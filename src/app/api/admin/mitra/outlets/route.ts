@@ -7,6 +7,13 @@ import { mitraOutletDetails, mitraOutlets, mitraTerritories } from "@/db/schema"
 import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
+import {
+    normalizeOutletBranding,
+    normalizeOutletCategory,
+    normalizePjpDay,
+    normalizePjpType,
+    resolveOutletMapsUrl,
+} from "@/lib/mitra-outlet-options";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +108,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Kode outlet, nama outlet, dan nomor owner wajib diisi" }, { status: 400 });
     }
 
+    const longitude = body.longitude === "" || body.longitude === undefined ? null : Number(body.longitude);
+    const latitude = body.latitude === "" || body.latitude === undefined ? null : Number(body.latitude);
+
     await db.insert(mitraOutlets).values({
         id,
         outletCode: String(body.outletCode).trim(),
@@ -113,14 +123,15 @@ export async function POST(request: Request) {
         salesforce: String(body.salesforce || ""),
         kabupaten: String(body.kabupaten || ""),
         kecamatan: String(body.kecamatan || ""),
-        longitude: body.longitude === "" || body.longitude === undefined ? null : Number(body.longitude),
-        latitude: body.latitude === "" || body.latitude === undefined ? null : Number(body.latitude),
-        locationUrl: body.locationUrl || null,
+        longitude,
+        latitude,
+        // Tautan lokasi diturunkan dari koordinat, bukan diketik admin.
+        locationUrl: resolveOutletMapsUrl(latitude, longitude, body.locationUrl) || null,
         territoryId: body.territoryId || null,
-        category: body.category || "FISIK",
-        pjpDay: body.pjpDay || "Senin",
-        pjpType: body.pjpType || "F1",
-        branding: body.branding || "",
+        category: normalizeOutletCategory(body.category),
+        pjpDay: normalizePjpDay(body.pjpDay),
+        pjpType: normalizePjpType(body.pjpType),
+        branding: normalizeOutletBranding(body.branding),
         status: body.status || "ACTIVE",
         photoUrl: body.photoUrl || null,
         createdAt: now,
