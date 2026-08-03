@@ -91,7 +91,7 @@ strukturnya, hanya disesuaikan agar tunduk pada RBAC baru.
 | Kelola Beranda & Konten | Full | Input | View-all | — | — |
 | Pengaturan (umum, WAHA, Whitelist OTP) | Full | — | View-all | — | — |
 | **Kelola User** (baru) | Full | — | View-all | — | — |
-| Program (unifikasi, lihat Bag. 2.3) | Full | Input | View-all | View-area | View-area |
+| Program (unifikasi, lihat Bag. 2.4) | Full | Input | View-all | View-area | View-area |
 | Form Builder & Data Peserta | Full | Input | View-all | — | — |
 | E-commerce (Produk, Voucher, Pesanan) | Full | Input | View-all | — | — |
 | Kalkulator Cuan (Master Produk) | Full | Input | View-all | — | — |
@@ -101,7 +101,60 @@ strukturnya, hanya disesuaikan agar tunduk pada RBAC baru.
 | Profil Admin (akun sendiri) | Full | Full | Full | Full | Full |
 | Audit Log | Full | — | View-all | — | — |
 
-### 2.3 Unifikasi Program
+### 2.3 Modernisasi Desain (UI/UX)
+
+**Referensi**: telkomsel.com. Berdasarkan tinjauan desainnya, gaya yang dipakai adalah *card-grid*
+modular dengan whitespace lega, tipografi sans-serif tegas (headline besar-bold, body tetap
+mudah dibaca), tombol CTA merah solid persegi dengan sudut membulat sedang (bukan pill penuh),
+shadow lembut untuk kedalaman tanpa kesan berat, foto produk bersih dikombinasikan dengan
+gradient yang dipakai sebagai aksen di hero — bukan mendominasi seluruh halaman — serta header
+sticky dengan struktur navigasi yang rapi.
+
+Kondisi desain aplikasi saat ini (`src/app/globals.css`) masih memakai beberapa pola dekoratif
+yang sudah terasa dari era desain lama: `wave-divider` (SVG gelombang antar section),
+`animate-float`/`animate-float-delayed` (elemen mengambang), dan `gradient-text` yang dipakai
+cukup luas. Arah baru menggantinya dengan pendekatan yang lebih bersih dan kontemporer:
+
+| Aspek | Sekarang | Arah Baru |
+|---|---|---|
+| Pemisah antar section | SVG wave divider | Dihapus; jarak antar section diatur lewat whitespace/spacing, tanpa bentuk dekoratif |
+| Animasi | Elemen mengambang (`animate-float`), gradient text dekoratif dipakai luas | Animasi minimal & bertujuan: micro-interaction halus saat hover/scroll, bukan animasi ambient terus-menerus |
+| Kartu/Card | Bervariasi antar halaman | Satu sistem card konsisten: shadow lembut, radius sedang, padding lega, dipakai seragam di semua halaman publik |
+| Warna | Merah + gradient oranye-merah dipakai cukup dominan | Merah (`#ED0226`) tetap warna brand utama, tapi dipakai strategis: CTA, aksen, highlight — latar mayoritas putih/abu terang seperti telkomsel.com |
+| Tipografi | Inter, hierarki standar | Hierarki dipertegas: headline lebih besar & bold untuk judul section/hero, body tetap nyaman dibaca, jarak antar section lebih lega |
+| Tombol CTA | Ada varian pill penuh (`btn-pill`) | Tombol solid merah teks putih, radius sedang (bukan pill penuh) mengikuti gaya telkomsel.com, hover state jelas |
+| Navigasi | Sticky navbar sudah ada | Dipertahankan strukturnya, disempurnakan konsistensi spacing & typography agar selaras sistem desain baru |
+
+**Cakupan**: berlaku untuk seluruh halaman publik — Beranda, Program (katalog & detail), Lokasi &
+Kontak, Belanja (storefront e-commerce), IndiHome, dan profil outlet publik Mitra
+(`/mitra`, `/mitra/o/[publicToken]`). Dashboard admin **tidak** diredesain total secara visual —
+tetap dense dan fungsional sesuai kebutuhan kerja sehari-hari admin — tapi disesuaikan agar
+memakai token warna/radius/tipografi yang sama dari `globals.css`, supaya publik dan dashboard
+tidak terasa seperti dua produk berbeda.
+
+**Prinsip desain**:
+
+1. Minimalis & bersih — kurangi elemen dekoratif yang tidak fungsional.
+2. Konsisten — satu skala spacing, satu skala radius, satu palet warna di semua halaman publik.
+3. Mobile-first — prioritas tampilan smartphone, karena mayoritas trafik datang dari scan QR dan
+   share link WhatsApp.
+4. Merah Telkomsel tetap jadi identitas brand, dipakai sebagai aksen strategis — bukan gradient
+   yang mendominasi seluruh halaman.
+5. Whitespace lega antar section dan hierarki tipografi yang tegas, mengikuti pola telkomsel.com.
+
+**Acceptance Criteria tambahan**:
+
+- [ ] `wave-divider` dan animasi mengambang (`animate-float`, `animate-float-delayed`) dihapus
+      dari seluruh halaman publik, diganti spacing bersih tanpa bentuk dekoratif.
+- [ ] Seluruh tombol CTA di halaman publik memakai satu gaya konsisten (solid merah, radius
+      sedang, hover state jelas) — bukan lagi campuran pill dan non-pill.
+- [ ] Perbandingan langsung terhadap telkomsel.com dari sisi whitespace, hierarki tipografi,
+      pemakaian warna merah sebagai aksen (bukan dominasi), dan gaya card/grid.
+- [ ] Tidak ada regresi mobile-responsiveness dibanding desain sekarang — dicek lewat screenshot
+      mobile & desktop sebelum rilis, sesuai kebiasaan verifikasi yang sudah tercatat di
+      `docs/session.md`.
+
+### 2.4 Unifikasi Program
 
 Kondisi saat ini ada dua mesin yang terpisah total secara skema database:
 
@@ -141,7 +194,7 @@ Program & Leaderboard (undian), Form Builder, Data Peserta, dan Undi Pemenang �
 masuk `/admin/program` untuk mengelola program apa pun modenya. Halaman "Portal Mitra Outlet"
 (grup "Layanan & Portal") setelahnya hanya berisi database outlet.
 
-### 2.4 Halaman Mitra Outlet (Refocus)
+### 2.5 Halaman Mitra Outlet (Refocus)
 
 Halaman `/admin/mitra` dirombak agar **hanya** berisi:
 
@@ -155,8 +208,8 @@ Halaman `/admin/mitra` dirombak agar **hanya** berisi:
 6. **Summary** — ringkasan jumlah outlet per status/wilayah, aktivitas OTP, kesehatan WAHA
    (menggantikan dashboard ringkasan yang sekarang ada di `/admin/mitra`).
 
-Yang **dipindahkan keluar** dari halaman ini: Program (ke grup Event & Form, lihat 2.3),
-Whitelist (ke Pengaturan, lihat 2.5), Performance metric definitions (tetap ada sebagai bagian
+Yang **dipindahkan keluar** dari halaman ini: Program (ke grup Event & Form, lihat 2.4),
+Whitelist (ke Pengaturan, lihat 2.6), Performance metric definitions (tetap ada sebagai bagian
 dari data outlet/summary, karena itu memang bagian dari "database mitra outlet" sesuai permintaan
 poin 6 — bukan bagian dari sistem Program).
 
@@ -165,7 +218,7 @@ struktur data yang sudah ada di database saat ini (`mitra_outlets`, `mitra_outle
 `mitra_territories`) — tidak menambah field baru di fase ini kecuali dibutuhkan oleh RBAC (kolom
 scope wilayah yang memang sudah ada).
 
-### 2.5 Whitelist OTP dan Konfigurasi WAHA di Pengaturan
+### 2.6 Whitelist OTP dan Konfigurasi WAHA di Pengaturan
 
 - Menu mandiri "Whitelist" di Portal Mitra (`/admin/mitra/whitelist`) **dihapus**; fungsinya
   dipindahkan sebagai satu section baru di halaman Pengaturan: "Whitelist Penerima OTP" dengan
@@ -177,7 +230,7 @@ scope wilayah yang memang sudah ada).
   dari sumber ini secara konsisten (fallback ke environment variable `WAHA_*` hanya jika field
   Pengaturan kosong, sebagaimana yang sudah berjalan hari ini).
 
-### 2.6 IndiHome — Lebih Customizable
+### 2.7 IndiHome — Lebih Customizable
 
 Kondisi sekarang: gambar hero (`/indihome/hero-family.png`) di-hardcode sebagai file statis, dan
 daftar lokasi (`INDIHOME_LOCATIONS`) adalah konstanta di kode, bukan data di database. Perombakan:
@@ -193,7 +246,7 @@ daftar lokasi (`INDIHOME_LOCATIONS`) adalah konstanta di kode, bukan data di dat
   hubungi via WhatsApp) — dipertahankan, hanya tunduk RBAC baru (Admin Input boleh ubah status,
   Manager hanya lihat).
 
-### 2.7 Kelola User (Baru)
+### 2.8 Kelola User (Baru)
 
 Halaman baru di bawah Pengaturan atau menu tersendiri "Kelola User", khusus Admin Super:
 
@@ -276,7 +329,7 @@ yang dirombak). Perubahan besar:
 3. **Scoping wilayah generik**: tabel `mitra_user_territories` digeneralisasi menjadi
    `admin_user_territories`, dipakai bersama oleh Supervisor dan Salesforce. Hierarki
    `mitra_territories` (REGION/CLUSTER/AREA) dipertahankan apa adanya.
-4. **Program terpadu**: `programs` + `program_winners` disatukan (lihat 2.3); tabel pendukung
+4. **Program terpadu**: `programs` + `program_winners` disatukan (lihat 2.4); tabel pendukung
    performa (`program_params`, `program_participants`, `program_scores`, `program_leaderboard`)
    dipertahankan strukturnya, hanya FK-nya mengarah ke `programs` yang sudah disatukan.
 5. **Whitelist & WAHA config**: tabel whitelist tetap sama, hanya UI-nya pindah ke Pengaturan;
@@ -361,13 +414,22 @@ perombakan struktural:
 - Halaman Kelola User (CRUD user, assign role & wilayah).
 - Migrasi/backfill akun Mitra existing ke role baru.
 
-### Fase 1 — Refocus Mitra Outlet + Whitelist/WAHA ke Pengaturan
+### Fase 1 — Modernisasi Desain UI Publik
+
+- Terapkan sistem desain baru di `globals.css` (hapus `wave-divider`, `animate-float`/
+  `animate-float-delayed`, rapikan `gradient-text`/`btn-pill`) sesuai arah di Bagian 2.3.
+- Terapkan ke halaman publik: Beranda, Program (katalog & detail), Lokasi & Kontak, Belanja,
+  profil outlet publik Mitra.
+- Tidak bergantung pada migrasi data/RBAC — dapat dikerjakan paralel dengan Fase 0, asal tidak
+  menyentuh logika akses.
+
+### Fase 2 — Refocus Mitra Outlet + Whitelist/WAHA ke Pengaturan
 
 - Halaman `/admin/mitra` dipangkas jadi database outlet + QR + summary saja.
 - Whitelist pindah ke Pengaturan (section baru).
 - Verifikasi konfigurasi WAHA hanya bersumber dari Pengaturan.
 
-### Fase 2 — Unifikasi Program (paling berisiko, karena migrasi data dua sistem)
+### Fase 3 — Unifikasi Program (paling berisiko, karena migrasi data dua sistem)
 
 - Desain final skema `programs` terpadu (`mode`, detail per mode).
 - Migrasi data `programs`+`mitra_programs` → `programs` baru, `winners`+`mitra_program_winners` →
@@ -375,13 +437,14 @@ perombakan struktural:
 - Satu halaman admin Program di grup Event & Form untuk kedua mode.
 - Uji ulang alur publik: `/program`, `/program/[slug]`, `/form-undian`, `/mitra/program`.
 
-### Fase 3 — IndiHome Enhancement
+### Fase 4 — IndiHome Enhancement
 
 - Tabel `indihome_locations` + admin CRUD, ganti pemakaian `INDIHOME_LOCATIONS` konstanta.
 - Tabel/kolom banner + admin upload, ganti hero file statis.
-- Sesuaikan halaman publik `/indihome` membaca lokasi & banner dari database.
+- Sesuaikan halaman publik `/indihome` membaca lokasi & banner dari database, memakai sistem
+  desain baru dari Fase 1.
 
-### Fase 4 — QA Menyeluruh per Role & Dokumentasi
+### Fase 5 — QA Menyeluruh per Role & Dokumentasi
 
 - Uji manual seluruh matriks akses (Bagian 2.2) dengan akun percobaan per role.
 - Perbarui `docs/session.md` dan dokumentasi terkait.
@@ -394,13 +457,16 @@ perombakan struktural:
 | Migrasi dua sistem Program jadi satu | Risiko kehilangan/salah mapping data undian atau performa | Migrasi aditif, verifikasi jumlah baris, jalankan di staging/lokal dulu sebelum production |
 | RBAC salah terap di satu endpoint | Kebocoran data lintas wilayah atau lintas role | Checklist acceptance criteria per role wajib dicoba manual sebelum rilis fase 0 dianggap selesai |
 | Reassignment makna role `MANAGER` lama | Akun existing yang seharusnya jadi Admin Super malah ke-mapping jadi Manager (view-only) | Mapping eksplisit `MANAGER` lama → `SUPER_ADMIN` baru saat backfill, bukan otomatis 1:1 nama |
-| Downtime saat migrasi skema besar (Fase 2) | Program/leaderboard tidak bisa diakses sementara | Migrasi di jam non-sibuk, backup wajib, punya rencana rollback ke skema lama bila gagal |
+| Downtime saat migrasi skema besar (Fase 3) | Program/leaderboard tidak bisa diakses sementara | Migrasi di jam non-sibuk, backup wajib, punya rencana rollback ke skema lama bila gagal |
 | Data lokasi/banner IndiHome kosong pasca migrasi | Halaman publik IndiHome tampil kosong | Seed data awal dari konstanta lama (`INDIHOME_LOCATIONS`, `hero-family.png`) sebagai baris pertama di tabel baru |
+| Desain baru dikerjakan terpisah dari Fase 4 (IndiHome) | Halaman IndiHome baru tampil tidak konsisten dengan sistem desain publik lain | Terapkan token desain dari Fase 1 saat membangun halaman IndiHome baru di Fase 4, bukan memakai gaya lama |
 
 ### Final Acceptance Checklist
 
 - [ ] Kelima role internal (Admin Super, Admin Input, Manager, Supervisor, Salesforce) sudah bisa
       dibuat lewat Kelola User dan terverifikasi hak aksesnya sesuai Bagian 2.2.
+- [ ] Seluruh halaman publik memakai sistem desain baru (tanpa wave divider/floating blob,
+      konsisten dengan arah telkomsel.com di Bagian 2.3), lulus pengecekan mobile & desktop.
 - [ ] Alur Mitra Outlet publik (QR + OTP) tidak berubah perilakunya untuk pemilik outlet.
 - [ ] Program mode Undian dan mode Performa Outlet berjalan dari satu modul yang sama.
 - [ ] Halaman Mitra Outlet hanya berisi database outlet, QR, dan summary.
