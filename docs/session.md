@@ -366,3 +366,70 @@ lewat CDP.**
 Yang tetap **tidak** terverifikasi di sesi ini: seluruh SQL migrasi (`0003`-`0006`) beserta
 backfill-nya, karena mesin ini tidak punya MySQL server, Docker, maupun MariaDB - hanya klien
 (MySQL Workbench, HeidiSQL).
+
+## 2026-08-04 - Master Outlet: pilihan tetap dan tautan lokasi otomatis
+
+Permintaan: mengubah database outlet agar sesuai daftar field tertentu, beserta tiga grup
+data detail ber-OTP. Dikerjakan dengan skill `context-map` dari `.agents` - memetakan dulu
+sebelum mengubah, dan pemetaan itu langsung mengubah gambaran pekerjaannya.
+
+### Temuan pemetaan: sebagian besar sudah ada
+
+- Ke-17 field master yang diminta **sudah ada seluruhnya** di `mitra_outlets`.
+- Field detail ber-OTP **sudah persis cocok**. Label digenerate ulang dari kode lalu dihitung:
+  Sellthru Digipos 48, Sellthru Nota 48, Recharge Digipos 45 - penamaan dan urutan sama,
+  termasuk SO / SellOut yang memang hanya punya qty tanpa rev. Tidak ada perubahan di sana.
+- Yang benar-benar kurang hanya dua: empat field masih teks bebas, dan tautan lokasi diketik
+  manual.
+
+### Perubahan
+
+- `src/lib/mitra-outlet-options.ts` (baru) memuat daftar nilai sah untuk Kategori Outlet,
+  Hari PJP, Tipe PJP, dan Branding, plus helper URL Maps. Schema, validasi API, form admin,
+  dan importer membaca dari satu sumber ini supaya tidak saling menyimpang.
+- Keempat kolom menjadi enum MySQL (migrasi `0007`).
+- `location_url` diturunkan dari `latitude`/`longitude`, tidak lagi diketik. Kolomnya tetap
+  ada supaya tautan manual pada baris tanpa koordinat tidak hilang; `resolveOutletMapsUrl`
+  memberi prioritas ke koordinat. Form admin mengganti input teks dengan pratinjau tautan
+  yang mengikuti koordinat yang sedang diketik.
+
+### Bagian paling berisiko dari migrasi 0007
+
+Data **dinormalisasi sebelum** `ALTER`, bukan sesudah. Alasannya konkret: `branding` selama
+ini berdefault string kosong, dan `''` **bukan** anggota enum baru. Bila tipe diubah lebih
+dulu, MySQL strict mode menolak baris-baris itu, dan pada mode longgar diam-diam
+mengosongkannya. Nilai tak dikenal dipetakan ke anggota yang masuk akal, bukan dibuang,
+sehingga tidak ada baris yang hilang. Koordinat yang sudah ada di-backfill ke `location_url`.
+
+Migrasi ini yang paling perlu diuji ke restore backup lebih dulu, karena **mengubah tipe
+kolom pada tabel berisi data** - berbeda dari migrasi sebelumnya yang hanya menambah kolom.
+
+### Empat bug ditemukan sambil jalan
+
+- Dropdown Kategori di form edit menawarkan **FISIK / DIGITAL / HYBRID**, nilai yang tidak
+  cocok dengan default schema maupun kebutuhan. Diperbaiki ke FISIK / Non FISIK.
+- Importer outlet **mengabaikan** TAP, Salesforce, Kategori, Hari PJP, Tipe PJP, dan Branding
+  sepenuhnya, serta mengirim key `address` yang tidak punya kolom sama sekali. Sekarang
+  semuanya terbawa, dengan sel tak dikenal jatuh ke default agar satu sel keliru tidak
+  menggagalkan seluruh baris.
+- Template import kekurangan kolom-kolom tersebut. Dilengkapi, plus sheet "Pilihan" berisi
+  daftar nilai yang sah.
+- `normalizeOutletBranding` mengirim merek tak dikenal ke "Non Branding", **tidak sepakat**
+  dengan migrasi SQL yang memetakannya ke "Lainnya". Ketahuan dari uji edge case, bukan dari
+  membaca kode. Disamakan ke "Lainnya": merek tak dikenal tetap outlet ber-branding, hanya
+  nilai kosong yang berarti tanpa branding.
+
+### Verifikasi
+
+- Normalizer dan pembangun URL diuji terhadap kasus pinggir: kosong, spasi, beda kapitalisasi,
+  koordinat di luar rentang, nilai tak dikenal, dan koordinat mengalahkan URL tersimpan.
+  Seluruhnya lulus.
+- Disisir juga apakah ada daftar pilihan hardcoded lain yang kini tidak sinkron (pola bug yang
+  sama seperti DIGITAL/HYBRID): tidak ada. Filter di halaman publik `/mitra` hanya Kabupaten
+  dan TAP.
+- Nilai outlet di `src/db/seed.ts` diperiksa dan seluruhnya sah terhadap enum baru;
+  `locationUrl`-nya disamakan ke format turunan. Dipastikan pula alias `@/` ter-resolve saat
+  seed dijalankan lewat `tsx` (gagal di koneksi DB, bukan di resolusi modul).
+- `npx tsc --noEmit`, `npx drizzle-kit check`, lint, dan `npm run build`: lulus.
+- Tetap **tidak** terverifikasi: SQL migrasi `0007` itu sendiri, karena mesin ini masih tanpa
+  database.

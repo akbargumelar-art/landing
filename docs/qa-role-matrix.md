@@ -136,6 +136,31 @@ atau publish.
 
 ---
 
+## E2. Master outlet: pilihan tetap dan tautan lokasi
+
+Menguji migrasi `0007`. **Jalankan langkah I1 sebelum menyentuh production** — ini satu-satunya
+migrasi yang mengubah tipe kolom pada tabel berisi data.
+
+| # | Uji | Harapan |
+|---|---|---|
+| I1 | Jalankan `0007` terhadap **restore backup**, lalu `SELECT DISTINCT branding, category, pjp_day, pjp_type FROM mitra_outlets` | seluruh nilai anggota enum; jumlah baris sama dengan sebelum migrasi |
+| I2 | Outlet lama yang `branding`-nya kosong | menjadi `Non Branding`, bukan gagal atau kosong |
+| I3 | Outlet lama yang brandingnya merek di luar daftar | menjadi `Lainnya` |
+| I4 | Outlet lama berkategori selain FISIK/Non FISIK (mis. `DIGITAL` dari dropdown lama) | menjadi `FISIK` |
+| I5 | Outlet lama yang punya koordinat | `location_url` terisi format `?api=1&query=lat,long` |
+| I6 | Tambah outlet baru lewat form admin | Kategori/Hari PJP/Tipe PJP/Branding tampil sebagai dropdown, bukan input teks |
+| I7 | Isi Longitude dan Latitude di form edit | pratinjau tautan Maps muncul dan cocok dengan yang tersimpan setelah disimpan |
+| I8 | Kosongkan koordinat pada outlet yang punya tautan manual lama | tautan lama tetap dipakai, tidak hilang |
+| I9 | Import outlet memakai template terbaru | TAP, Salesforce, Kategori, Hari PJP, Tipe PJP, Branding ikut tersimpan |
+| I10 | Import dengan sel Branding berisi nilai ngawur | baris tetap masuk, brandingnya `Lainnya` — satu sel keliru tidak menggagalkan baris |
+| I11 | Unduh template outlet | ada sheet "Pilihan" berisi daftar nilai sah |
+| I12 | Buka profil publik outlet `/mitra/o/[token]` | tautan lokasi mengarah ke koordinat outlet |
+
+- [ ] I1  - [ ] I2  - [ ] I3  - [ ] I4  - [ ] I5  - [ ] I6
+- [ ] I7  - [ ] I8  - [ ] I9  - [ ] I10  - [ ] I11  - [ ] I12
+
+---
+
 ## F. Hapus outlet (Fase 2)
 
 | # | Uji | Harapan |

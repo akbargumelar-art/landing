@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { eq } from "drizzle-orm";
 import mysql from "mysql2/promise";
+import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
 import {
     siteSettings,
     heroSlides,
@@ -538,7 +539,7 @@ async function seed() {
                     kecamatan: "Kesambi",
                     longitude: 108.549,
                     latitude: -6.732,
-                    locationUrl: "https://www.google.com/maps/search/Kesambi+Cirebon",
+                    locationUrl: buildOutletMapsUrl(-6.732, 108.549),
                     territoryId: areaKesambiId,
                     category: "FISIK",
                     pjpDay: "Senin",
@@ -561,7 +562,7 @@ async function seed() {
                     kecamatan: "Kuningan",
                     longitude: 108.482,
                     latitude: -6.975,
-                    locationUrl: "https://www.google.com/maps/search/Kuningan+Jawa+Barat",
+                    locationUrl: buildOutletMapsUrl(-6.975, 108.482),
                     territoryId: areaKuninganId,
                     category: "Non FISIK",
                     pjpDay: "Rabu",
