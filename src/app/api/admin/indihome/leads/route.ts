@@ -4,12 +4,12 @@ import { db } from "@/db";
 import { indihomeLeads } from "@/db/schema";
 import { isIndihomeLeadStatus } from "@/lib/indihome-admin";
 import { isIndihomeLocation } from "@/lib/indihome-products";
-import { requireMitraAccess } from "@/lib/mitra-auth";
+import { requireRole } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

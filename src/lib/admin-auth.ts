@@ -6,21 +6,29 @@ import { v4 as uuid } from "uuid";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-    mitraAuditLogs,
-    mitraUserProfiles,
-    mitraUserTerritories,
-    type MitraRole,
+    adminAuditLogs,
+    adminUserProfiles,
+    adminUserTerritories,
+    type AdminRole,
 } from "@/db/schema";
 
-export interface MitraSession {
+export type { AdminRole };
+
+export interface AdminSession {
     userId: string;
     name: string;
     email: string;
-    role: MitraRole;
+    role: AdminRole;
     isActive: boolean;
 }
 
-export async function getMitraSession(): Promise<MitraSession | null> {
+const TERRITORY_SCOPED_ROLES: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
+
+export function isTerritoryScopedRole(role: AdminRole): boolean {
+    return TERRITORY_SCOPED_ROLES.includes(role);
+}
+
+export async function getAdminSession(): Promise<AdminSession | null> {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
@@ -29,28 +37,32 @@ export async function getMitraSession(): Promise<MitraSession | null> {
 
     const [profile] = await db
         .select()
-        .from(mitraUserProfiles)
-        .where(eq(mitraUserProfiles.userId, session.user.id))
+        .from(adminUserProfiles)
+        .where(eq(adminUserProfiles.userId, session.user.id))
         .limit(1);
 
-    const bootstrapEmail = (process.env.MITRA_BOOTSTRAP_MANAGER_EMAIL || "admin@abkciraya.com").toLowerCase();
+    const bootstrapEmail = (
+        process.env.ADMIN_BOOTSTRAP_SUPER_ADMIN_EMAIL ||
+        process.env.MITRA_BOOTSTRAP_MANAGER_EMAIL ||
+        "admin@abkciraya.com"
+    ).toLowerCase();
     if (!profile && session.user.email?.toLowerCase() !== bootstrapEmail) return null;
 
     return {
         userId: session.user.id,
         name: session.user.name || "Admin",
         email: session.user.email || "",
-        role: (profile?.role || "MANAGER") as MitraRole,
+        role: (profile?.role || "SUPER_ADMIN") as AdminRole,
         isActive: profile?.isActive ?? true,
     };
 }
 
-export async function requireMitraAccess(roles: MitraRole[] = ["MANAGER", "ADMIN", "LEADER"]) {
-    let session: MitraSession | null;
+export async function requireRole(roles: AdminRole[]) {
+    let session: AdminSession | null;
     try {
-        session = await getMitraSession();
+        session = await getAdminSession();
     } catch (error) {
-        console.error("requireMitraAccess session lookup failed:", error);
+        console.error("requireRole session lookup failed:", error);
         return {
             error: NextResponse.json({ error: "Layanan sedang gangguan, coba lagi." }, { status: 503 }),
             session: null,
@@ -74,16 +86,16 @@ export async function requireMitraAccess(roles: MitraRole[] = ["MANAGER", "ADMIN
     return { error: null, session };
 }
 
-export async function getLeaderTerritoryIds(userId: string): Promise<string[]> {
+export async function getUserTerritoryIds(userId: string): Promise<string[]> {
     const rows = await db
-        .select({ territoryId: mitraUserTerritories.territoryId })
-        .from(mitraUserTerritories)
-        .where(eq(mitraUserTerritories.userId, userId));
+        .select({ territoryId: adminUserTerritories.territoryId })
+        .from(adminUserTerritories)
+        .where(eq(adminUserTerritories.userId, userId));
 
     return rows.map((row) => row.territoryId);
 }
 
-export async function writeMitraAuditLog(input: {
+export async function writeAdminAuditLog(input: {
     userId?: string | null;
     action: string;
     entity: string;
@@ -91,7 +103,7 @@ export async function writeMitraAuditLog(input: {
     diff?: Record<string, unknown> | null;
     ip?: string | null;
 }) {
-    await db.insert(mitraAuditLogs).values({
+    await db.insert(adminAuditLogs).values({
         id: uuid(),
         userId: input.userId || null,
         action: input.action,

@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { winners, programs, formSubmissions, submissionValues, formFields } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET winner history
 export async function GET(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const { searchParams } = new URL(request.url);
         const programId = searchParams.get("programId");

@@ -4,29 +4,27 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import {
-    mitraAuditLogs,
+    adminAuditLogs,
     mitraDetailSessions,
     mitraOtpRequests,
     mitraTerritories,
-    mitraUserProfiles,
-    mitraUserTerritories,
     siteSettings,
     user,
 } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getMitraAdminSummary } from "@/lib/mitra-data";
-import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
+import { getClientIp } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-    const auth = await requireMitraAccess();
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const resource = new URL(request.url).searchParams.get("resource") || "summary";
 
     if (resource === "health") {
-        const admin = await requireMitraAccess(["MANAGER", "ADMIN"]);
+        const admin = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
         if (admin.error) return admin.error;
 
         const settings = await db
@@ -62,48 +60,16 @@ export async function GET(request: Request) {
     }
 
     if (resource === "territories") {
-        const manager = await requireMitraAccess(["MANAGER"]);
-        if (manager.error) return manager.error;
+        const admin = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+        if (admin.error) return admin.error;
 
         const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.type), asc(mitraTerritories.name));
         return NextResponse.json({ territories });
     }
 
-    if (resource === "users") {
-        const manager = await requireMitraAccess(["MANAGER"]);
-        if (manager.error) return manager.error;
-
-        const users = await db
-            .select({
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: mitraUserProfiles.phone,
-                role: mitraUserProfiles.role,
-                isActive: mitraUserProfiles.isActive,
-                createdAt: user.createdAt,
-            })
-            .from(user)
-            .leftJoin(mitraUserProfiles, eq(user.id, mitraUserProfiles.userId))
-            .orderBy(asc(user.name));
-
-        const assignments = await db.select().from(mitraUserTerritories);
-        const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.name));
-
-        return NextResponse.json({
-            users: users.map((row) => ({
-                ...row,
-                role: row.role || "MANAGER",
-                isActive: row.isActive ?? true,
-                territoryIds: assignments.filter((assignment) => assignment.userId === row.id).map((assignment) => assignment.territoryId),
-            })),
-            territories,
-        });
-    }
-
     if (resource === "audit") {
-        const manager = await requireMitraAccess(["MANAGER"]);
-        if (manager.error) return manager.error;
+        const superAdmin = await requireRole(["SUPER_ADMIN"]);
+        if (superAdmin.error) return superAdmin.error;
 
         const url = new URL(request.url);
         const action = url.searchParams.get("action") || "";
@@ -111,26 +77,26 @@ export async function GET(request: Request) {
         const q = url.searchParams.get("q") || "";
         const filters: SQL[] = [];
 
-        if (action) filters.push(eq(mitraAuditLogs.action, action));
-        if (entity) filters.push(eq(mitraAuditLogs.entity, entity));
-        if (q) filters.push(like(mitraAuditLogs.entityId, `%${q}%`));
+        if (action) filters.push(eq(adminAuditLogs.action, action));
+        if (entity) filters.push(eq(adminAuditLogs.entity, entity));
+        if (q) filters.push(like(adminAuditLogs.entityId, `%${q}%`));
 
         const logs = await db
             .select({
-                id: mitraAuditLogs.id,
-                action: mitraAuditLogs.action,
-                entity: mitraAuditLogs.entity,
-                entityId: mitraAuditLogs.entityId,
-                diffJson: mitraAuditLogs.diffJson,
-                ip: mitraAuditLogs.ip,
-                createdAt: mitraAuditLogs.createdAt,
+                id: adminAuditLogs.id,
+                action: adminAuditLogs.action,
+                entity: adminAuditLogs.entity,
+                entityId: adminAuditLogs.entityId,
+                diffJson: adminAuditLogs.diffJson,
+                ip: adminAuditLogs.ip,
+                createdAt: adminAuditLogs.createdAt,
                 userName: user.name,
                 userEmail: user.email,
             })
-            .from(mitraAuditLogs)
-            .leftJoin(user, eq(mitraAuditLogs.userId, user.id))
+            .from(adminAuditLogs)
+            .leftJoin(user, eq(adminAuditLogs.userId, user.id))
             .where(filters.length > 0 ? and(...filters) : undefined)
-            .orderBy(desc(mitraAuditLogs.createdAt))
+            .orderBy(desc(adminAuditLogs.createdAt))
             .limit(300);
 
         return NextResponse.json({ logs });
@@ -141,7 +107,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -163,7 +129,7 @@ export async function POST(request: Request) {
             otpRequests: otpCount?.value || 0,
             detailSessions: sessionCount?.value || 0,
         };
-        await writeMitraAuditLog({
+        await writeAdminAuditLog({
             userId: auth.session?.userId,
             action: "CLEANUP",
             entity: "mitra_access_session",
@@ -190,7 +156,7 @@ export async function POST(request: Request) {
             createdAt: new Date(),
         });
 
-        await writeMitraAuditLog({
+        await writeAdminAuditLog({
             userId: auth.session?.userId,
             action: "CREATE",
             entity: "mitra_territory",
@@ -201,47 +167,6 @@ export async function POST(request: Request) {
 
         const [created] = await db.select().from(mitraTerritories).where(eq(mitraTerritories.id, id));
         return NextResponse.json(created, { status: 201 });
-    }
-
-    if (resource === "user_profile") {
-        const userId = String(body.userId || "");
-        if (!userId || !["MANAGER", "ADMIN", "LEADER"].includes(String(body.role || ""))) {
-            return NextResponse.json({ error: "User dan role wajib valid" }, { status: 400 });
-        }
-
-        const [existing] = await db.select().from(mitraUserProfiles).where(eq(mitraUserProfiles.userId, userId)).limit(1);
-        const values = {
-            phone: body.phone ? normalizePhoneE164(String(body.phone)) : null,
-            role: body.role as "MANAGER" | "ADMIN" | "LEADER",
-            isActive: body.isActive ?? true,
-        };
-
-        if (existing) {
-            await db.update(mitraUserProfiles).set(values).where(eq(mitraUserProfiles.userId, userId));
-        } else {
-            await db.insert(mitraUserProfiles).values({
-                userId,
-                ...values,
-                createdAt: new Date(),
-            });
-        }
-
-        await db.delete(mitraUserTerritories).where(eq(mitraUserTerritories.userId, userId));
-        const territoryIds = Array.isArray(body.territoryIds) ? (body.territoryIds as unknown[]).map(String) : [];
-        if (territoryIds.length > 0) {
-            await db.insert(mitraUserTerritories).values(territoryIds.map((territoryId) => ({ userId, territoryId })));
-        }
-
-        await writeMitraAuditLog({
-            userId: auth.session?.userId,
-            action: existing ? "UPDATE" : "CREATE",
-            entity: "mitra_user_profile",
-            entityId: userId,
-            diff: { role: body.role, isActive: body.isActive, territoryCount: territoryIds.length },
-            ip: getClientIp(request),
-        });
-
-        return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Resource tidak valid" }, { status: 400 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
-import { requireMitraAccess } from "@/lib/mitra-auth";
+import { requireRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,7 +64,7 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
 };
 
 export async function GET(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

@@ -4,14 +4,14 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraProgramParams, mitraPrograms } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, slugify } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const programs = await db.select().from(mitraPrograms).orderBy(desc(mitraPrograms.periodStart));
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         );
     }
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "CREATE",
         entity: "mitra_program",
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -91,7 +91,7 @@ export async function PATCH(request: Request) {
     }
 
     await recomputeMitraProgramLeaderboard(String(body.programId));
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "RECOMPUTE",
         entity: "mitra_program_leaderboard",

@@ -3,8 +3,12 @@ import { db } from "@/db";
 import { vouchers, products } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function GET(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const { searchParams } = new URL(request.url);
         const productId = searchParams.get('productId');
@@ -35,6 +39,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const { productId, codes } = body;

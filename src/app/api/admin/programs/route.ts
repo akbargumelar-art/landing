@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { programs, dynamicForms } from "@/db/schema";
 import { asc, eq, max } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET all programs
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
+    if (auth.error) return auth.error;
+
     try {
         const allPrograms = await db.select().from(programs).orderBy(asc(programs.sortOrder));
         // Attach forms for each program
@@ -26,6 +30,9 @@ export async function GET() {
 
 // POST create program
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
 

@@ -3,10 +3,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
 import { parseIndihomeProductInput } from "@/lib/indihome-admin";
-import { requireMitraAccess } from "@/lib/mitra-auth";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -26,7 +26,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;

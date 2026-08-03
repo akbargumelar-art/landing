@@ -3,10 +3,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeLeads } from "@/db/schema";
 import { isIndihomeLeadStatus } from "@/lib/indihome-admin";
-import { requireMitraAccess } from "@/lib/mitra-auth";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;

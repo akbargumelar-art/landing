@@ -3,8 +3,12 @@ import { db } from "@/db";
 import { cuanProducts, cuanCategories, cuanBrands } from "@/db/schema";
 import { v4 as uuid } from "uuid";
 import * as XLSX from "xlsx";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function POST(req: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const formData = await req.formData();
         const file = formData.get("file") as File;

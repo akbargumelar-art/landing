@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { formSubmissions, submissionValues, formFields, dynamicForms, programs } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET export submissions as Excel
 export async function GET(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const { searchParams } = new URL(request.url);
         const programId = searchParams.get("programId");

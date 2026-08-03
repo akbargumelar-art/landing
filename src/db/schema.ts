@@ -701,3 +701,59 @@ export const mitraProgramWinnersRelations = relations(mitraProgramWinners, ({ on
     program: one(mitraPrograms, { fields: [mitraProgramWinners.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramWinners.outletId], references: [mitraOutlets.id] }),
 }));
+
+// ========== RBAC Umum (PRD Fase 0 - prd-total-revamp.md) ==========
+//
+// Menggantikan mitra_user_profiles/mitra_user_territories sebagai sumber role untuk SELURUH
+// dashboard admin, bukan hanya modul Mitra. mitra_user_profiles/mitra_user_territories tetap
+// dipertahankan untuk sementara (lihat migrasi 0003) dan dihapus di Fase 5 setelah observasi.
+
+export type AdminRole = "SUPER_ADMIN" | "ADMIN_INPUT" | "MANAGER" | "SUPERVISOR" | "SALESFORCE";
+
+export const adminUserProfiles = mysqlTable("admin_user_profiles", {
+    userId: varchar("user_id", { length: 36 }).primaryKey().references(() => user.id, { onDelete: "cascade" }),
+    phone: varchar("phone", { length: 50 }),
+    role: mysqlEnum("role", ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]).notNull().default("MANAGER"),
+    isActive: boolean("is_active").notNull().default(true),
+    lastLoginAt: datetime("last_login_at"),
+    failedLoginAttempts: int("failed_login_attempts").notNull().default(0),
+    lastFailedLoginAt: datetime("last_failed_login_at"),
+    lockedUntil: datetime("locked_until"),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("admin_user_profiles_role_idx").on(table.role),
+]);
+
+export const adminUserTerritories = mysqlTable("admin_user_territories", {
+    userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
+    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.territoryId], name: "admin_user_territories_pk" }),
+    index("admin_user_territories_territory_idx").on(table.territoryId),
+]);
+
+export const adminAuditLogs = mysqlTable("admin_audit_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    userId: varchar("user_id", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 80 }).notNull(),
+    entity: varchar("entity", { length: 120 }).notNull(),
+    entityId: varchar("entity_id", { length: 36 }),
+    diffJson: json("diff_json").$type<Record<string, unknown>>(),
+    ip: varchar("ip", { length: 120 }),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("admin_audit_user_idx").on(table.userId),
+    index("admin_audit_entity_idx").on(table.entity, table.entityId),
+    index("admin_audit_created_idx").on(table.createdAt),
+]);
+
+export const adminUserProfilesRelations = relations(adminUserProfiles, ({ one, many }) => ({
+    user: one(user, { fields: [adminUserProfiles.userId], references: [user.id] }),
+    territories: many(adminUserTerritories),
+}));
+
+export const adminUserTerritoriesRelations = relations(adminUserTerritories, ({ one }) => ({
+    user: one(user, { fields: [adminUserTerritories.userId], references: [user.id] }),
+    territory: one(mitraTerritories, { fields: [adminUserTerritories.territoryId], references: [mitraTerritories.id] }),
+}));

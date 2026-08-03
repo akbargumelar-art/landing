@@ -10,7 +10,7 @@ import {
     mitraPrograms,
     mitraProgramWinners,
 } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, slugify } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -49,7 +49,7 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -82,7 +82,7 @@ export async function PUT(
             }
         });
 
-        await writeMitraAuditLog({
+        await writeAdminAuditLog({
             userId: auth.session?.userId,
             action: "UPDATE_PARTICIPANTS",
             entity: "mitra_program",
@@ -133,7 +133,7 @@ export async function PUT(
             await tx.update(mitraPrograms).set({ status: "PUBLISHED", isPublic: true }).where(eq(mitraPrograms.id, id));
         });
 
-        await writeMitraAuditLog({
+        await writeAdminAuditLog({
             userId: auth.session?.userId,
             action: "PUBLISH_WINNERS",
             entity: "mitra_program",
@@ -184,7 +184,7 @@ export async function PUT(
         }
     }
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "UPDATE",
         entity: "mitra_program",

@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { vouchers, products } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
     try {
         const params = await context.params;
         const id = params.id;

@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { programs, dynamicForms, formFields } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET single program
 export async function GET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id } = await params;
         const [program] = await db.select().from(programs).where(eq(programs.id, id));
@@ -32,6 +36,9 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id } = await params;
         const body = await request.json();
@@ -64,6 +71,9 @@ export async function DELETE(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id } = await params;
         await db.delete(programs).where(eq(programs.id, id));

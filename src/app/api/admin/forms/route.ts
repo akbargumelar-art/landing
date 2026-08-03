@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { dynamicForms, formFields, formSubmissions, programs } from "@/db/schema";
 import { desc, eq, count } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET all forms
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const forms = await db.select().from(dynamicForms).orderBy(desc(dynamicForms.createdAt));
         const result = [];
@@ -35,6 +39,9 @@ export async function GET() {
 
 // POST create form
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const newId = uuid();

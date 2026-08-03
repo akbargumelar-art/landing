@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
@@ -13,7 +13,7 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireMitraAccess();
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -28,7 +28,7 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -76,7 +76,7 @@ export async function PUT(
         }
     }
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "UPDATE",
         entity: "mitra_outlet",

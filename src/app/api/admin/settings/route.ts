@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET all settings
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const settings = await db.select().from(siteSettings);
         const settingsMap: Record<string, string> = {};
@@ -21,6 +25,9 @@ export async function GET() {
 
 // PUT update settings
 export async function PUT(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const updates: { key: string; value: string; type?: string }[] = body.settings;

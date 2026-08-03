@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraWhitelistNumbers } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -34,7 +34,7 @@ export async function PUT(
         expiresAt: body.expiresAt === "" ? null : body.expiresAt ? new Date(body.expiresAt) : existing.expiresAt,
     }).where(eq(mitraWhitelistNumbers.id, id));
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "UPDATE",
         entity: "mitra_whitelist",

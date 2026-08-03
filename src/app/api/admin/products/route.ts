@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const allProducts = await db.select().from(products);
         return NextResponse.json(allProducts);
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const newId = uuid();

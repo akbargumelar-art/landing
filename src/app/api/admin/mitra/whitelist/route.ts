@@ -4,13 +4,13 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraTerritories, mitraWhitelistNumbers } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const whitelist = await db
@@ -40,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         createdAt: new Date(),
     });
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "CREATE",
         entity: "mitra_whitelist",

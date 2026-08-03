@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { dynamicForms, formSubmissions } from "@/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 interface SubValue {
     value: string;
@@ -36,6 +37,9 @@ interface FetchedSubmission {
 
 // GET submissions with filters
 export async function GET(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const { searchParams } = new URL(request.url);
         const programId = searchParams.get("programId");

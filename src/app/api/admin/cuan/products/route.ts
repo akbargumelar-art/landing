@@ -3,8 +3,12 @@ import { db } from "@/db";
 import { cuanProducts, cuanCategories, cuanBrands } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const rows = await db
             .select({
@@ -33,6 +37,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await req.json();
         const { name, categoryId, brandId, capitalPrice, sellingPrice, cashback, isHot } = body;

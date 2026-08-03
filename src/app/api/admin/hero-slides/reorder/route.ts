@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { heroSlides } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 // PUT reorder hero slides
 export async function PUT(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const { order } = body; // array of { id, sortOrder }

@@ -4,14 +4,14 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets, mitraTerritories } from "@/db/schema";
-import { getLeaderTerritoryIds, requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-    const auth = await requireMitraAccess();
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
@@ -34,8 +34,8 @@ export async function GET(request: Request) {
         filters.push(eq(mitraOutlets.status, status as "ACTIVE" | "INACTIVE" | "SUSPENDED"));
     }
 
-    if (auth.session?.role === "LEADER") {
-        const territoryIds = await getLeaderTerritoryIds(auth.session.userId);
+    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
+        const territoryIds = await getUserTerritoryIds(auth.session.userId);
         if (territoryIds.length === 0) {
             return NextResponse.json({ outlets: [], total: 0, page, pageSize });
         }
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
         rechargeDigiposJson: sanitizeDetailGroup(body.rechargeDigipos, MITRA_DETAIL_FIELD_GROUPS[2].fields.map((field) => field.key)),
     });
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "CREATE",
         entity: "mitra_outlet",

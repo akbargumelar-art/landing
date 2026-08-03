@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Activity, ClipboardList, Database, FileSpreadsheet, KeyRound, LayoutDashboard, MessageCircle, QrCode, ShieldCheck, Trash2, Trophy, Users } from "lucide-react";
+import { Activity, ClipboardList, Database, FileSpreadsheet, KeyRound, LayoutDashboard, MessageCircle, QrCode, ShieldCheck, Trash2, Trophy, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,6 @@ interface Territory {
     type: "REGION" | "CLUSTER" | "AREA";
 }
 
-interface MitraUser {
-    id: string;
-    name: string;
-    email: string;
-    role: "MANAGER" | "ADMIN" | "LEADER";
-    isActive: boolean;
-}
-
 interface HealthStatus {
     database: { ok: boolean };
     waha: { configured: boolean; reachable: boolean; session: string };
@@ -50,7 +42,6 @@ const modules = [
 export default function AdminMitraPage() {
     const [summary, setSummary] = React.useState<Summary | null>(null);
     const [territories, setTerritories] = React.useState<Territory[]>([]);
-    const [users, setUsers] = React.useState<MitraUser[]>([]);
     const [health, setHealth] = React.useState<HealthStatus | null>(null);
     const [cleaning, setCleaning] = React.useState(false);
     const [territoryForm, setTerritoryForm] = React.useState({ name: "", type: "AREA", parentId: "" });
@@ -63,9 +54,6 @@ export default function AdminMitraPage() {
         fetch("/api/admin/mitra?resource=territories")
             .then((res) => res.ok ? res.json() : { territories: [] })
             .then((data) => setTerritories(Array.isArray(data.territories) ? data.territories : []));
-        fetch("/api/admin/mitra?resource=users")
-            .then((res) => res.ok ? res.json() : { users: [] })
-            .then((data) => setUsers(Array.isArray(data.users) ? data.users : []));
         fetch("/api/admin/mitra?resource=health")
             .then((res) => res.ok ? res.json() : null)
             .then(setHealth)
@@ -82,15 +70,6 @@ export default function AdminMitraPage() {
             body: JSON.stringify({ resource: "territory", ...territoryForm }),
         });
         setTerritoryForm({ name: "", type: "AREA", parentId: "" });
-        load();
-    };
-
-    const updateUserRole = async (userId: string, role: string, isActive: boolean) => {
-        await fetch("/api/admin/mitra", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ resource: "user_profile", userId, role, isActive }),
-        });
         load();
     };
 
@@ -209,26 +188,18 @@ export default function AdminMitraPage() {
                 </Card>
 
                 <Card>
-                    <CardContent className="p-5">
-                        <h2 className="font-bold">User Role</h2>
-                        <div className="mt-4 max-h-80 space-y-2 overflow-auto">
-                            {users.map((item) => (
-                                <div key={item.id} className="grid gap-2 rounded-lg border bg-gray-50 p-3 sm:grid-cols-[1fr_140px_100px] sm:items-center">
-                                    <div>
-                                        <p className="text-sm font-semibold">{item.name}</p>
-                                        <p className="text-xs text-muted-foreground">{item.email}</p>
-                                    </div>
-                                    <select value={item.role} onChange={(event) => updateUserRole(item.id, event.target.value, item.isActive)} className="h-9 rounded-md border px-2 text-sm">
-                                        <option value="MANAGER">MANAGER</option>
-                                        <option value="ADMIN">ADMIN</option>
-                                        <option value="LEADER">LEADER</option>
-                                    </select>
-                                    <Button variant="outline" size="sm" onClick={() => updateUserRole(item.id, item.role, !item.isActive)}>
-                                        {item.isActive ? "Aktif" : "Nonaktif"}
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
+                    <CardContent className="flex flex-col items-start gap-3 p-5">
+                        <h2 className="font-bold">Kelola User</h2>
+                        <p className="text-sm text-muted-foreground">
+                            Pengelolaan role, akun, dan wilayah user internal sudah dipindahkan ke halaman
+                            Kelola User (khusus Admin Super).
+                        </p>
+                        <Link href="/admin/users">
+                            <Button variant="outline">
+                                <UserCog className="h-4 w-4" />
+                                Buka Kelola User
+                            </Button>
+                        </Link>
                     </CardContent>
                 </Card>
             </div>

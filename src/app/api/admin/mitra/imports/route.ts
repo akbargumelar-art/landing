@@ -15,7 +15,7 @@ import {
     mitraTerritories,
     mitraWhitelistNumbers,
 } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
 
@@ -26,7 +26,7 @@ type ImportType = "whitelist" | "performance" | "program_score" | "outlet";
 type ImportExecutor = Pick<typeof db, "insert">;
 
 export async function GET() {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const batches = await db.select().from(mitraImportBatches).orderBy(mitraImportBatches.createdAt).limit(100);
@@ -34,7 +34,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const form = await request.formData();
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     }
 
     await db.update(mitraImportBatches).set({ status: "COMPLETED" }).where(eq(mitraImportBatches.id, batchId));
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "IMPORT",
         entity: `mitra_${type}`,
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -135,7 +135,7 @@ export async function PATCH(request: Request) {
 
     await db.update(mitraWhitelistNumbers).set({ isActive: false }).where(eq(mitraWhitelistNumbers.sourceBatchId, batchId));
     await db.update(mitraImportBatches).set({ status: "ROLLED_BACK", rolledBackAt: new Date() }).where(eq(mitraImportBatches.id, batchId));
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "ROLLBACK",
         entity: "mitra_import_batch",

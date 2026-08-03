@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraMetricDefs, mitraOutletMetrics, mitraOutlets } from "@/db/schema";
-import { getLeaderTerritoryIds, requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, toDecimalString } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-    const auth = await requireMitraAccess();
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
@@ -22,6 +22,10 @@ export async function GET(request: Request) {
     const filters = [];
     if (outletId) filters.push(eq(mitraOutletMetrics.outletId, outletId));
     if (periodYm) filters.push(eq(mitraOutletMetrics.periodYm, periodYm));
+    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
+        const territoryIds = await getUserTerritoryIds(auth.session.userId);
+        filters.push(territoryIds.length > 0 ? inArray(mitraOutlets.territoryId, territoryIds) : eq(mitraOutlets.territoryId, "__none__"));
+    }
 
     const rows = await db
         .select({
@@ -44,14 +48,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN", "LEADER"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
 
     if (body.type === "metric_def") {
-        const manager = await requireMitraAccess(["MANAGER"]);
-        if (manager.error) return manager.error;
+        const superAdmin = await requireRole(["SUPER_ADMIN"]);
+        if (superAdmin.error) return superAdmin.error;
 
         const id = uuid();
         await db.insert(mitraMetricDefs).values({
@@ -64,8 +68,8 @@ export async function POST(request: Request) {
             createdAt: new Date(),
         });
 
-        await writeMitraAuditLog({
-            userId: manager.session?.userId,
+        await writeAdminAuditLog({
+            userId: superAdmin.session?.userId,
             action: "CREATE",
             entity: "mitra_metric_def",
             entityId: id,
@@ -83,14 +87,6 @@ export async function POST(request: Request) {
 
     if (!outletId || !metricDefId || !/^\d{4}-\d{2}$/.test(periodYm)) {
         return NextResponse.json({ error: "Outlet, metric, dan periode YYYY-MM wajib diisi" }, { status: 400 });
-    }
-
-    if (auth.session?.role === "LEADER") {
-        const territoryIds = await getLeaderTerritoryIds(auth.session.userId);
-        const [outlet] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, outletId)).limit(1);
-        if (!outlet?.territoryId || !territoryIds.includes(outlet.territoryId)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
     }
 
     const [existing] = await db
@@ -120,7 +116,7 @@ export async function POST(request: Request) {
         });
     }
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: existing ? "UPDATE" : "CREATE",
         entity: "mitra_outlet_metric",

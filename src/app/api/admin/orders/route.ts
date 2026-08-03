@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, products, redemptionLogs } from "@/db/schema";
 import { count, desc, eq, sql } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function GET(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const { searchParams } = new URL(request.url);
         const limitStr = searchParams.get("limit") || "100";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -22,7 +22,10 @@ import {
     Calculator,
     Store,
     Wifi,
+    UserCog,
 } from "lucide-react";
+
+type AdminRole = "SUPER_ADMIN" | "ADMIN_INPUT" | "MANAGER" | "SUPERVISOR" | "SALESFORCE";
 
 const sidebarGroups = [
     {
@@ -30,6 +33,7 @@ const sidebarGroups = [
         links: [
             { href: "/admin/beranda", label: "Kelola Beranda", icon: Image },
             { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
+            { href: "/admin/users", label: "Kelola User", icon: UserCog, roles: ["SUPER_ADMIN"] as AdminRole[] },
         ]
     },
     {
@@ -74,8 +78,21 @@ export default function AdminLayout({
     const router = useRouter();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [role, setRole] = useState<AdminRole | null>(null);
 
-    const currentPage = sidebarGroups.flatMap((g) => g.links).find((l) => pathname.startsWith(l.href));
+    useEffect(() => {
+        fetch("/api/admin/me")
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => setRole(data?.session?.role || null))
+            .catch(() => setRole(null));
+    }, []);
+
+    const visibleGroups = sidebarGroups.map((group) => ({
+        ...group,
+        links: group.links.filter((link) => !("roles" in link) || !role || (link.roles as AdminRole[]).includes(role)),
+    })).filter((group) => group.links.length > 0);
+
+    const currentPage = visibleGroups.flatMap((g) => g.links).find((l) => pathname.startsWith(l.href));
 
     const handleLogout = async () => {
         const { signOut } = await import("@/lib/auth-client");
@@ -128,7 +145,7 @@ export default function AdminLayout({
 
                 {/* Nav Links */}
                 <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
-                    {sidebarGroups.map((group, i) => (
+                    {visibleGroups.map((group, i) => (
                         <div key={i} className="space-y-1">
                             {!collapsed && (
                                 <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-2">

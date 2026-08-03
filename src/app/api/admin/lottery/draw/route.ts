@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { formSubmissions, submissionValues, formFields, dynamicForms, winners } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // POST draw a winner
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const { programId, period, prizeName } = body;

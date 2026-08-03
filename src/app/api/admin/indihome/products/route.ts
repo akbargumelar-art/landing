@@ -4,12 +4,12 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
 import { parseIndihomeProductInput } from "@/lib/indihome-admin";
-import { requireMitraAccess } from "@/lib/mitra-auth";
+import { requireRole } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
     if (auth.error) return auth.error;
 
     try {
@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));

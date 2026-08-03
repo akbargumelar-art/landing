@@ -3,9 +3,13 @@ import { db } from "@/db";
 import { heroSlides } from "@/db/schema";
 import { asc, eq, max } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // GET all hero slides
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    if (auth.error) return auth.error;
+
     try {
         const slides = await db
             .select()
@@ -20,6 +24,9 @@ export async function GET() {
 
 // POST create new hero slide
 export async function POST(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const body = await request.json();
         const [maxResult] = await db

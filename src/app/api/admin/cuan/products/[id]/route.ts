@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { cuanProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requireRole } from "@/lib/admin-auth";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id } = await params;
         const body = await req.json();
@@ -27,6 +31,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id } = await params;
         await db.delete(cuanProducts).where(eq(cuanProducts.id, id));

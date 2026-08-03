@@ -3,12 +3,16 @@ import { db } from "@/db";
 import { formFields, dynamicForms } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { requireRole } from "@/lib/admin-auth";
 
 // PUT batch update fields (create/update/delete/reorder)
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    if (auth.error) return auth.error;
+
     try {
         const { id: formId } = await params;
         const body = await request.json();

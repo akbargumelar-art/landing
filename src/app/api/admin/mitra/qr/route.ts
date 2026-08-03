@@ -5,14 +5,14 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
-import { requireMitraAccess, writeMitraAuditLog } from "@/lib/mitra-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { buildOutletPublicUrl, getClientIp } from "@/lib/mitra-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-    const auth = await requireMitraAccess(["MANAGER", "ADMIN"]);
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         }))
     );
 
-    await writeMitraAuditLog({
+    await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "EXPORT_QR",
         entity: "mitra_outlet",
