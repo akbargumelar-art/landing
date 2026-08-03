@@ -187,7 +187,13 @@ export const formSubmissions = mysqlTable("form_submissions", {
     participantName: varchar("participant_name", { length: 255 }).notNull().default("Peserta"),
     participantPhone: varchar("participant_phone", { length: 255 }).notNull().default("-"),
     submittedAt: datetime("submitted_at").notNull(),
-});
+}, (table) => [
+    // GET /api/admin/submissions filters on these two and orders by submittedAt; without
+    // indexes MySQL still full-scans even though the filters were pushed down to SQL.
+    index("form_submissions_form_idx").on(table.formId),
+    index("form_submissions_status_idx").on(table.status),
+    index("form_submissions_submitted_idx").on(table.submittedAt),
+]);
 
 export const indihomeProducts = mysqlTable("indihome_products", {
     id: varchar("id", { length: 80 }).primaryKey(),

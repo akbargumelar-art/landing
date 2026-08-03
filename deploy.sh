@@ -10,6 +10,8 @@ APP_DIR="${APP_DIR:-/var/www/abkciraya.cloud}"
 PM2_NAME="${PM2_NAME:-abkciraya-web}"
 BRANCH="${BRANCH:-main}"
 APP_PORT="${APP_PORT:-}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/abkciraya-db}"
+BACKUP_FILE=""
 
 print_header() {
     echo "=========================================="
@@ -94,6 +96,61 @@ verify_port() {
     fi
 }
 
+backup_database() {
+    local db_url
+    db_url="$(read_env_value DATABASE_URL || true)"
+    if [ -z "$db_url" ]; then
+        db_url="${DATABASE_URL:-}"
+    fi
+
+    if [ -z "$db_url" ]; then
+        fail "DATABASE_URL tidak ditemukan; backup wajib sebelum migrasi"
+    fi
+
+    mkdir -p "$BACKUP_DIR"
+    BACKUP_FILE="${BACKUP_DIR}/backup-$(date +%Y%m%d-%H%M%S).sql"
+
+    # Parse mysql://user:pass@host:port/dbname tanpa mencetak kredensial ke layar.
+    local creds hostport userpass
+    creds="${db_url#mysql://}"
+    userpass="${creds%%@*}"
+    hostport="${creds#*@}"
+
+    local db_user db_pass db_host db_port db_name
+    db_user="${userpass%%:*}"
+    db_pass="${userpass#*:}"
+    [ "$db_pass" = "$userpass" ] && db_pass=""
+    db_name="${hostport#*/}"
+    db_name="${db_name%%\?*}"
+    hostport="${hostport%%/*}"
+    db_host="${hostport%%:*}"
+    db_port="${hostport#*:}"
+    [ "$db_port" = "$hostport" ] && db_port="3306"
+
+    echo "Membuat backup ke ${BACKUP_FILE} ..."
+    if ! MYSQL_PWD="$db_pass" mysqldump \
+        --host="$db_host" --port="$db_port" --user="$db_user" \
+        --single-transaction --quick --routines --triggers --events \
+        "$db_name" > "$BACKUP_FILE" 2>/tmp/mysqldump-err.log; then
+        echo "--- mysqldump error ---" >&2
+        tail -n 20 /tmp/mysqldump-err.log >&2 || true
+        rm -f "$BACKUP_FILE"
+        fail "Backup database gagal; migrasi dibatalkan"
+    fi
+
+    if [ ! -s "$BACKUP_FILE" ]; then
+        rm -f "$BACKUP_FILE"
+        fail "Backup database kosong; migrasi dibatalkan"
+    fi
+
+    gzip -f "$BACKUP_FILE"
+    BACKUP_FILE="${BACKUP_FILE}.gz"
+    echo "Backup selesai: ${BACKUP_FILE} ($(du -h "$BACKUP_FILE" | cut -f1))"
+
+    # Sisakan 10 backup terbaru saja agar disk VPS tidak penuh.
+    ls -1t "${BACKUP_DIR}"/backup-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+}
+
 verify_http() {
     local health_url="http://127.0.0.1:${APP_PORT}"
     local http_code
@@ -117,33 +174,44 @@ require_command npx
 require_command pm2
 require_command curl
 require_command ss
+require_command mysqldump
+require_command gzip
 
 cd "$APP_DIR"
 resolve_port
 
-print_step 1 7 "Pull dari GitHub..."
+print_step 1 8 "Pull dari GitHub..."
 git pull origin "$BRANCH"
 
-print_step 2 7 "Install dependencies..."
+print_step 2 8 "Install dependencies..."
 npm install --legacy-peer-deps
 
-print_step 3 7 "Validasi environment..."
+print_step 3 8 "Validasi environment..."
 npm run env:check
 
-print_step 4 7 "Build production..."
+print_step 4 8 "Build production..."
 rm -rf .next
 npm run build
 
-print_step 5 7 "Terapkan migrasi database terversi..."
-npm run db:migrate
+print_step 5 8 "Backup database sebelum migrasi..."
+backup_database
 
-print_step 6 7 "Restart aplikasi..."
+print_step 6 8 "Terapkan migrasi database terversi..."
+if ! npm run db:migrate; then
+    echo ""
+    echo "Migrasi GAGAL. Database mungkin dalam kondisi setengah termigrasi."
+    echo "Restore dengan:"
+    echo "  gunzip -c ${BACKUP_FILE} | mysql -u <user> -p <nama_database>"
+    fail "Migrasi database gagal"
+fi
+
+print_step 7 8 "Restart aplikasi..."
 stop_pm2_app
 kill_port_if_busy
 start_pm2_app
 pm2 save >/dev/null
 
-print_step 7 7 "Verifikasi aplikasi..."
+print_step 8 8 "Verifikasi aplikasi..."
 verify_port
 verify_http
 
@@ -153,4 +221,5 @@ echo "Deploy selesai"
 echo "=========================================="
 echo "PM2 app : $PM2_NAME"
 echo "Port    : $APP_PORT"
+echo "Backup  : $BACKUP_FILE"
 pm2 status "$PM2_NAME"

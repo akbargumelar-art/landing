@@ -91,7 +91,7 @@ export default function ProgramPage() {
             <section className="py-16">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     {/* Category Filter Tabs */}
-                    <div className="flex justify-center gap-3 mb-10">
+                    <div className="flex flex-wrap justify-center gap-3 mb-10">
                         <button
                             onClick={() => setFilterCategory("")}
                             className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all cursor-pointer ${!filterCategory ? "bg-red-600 text-white shadow-lg" : "bg-gray-100 text-gray-600 hover:bg-gray-200"

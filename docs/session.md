@@ -146,10 +146,14 @@ Eksekusi `prd-total-revamp.md`. Seluruh commit masih **lokal, belum di-push** at
   keyframes float, `gradient-text`, `hover-lift`).
 - Diverifikasi visual lewat dev server dan screenshot headless Chrome (desktop dan mobile) di
   `/`, `/program`, `/lokasi-kontak`, `/cuan`.
-- **Catatan:** ditemukan horizontal overflow di tampilan mobile Beranda. Dibuktikan
-  **pra-existing** (screenshot byte-identik terhadap commit sebelum Fase 1, dicek dua kali:
-  via `git stash` dan via checkout eksplisit `7a82891`). Bukan regresi, belum diperbaiki,
-  layak jadi perbaikan tersendiri karena mayoritas trafik dari scan QR dan share WhatsApp.
+- **KOREKSI (2026-08-04):** catatan sebelumnya di sini menyebut ada horizontal overflow di
+  tampilan mobile Beranda. **Itu keliru.** Kesimpulan itu ditarik dari screenshot headless
+  Chrome, dan ternyata merupakan artefak pengukuran: `--window-size` menentukan lebar tangkapan
+  gambar, bukan lebar layout viewport, sehingga halaman dirender lebih lebar lalu dipotong.
+  Pengukuran ulang lewat Chrome DevTools Protocol (`Emulation.setDeviceMetricsOverride` +
+  `Runtime.evaluate`) menunjukkan Beranda **nol overflow** pada 320/360/390/414 px:
+  `scrollWidth` sama persis dengan `clientWidth` dan tidak ada satu pun elemen yang melewati
+  viewport. Pelajaran: screenshot headless tidak sahih untuk menilai overflow; ukur lewat CDP.
 
 ### Fase 2 - Refocus Mitra Outlet + Whitelist/WAHA ke Pengaturan (`0fa9fa3`)
 
