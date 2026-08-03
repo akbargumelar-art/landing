@@ -29,12 +29,17 @@ export async function GET(request: Request) {
     if (isIndihomeLeadStatus(status)) filters.push(eq(indihomeLeads.status, status));
     if (isIndihomeLocation(location)) filters.push(eq(indihomeLeads.location, location));
 
-    const leads = await db
-        .select()
-        .from(indihomeLeads)
-        .where(filters.length ? and(...filters) : undefined)
-        .orderBy(desc(indihomeLeads.createdAt))
-        .limit(250);
+    try {
+        const leads = await db
+            .select()
+            .from(indihomeLeads)
+            .where(filters.length ? and(...filters) : undefined)
+            .orderBy(desc(indihomeLeads.createdAt))
+            .limit(250);
 
-    return NextResponse.json({ leads });
+        return NextResponse.json({ leads });
+    } catch (error) {
+        console.error("Indihome leads GET error:", error);
+        return NextResponse.json({ error: "Pengajuan gagal dimuat." }, { status: 500 });
+    }
 }

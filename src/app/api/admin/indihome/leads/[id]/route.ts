@@ -16,8 +16,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "Status pengajuan tidak valid." }, { status: 400 });
     }
 
-    await db.update(indihomeLeads).set({ status }).where(eq(indihomeLeads.id, id));
-    const [lead] = await db.select().from(indihomeLeads).where(eq(indihomeLeads.id, id));
-    if (!lead) return NextResponse.json({ error: "Pengajuan tidak ditemukan." }, { status: 404 });
-    return NextResponse.json({ lead });
+    try {
+        await db.update(indihomeLeads).set({ status }).where(eq(indihomeLeads.id, id));
+        const [lead] = await db.select().from(indihomeLeads).where(eq(indihomeLeads.id, id));
+        if (!lead) return NextResponse.json({ error: "Pengajuan tidak ditemukan." }, { status: 404 });
+        return NextResponse.json({ lead });
+    } catch (error) {
+        console.error("Indihome lead PATCH error:", error);
+        return NextResponse.json({ error: "Status gagal diperbarui." }, { status: 500 });
+    }
 }

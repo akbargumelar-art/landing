@@ -46,7 +46,16 @@ export async function getMitraSession(): Promise<MitraSession | null> {
 }
 
 export async function requireMitraAccess(roles: MitraRole[] = ["MANAGER", "ADMIN", "LEADER"]) {
-    const session = await getMitraSession();
+    let session: MitraSession | null;
+    try {
+        session = await getMitraSession();
+    } catch (error) {
+        console.error("requireMitraAccess session lookup failed:", error);
+        return {
+            error: NextResponse.json({ error: "Layanan sedang gangguan, coba lagi." }, { status: 503 }),
+            session: null,
+        };
+    }
 
     if (!session) {
         return {
