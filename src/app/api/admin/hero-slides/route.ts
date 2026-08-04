@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/admin-auth";
 
 // GET all hero slides
 export async function GET() {
-    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     try {
@@ -24,7 +24,7 @@ export async function GET() {
 
 // POST create new hero slide
 export async function POST(request: Request) {
-    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     try {

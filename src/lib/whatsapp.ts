@@ -32,6 +32,11 @@ export const DEFAULT_OTP_TEMPLATE =
 export const DEFAULT_UNDIAN_TEMPLATE =
     "Halo {nama}, pendaftaran Anda untuk {program} sudah kami terima. Terima kasih.";
 
+/** Template bawaan konfirmasi pengajuan langganan IndiHome. */
+export const DEFAULT_INDIHOME_TEMPLATE =
+    "Halo {nama}, pengajuan IndiHome {paket} untuk {lokasi} sudah kami terima. " +
+    "Nomor referensi: {referensi}. Tim kami akan menghubungi Anda untuk pengecekan jaringan.";
+
 async function readSettings(): Promise<Record<string, string>> {
     // Baca seluruh baris: tipe baris diturunkan dari nama key di UI admin, jadi memfilter
     // berdasarkan `type` pernah membuat field WAHA hilang diam-diam.
@@ -66,6 +71,15 @@ export async function getOtpTemplate(): Promise<string> {
         return settings.wa_otp_template?.trim() || settings.wa_gw_template?.trim() || DEFAULT_OTP_TEMPLATE;
     } catch {
         return DEFAULT_OTP_TEMPLATE;
+    }
+}
+
+export async function getIndihomeTemplate(): Promise<string> {
+    try {
+        const settings = await readSettings();
+        return settings.wa_indihome_template?.trim() || DEFAULT_INDIHOME_TEMPLATE;
+    } catch {
+        return DEFAULT_INDIHOME_TEMPLATE;
     }
 }
 

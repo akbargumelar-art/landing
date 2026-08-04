@@ -32,7 +32,7 @@ type FormState = {
     district: string;
     address: string;
     consent: boolean;
-    company: string;
+    website_hp: string;
 };
 
 const initialForm: FormState = {
@@ -42,7 +42,7 @@ const initialForm: FormState = {
     district: "",
     address: "",
     consent: false,
-    company: "",
+    website_hp: "",
 };
 
 export function IndihomePlansAndForm() {
@@ -304,9 +304,20 @@ export function IndihomePlansAndForm() {
                                     <Label htmlFor="address">Alamat lengkap pemasangan</Label>
                                     <Textarea id="address" name="address" autoComplete="street-address" required minLength={10} maxLength={2000} rows={4} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} placeholder="Nama jalan, nomor rumah, kelurahan/desa, dan patokan" />
                                 </div>
-                                <div className="sr-only" aria-hidden="true">
-                                    <Label htmlFor="company">Perusahaan</Label>
-                                    <Input id="company" name="company" tabIndex={-1} autoComplete="off" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
+                                {/* Honeypot. Namanya sengaja tidak menyerupai field profil apa pun
+                                    ("company" dulu dipakai dan rutin diisi otomatis oleh Chrome
+                                    serta password manager, sehingga pengajuan asli ikut tertandai). */}
+                                <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", top: 0, width: 1, height: 1, overflow: "hidden" }}>
+                                    <label htmlFor="website_hp">Jangan diisi</label>
+                                    <input
+                                        id="website_hp"
+                                        name="website_hp"
+                                        type="text"
+                                        tabIndex={-1}
+                                        autoComplete="off"
+                                        value={form.website_hp}
+                                        onChange={(event) => setForm({ ...form, website_hp: event.target.value })}
+                                    />
                                 </div>
                                 <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-gray-600">
                                     <input

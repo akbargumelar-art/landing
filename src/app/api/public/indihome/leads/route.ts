@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { indihomeLeads, indihomeProducts } from "@/db/schema";
 import { isActiveIndihomeLocation } from "@/lib/indihome-data";
+import { getIndihomeTemplate, sendTemplatedWhatsApp } from "@/lib/whatsapp";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,9 +35,20 @@ export async function POST(request: Request) {
         const packageId = String(body.packageId || "").trim();
         const consent = body.consent === true;
 
-        // A filled honeypot is treated as a successful no-op to avoid helping bots adapt.
-        if (String(body.company || "").trim()) {
-            return NextResponse.json({ success: true, reference: "DITERIMA" }, { status: 201 });
+        // Honeypot. SEBELUMNYA field ini bernama `company` dan pengajuannya dibuang diam-diam
+        // sambil tetap membalas sukses. Itu menghilangkan pendaftaran asli tanpa jejak, karena
+        // Chrome dan password manager rutin mengisi field bernama "company"/"organization"
+        // meski sudah diberi autocomplete="off".
+        //
+        // Sekarang: namanya tidak lagi menyerupai field profil apa pun, dan bila terisi
+        // pengajuannya TETAP DISIMPAN, hanya ditandai lewat kolom `source` supaya admin bisa
+        // memilahnya. Lebih baik menyaring spam di dashboard daripada kehilangan calon pelanggan.
+        const honeypotTripped = Boolean(String(body.website_hp || "").trim());
+        if (honeypotTripped) {
+            console.warn("[IndiHome] Honeypot terisi, pengajuan tetap disimpan dan ditandai:", {
+                ip: getClientIp(request),
+                userAgent: request.headers.get("user-agent"),
+            });
         }
 
         if (fullName.length < 3 || fullName.length > 255) {
@@ -99,14 +111,35 @@ export async function POST(request: Request) {
             packageName: product.name,
             status: "NEW",
             consent,
-            source: "landing_indihome",
+            source: honeypotTripped ? "landing_indihome_suspect" : "landing_indihome",
             ip,
             userAgent: request.headers.get("user-agent"),
             createdAt: new Date(),
         });
 
+        const reference = id.slice(0, 8).toUpperCase();
+
+        // Konfirmasi WhatsApp memakai gateway umum di Pengaturan. Tidak di-await supaya
+        // gangguan WAHA tidak menggagalkan pengajuan yang sudah tersimpan.
+        getIndihomeTemplate()
+            .then((template) => sendTemplatedWhatsApp(phoneE164, template, {
+                name: fullName,
+                nama: fullName,
+                paket: product.name,
+                lokasi: location,
+                referensi: reference,
+            }))
+            .then((result) => {
+                if (!result.ok) {
+                    console.error(`[IndiHome] Konfirmasi WhatsApp gagal untuk ${phoneE164}: ${result.error}`);
+                }
+            })
+            .catch((error) => {
+                console.error("[IndiHome] Exception saat mengirim konfirmasi WhatsApp", error);
+            });
+
         return NextResponse.json(
-            { success: true, reference: id.slice(0, 8).toUpperCase() },
+            { success: true, reference },
             { status: 201 },
         );
     } catch {

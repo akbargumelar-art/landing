@@ -339,6 +339,20 @@ export default function PengaturanPage() {
                         </p>
                     </div>
 
+                    <div className="space-y-2">
+                        <Label>Template Konfirmasi Pengajuan IndiHome</Label>
+                        <textarea
+                            className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            value={settings.wa_indihome_template || ""}
+                            onChange={(e) => updateSetting("wa_indihome_template", e.target.value)}
+                            placeholder="Halo {nama}, pengajuan IndiHome {paket} untuk {lokasi} sudah kami terima. Nomor referensi: {referensi}."
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Dikirim otomatis ke pendaftar setelah form langganan tersimpan. Placeholder:
+                            <code> &#123;nama&#125;</code>, <code>&#123;paket&#125;</code>, <code>&#123;lokasi&#125;</code>, <code>&#123;referensi&#125;</code>.
+                        </p>
+                    </div>
+
                     <div className="rounded-lg border bg-gray-50 p-4 space-y-3">
                         <div>
                             <p className="text-sm font-semibold">Tes Koneksi</p>

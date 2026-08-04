@@ -10,8 +10,10 @@ import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    // Manager is view-only on Pengaturan (see prd-total-revamp.md 2.2); writes stay Super Admin.
-    const auth = await requireRole(["SUPER_ADMIN", "MANAGER"]);
+    // Whitelist berada di halaman Pengaturan, dan seluruh grup "Sistem & Konten" kini
+    // khusus Admin Super atas permintaan pemilik aplikasi - menggantikan baris View-all
+    // untuk Manager pada matriks di prd-total-revamp.md 2.2.
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const whitelist = await db

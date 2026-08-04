@@ -30,10 +30,12 @@ type AdminRole = "SUPER_ADMIN" | "ADMIN_INPUT" | "MANAGER" | "SUPERVISOR" | "SAL
 
 const sidebarGroups = [
     {
+        // Seluruh grup ini khusus Admin Super: berisi konfigurasi sistem, gateway WhatsApp,
+        // whitelist OTP, dan pengelolaan akun.
         title: "Sistem & Konten",
         links: [
-            { href: "/admin/beranda", label: "Kelola Beranda", icon: Image },
-            { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
+            { href: "/admin/beranda", label: "Kelola Beranda", icon: Image, roles: ["SUPER_ADMIN"] as AdminRole[] },
+            { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings, roles: ["SUPER_ADMIN"] as AdminRole[] },
             { href: "/admin/users", label: "Kelola User", icon: UserCog, roles: ["SUPER_ADMIN"] as AdminRole[] },
         ]
     },

@@ -9,7 +9,7 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     try {

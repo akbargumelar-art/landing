@@ -13,7 +13,7 @@ const VALID_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPE
 const TERRITORY_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
 export async function GET() {
-    const authResult = await requireRole(["SUPER_ADMIN", "MANAGER"]);
+    const authResult = await requireRole(["SUPER_ADMIN"]);
     if (authResult.error) return authResult.error;
 
     const users = await db

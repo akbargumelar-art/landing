@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/admin-auth";
 
 // GET all settings
 export async function GET() {
-    const auth = await requireRole(["SUPER_ADMIN", "MANAGER"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     try {

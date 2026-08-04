@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/admin-auth";
 
 // PUT reorder hero slides
 export async function PUT(request: Request) {
-    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     try {
