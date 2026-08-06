@@ -66,30 +66,25 @@ function hrefAktif(pathname: string): string | null {
 }
 
 /**
- * Bentuk nyala api mengikuti logo, digambar sebagai SVG supaya lengkungannya terkendali.
- * Meniru siluet logo: ujung lancip di atas, badan membulat, lalu meruncing lembut di bawah.
- * Gradiennya merah di atas menuju jingga-kuning di bawah, seperti pada logo.
+ * Tombol tengah berbentuk lingkaran timbul.
+ *
+ * Percobaan meniru bentuk nyala api pada logo tidak pernah terlihat meyakinkan pada ukuran
+ * 54px -- lengkungannya jadi ambigu dan malah terbaca seperti bentuk lain. Lingkaran dipilih
+ * karena bentuknya tegas di ukuran kecil, dan cincin putih di sekelilingnya membuatnya
+ * terbaca "mengambang" di atas bar meskipun bar-nya menempel rata ke tepi layar.
+ *
+ * Warna merek tetap dipertahankan lewat gradien merah ke jingga.
  */
-function IkonNyalaApi() {
+function TombolHomeTengah() {
     return (
-        <svg viewBox="0 0 64 68" className="h-full w-full" aria-hidden focusable="false">
-            <defs>
-                {/* Arah gradien mengikuti logo: merah di kanan-atas turun ke kuning di kiri-bawah. */}
-                <linearGradient id="nyala-api-bottomnav" x1="0.72" y1="0.05" x2="0.28" y2="1">
-                    <stop offset="0%" stopColor="#e60012" />
-                    <stop offset="42%" stopColor="#f42a24" />
-                    <stop offset="70%" stopColor="#ff7a00" />
-                    <stop offset="100%" stopColor="#ffcc00" />
-                </linearGradient>
-            </defs>
-            {/* Siluet tetes air/nyala api: ujung lancip di atas sedikit condong ke kanan,
-                badan melebar, dasar membulat penuh. Sengaja dibuat tegak dan lebar supaya
-                sebangun dengan logo, bukan melengkung seperti koma. */}
-            <path
-                d="M35 2c9.5 12.5 21 22.5 21 36.5C56 52 45.2 63 32 63S8 52 8 38.5C8 24.5 24 14.5 35 2z"
-                fill="url(#nyala-api-bottomnav)"
-            />
-        </svg>
+        <span
+            className="-mt-7 flex h-[56px] w-[56px] items-center justify-center rounded-full
+                       bg-gradient-to-br from-[#f5222d] via-[#fa4b1e] to-[#ff8a00]
+                       shadow-[0_6px_16px_-4px_rgba(230,0,18,0.5)]
+                       ring-4 ring-white transition-transform active:scale-95"
+        >
+            <Home className="h-[26px] w-[26px] text-white" strokeWidth={2.4} />
+        </span>
     );
 }
 
@@ -133,16 +128,7 @@ export function BottomNav() {
                             aria-label="Home"
                             className="flex h-16 w-full flex-col items-center justify-end gap-1 pb-2"
                         >
-                            <span className="relative -mt-7 block h-[54px] w-[54px] drop-shadow-[0_3px_6px_rgba(230,0,18,0.28)]">
-                                <IkonNyalaApi />
-                                {/* Diletakkan pada 57% tinggi, bukan 50%: pusat massa nyala api ada
-                                    di badan bawah, sementara bagian atasnya meruncing. Ditengahkan
-                                    ke 50% membuat ikon terlihat melayang di ujung lancipnya. */}
-                                <Home
-                                    className="absolute left-1/2 top-[57%] h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 text-white"
-                                    strokeWidth={2.5}
-                                />
-                            </span>
+                            <TombolHomeTengah />
                             <span
                                 className={`text-[10px] font-semibold leading-none ${berandaAktif ? "text-red-600" : "text-gray-500"
                                     }`}
