@@ -1,4 +1,4 @@
-﻿-- Portal Mitra Outlet integration migration for an existing ABK Ciraya schema.
+-- Portal Mitra Outlet integration migration for an existing ABK Ciraya schema.
 -- Requires the existing better-auth `user` table.
 CREATE TABLE `mitra_audit_logs` (
 	`id` varchar(36) NOT NULL,

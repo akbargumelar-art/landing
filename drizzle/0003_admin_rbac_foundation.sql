@@ -68,9 +68,15 @@ SELECT
     NOW()
 FROM `user` u
 LEFT JOIN `mitra_user_profiles` mup ON mup.`user_id` = u.`id`
-ON DUPLICATE KEY UPDATE `user_id` = `user_id`;--> statement-breakpoint
+-- Nama tabel WAJIB ditulis lengkap di sini. Tanpa itu MySQL 8 menolak seluruh statement
+-- dengan ER_NON_UNIQ_ERROR ("Column 'user_id' in field list is ambiguous"), karena kolom
+-- `user_id` ada baik di tabel tujuan maupun di `mitra_user_profiles` yang di-join.
+-- Terbukti di uji runtime 2026-08-06: tanpa qualifier, backfill ini TIDAK PERNAH jalan dan
+-- admin_user_profiles tetap kosong, sehingga seluruh admin selain akun bootstrap terkunci.
+ON DUPLICATE KEY UPDATE `admin_user_profiles`.`user_id` = `admin_user_profiles`.`user_id`;--> statement-breakpoint
 -- Backfill wilayah: salin penugasan wilayah Supervisor/Salesforce dari mitra_user_territories.
 INSERT INTO `admin_user_territories` (`user_id`, `territory_id`)
 SELECT mut.`user_id`, mut.`territory_id`
 FROM `mitra_user_territories` mut
-ON DUPLICATE KEY UPDATE `user_id` = `user_id`;
+-- Sama seperti di atas: tanpa qualifier, ambigu terhadap `mitra_user_territories`.
+ON DUPLICATE KEY UPDATE `admin_user_territories`.`user_id` = `admin_user_territories`.`user_id`;

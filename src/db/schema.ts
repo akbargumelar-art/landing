@@ -8,6 +8,7 @@ import {
     timestamp,
     decimal,
     double,
+    foreignKey,
     index,
     json,
     mysqlEnum,
@@ -346,7 +347,11 @@ export const vouchers = mysqlTable("vouchers", {
 export const redemptionLogs = mysqlTable("redemption_logs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     orderId: varchar("order_id", { length: 36 }).notNull().references(() => orders.id, { onDelete: "cascade" }),
-    voucherId: varchar("voucher_id", { length: 36 }).notNull().references(() => vouchers.id),
+    // Boleh null: kegagalan "stok voucher habis" terjadi justru ketika tidak ada voucher
+    // yang bisa dirujuk. Sebelumnya kolom ini NOT NULL dan kode mengisinya dengan string
+    // "NO-STOCK", yang melanggar foreign key di bawah sehingga kegagalan itu tidak pernah
+    // tercatat sama sekali.
+    voucherId: varchar("voucher_id", { length: 36 }).references(() => vouchers.id),
     status: mysqlEnum("status", ["sukses", "gagal"]).notNull(),
     responseMessage: text("response_message").notNull().default(""),
     createdAt: datetime("created_at").notNull(),
@@ -582,7 +587,11 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "cascade" }),
     isActive: boolean("is_active").notNull().default(true),
     createdBy: varchar("created_by", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
-    sourceBatchId: varchar("source_batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
+    // FK dinamai eksplisit: nama turunan otomatis Drizzle untuk kolom ini
+    // ("mitra_whitelist_numbers_source_batch_id_mitra_import_batches_id_fk")
+    // panjangnya 66 karakter, melewati batas 64 karakter identifier MySQL,
+    // sehingga membuat tabel ini dari nol selalu gagal ER_TOO_LONG_IDENT.
+    sourceBatchId: varchar("source_batch_id", { length: 36 }),
     expiresAt: datetime("expires_at"),
     createdAt: datetime("created_at").notNull(),
 }, (table) => [
@@ -590,6 +599,11 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     index("mitra_whitelist_scope_idx").on(table.scope),
     index("mitra_whitelist_outlet_idx").on(table.outletId),
     index("mitra_whitelist_territory_idx").on(table.territoryId),
+    foreignKey({
+        columns: [table.sourceBatchId],
+        foreignColumns: [mitraImportBatches.id],
+        name: "mitra_whitelist_source_batch_fk",
+    }).onDelete("set null"),
 ]);
 
 export const mitraOtpRequests = mysqlTable("mitra_otp_requests", {
@@ -626,7 +640,10 @@ export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
 
 export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {
     id: varchar("id", { length: 36 }).primaryKey(),
-    whitelistId: varchar("whitelist_id", { length: 36 }).references(() => mitraWhitelistNumbers.id, { onDelete: "set null" }),
+    // Sama seperti mitra_whitelist_numbers.source_batch_id: nama FK turunan
+    // otomatis ("mitra_whitelist_usage_logs_whitelist_id_mitra_whitelist_numbers_id_fk")
+    // panjangnya 69 karakter, melewati batas 64 karakter identifier MySQL.
+    whitelistId: varchar("whitelist_id", { length: 36 }),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
     outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
     action: mysqlEnum("action", ["OTP_REQUESTED", "OTP_VERIFIED", "OTP_REJECTED"]).notNull(),
@@ -635,6 +652,11 @@ export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", 
 }, (table) => [
     index("mitra_whitelist_usage_phone_idx").on(table.phoneE164),
     index("mitra_whitelist_usage_outlet_idx").on(table.outletId),
+    foreignKey({
+        columns: [table.whitelistId],
+        foreignColumns: [mitraWhitelistNumbers.id],
+        name: "mitra_whitelist_usage_whitelist_fk",
+    }).onDelete("set null"),
 ]);
 
 export const mitraPrograms = mysqlTable("mitra_programs", {
