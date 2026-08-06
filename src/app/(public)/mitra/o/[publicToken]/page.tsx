@@ -125,8 +125,12 @@ export default function MitraOutletProfilePage() {
                         <Info label="Branding" value={outlet.branding || "-"} />
                         <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
                     </div>
+                    {/* "Lokasi akurat" dihapus dari kalimat ini: sejak peta sebaran di /mitra
+                        menampilkan koordinat outlet secara publik, menjanjikannya sebagai data
+                        terkunci tidak lagi benar. Yang masih benar-benar di balik OTP adalah
+                        detail owner dan angka performa. */}
                     <div className="border-t p-5 text-sm text-muted-foreground">
-                        Detail owner, lokasi akurat, dan performansi hanya tersedia setelah OTP WhatsApp berhasil diverifikasi.
+                        Detail owner dan performansi hanya tersedia setelah OTP WhatsApp berhasil diverifikasi.
                     </div>
                 </div>
 
