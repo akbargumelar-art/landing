@@ -432,4 +432,168 @@ kolom pada tabel berisi data** - berbeda dari migrasi sebelumnya yang hanya mena
   seed dijalankan lewat `tsx` (gagal di koneksi DB, bukan di resolusi modul).
 - `npx tsc --noEmit`, `npx drizzle-kit check`, lint, dan `npm run build`: lulus.
 - Tetap **tidak** terverifikasi: SQL migrasi `0007` itu sendiri, karena mesin ini masih tanpa
-  database.
+  database. **(Sudah tidak berlaku sejak 2026-08-06 — migrasi `0007` akhirnya diuji terhadap
+  MySQL nyata dan lulus 16/16; lihat entri di bawah.)**
+
+## 2026-08-06 - Audit lanjutan dan uji runtime dengan MySQL nyata
+
+Dua pekerjaan dalam satu sesi: audit statis pada modul yang belum pernah disentuh, lalu membuka
+blokade "tidak ada database" yang menggantung sejak 2026-08-04.
+
+### Audit statis - `docs/audit-2026-08-06.md`
+
+Ruang lingkup dipilih agar tidak tumpang tindih: `audit-2026-08-03.md` menutup dirinya dengan
+catatan bahwa **Belanja/E-commerce, Undian, dan Form Builder "tidak diaudit mendalam"**, jadi
+audit ini masuk ke sana. Temuan utama: tiga jalur bypass pembayaran, endpoint submit form publik
+tanpa rate limit/honeypot (padahal endpoint IndiHome sudah punya ketiganya), dan rantai
+deprecation gateway pembayaran yang menunjuk ke endpoint yang juga sudah mati.
+
+### Uji runtime - `docs/uji-runtime-2026-08-06.md`
+
+**Catatan sesi sebelumnya keliru sebagian.** "Mesin ini tidak punya MySQL server, Docker, maupun
+MariaDB" benar untuk sisi Windows, tetapi **melewatkan WSL**: Ubuntu 24.04 WSL2 sudah terpasang
+dengan systemd aktif, dan `mysql-server` 8.0 tersedia langsung dari repo Ubuntu — engine dan versi
+mayor yang sama dengan produksi. MySQL 8.0.46 dipasang di sana; `.env` lokal tidak perlu diubah.
+
+Hasil terpenting:
+
+- **Ketiga temuan kritis audit TERBUKTI** dapat dieksploitasi tanpa cookie/token apa pun terhadap
+  server dan database hidup. K3 mengonfirmasi bahwa cukup **menghilangkan field `signature_key`**
+  dari body untuk melewati verifikasi signature Midtrans sepenuhnya.
+- **Bug baru yang tidak terlihat dari pembacaan statis:** race condition di `auto-redeem.ts`
+  membagikan **kode voucher yang sama ke tiga pelanggan sekaligus** (pemilihan voucher tanpa
+  penguncian baris, penandaan `is_used` baru terjadi ~5 detik kemudian). Stok hanya berkurang 1
+  walau tiga pelanggan dilayani, jadi selisihnya tidak akan ketahuan dari laporan stok.
+- **Database tidak bisa dibangun dari nol.** Tiga blocker berturut-turut: BOM UTF-8 di migrasi
+  `0000` (ditolak `ER_PARSE_ERROR`), dua nama constraint FK sepanjang 66 dan 69 karakter yang
+  melewati batas 64 MySQL (`ER_TOO_LONG_IDENT`), dan **19 dari 46 tabel di `schema.ts` tidak
+  pernah dibuat oleh migrasi mana pun** — termasuk `user`, `programs`, `products`, `orders`,
+  `site_settings`. Skema dasar lahir dari `drizzle-kit push`, migrasi hanya menumpuk di atasnya.
+  Bukan blocker deploy production, tapi **inilah akar penyebab setiap sesi sebelumnya terblokir**.
+- **Migrasi `0007` lulus 16/16** terhadap data sengaja berantakan; `sql_mode` server memang memuat
+  `STRICT_TRANS_TABLES`, jadi premis "normalisasi sebelum ALTER" terbukti benar.
+- **Migrasi `0004` lulus** termasuk skenario tabrakan slug, dan
+  `node scripts/verify-program-migration.mjs` **11/11 OK, exit code 0** — gerbang Fase 3b hijau.
+- **QA Fase 5 bagian A/B/D: 30 dari 33 lulus.** Scoping wilayah (B1/B2, inti keamanan Fase 0)
+  lulus seluruhnya terhadap database sungguhan. Tiga yang gagal semuanya karena implementasi
+  **lebih ketat** daripada matriks PRD: Manager ditolak 403 di `GET /api/admin/users`,
+  `GET /api/admin/settings`, dan `GET /api/admin/mitra/whitelist`.
+
+**KOREKSI: ini bukan kontradiksi, melainkan keputusan yang sudah diambil.** Commit `6e2a1f1`
+sengaja memperketat `hero-slides` (semua verb), `settings GET`, `users GET`, dan `whitelist GET`
+ke `SUPER_ADMIN` mengikuti pembatasan grup sidebar "Sistem & Konten", dan pesan commit-nya
+menyatakan hal itu **menggantikan** baris "Pengaturan = View-all for Manager" di
+`prd-total-revamp.md` 2.2. Catatan Fase 2 di atas merujuk keadaan sebelum keputusan itu.
+Jadi kodenya benar; yang tertinggal adalah `docs/qa-role-matrix.md` (baris A2, A5, D3) dan
+matriks PRD 2.2 — keduanya perlu diubah menjadi 403 untuk Manager.
+
+### Perubahan kode
+
+- `drizzle/0000_brainy_slapstick.sql`: BOM UTF-8 dibuang.
+- `src/db/schema.ts`: dua FK diberi nama eksplisit (`mitra_whitelist_source_batch_fk`,
+  `mitra_whitelist_usage_whitelist_fk`) plus import `foreignKey`.
+- Verifikasi: `npx tsc --noEmit` lulus, `npx drizzle-kit check` "Everything's fine".
+
+### Perbaikan menyusul di sesi yang sama - `docs/perbaikan-pembayaran-2026-08-06.md`
+
+Seluruh temuan Kritis ditutup dan diverifikasi ulang terhadap MySQL dan server yang berjalan:
+
+- **K1** endpoint `simulate` **dihapus** (nol pemanggil) — kini 404.
+- **K2** webhook Mayar memverifikasi setting baru `mayar_webhook_token` dengan perbandingan
+  waktu tetap, **fail-closed**. Tanpa token → 503, token salah → 403, token benar → 200.
+- **K3** webhook Midtrans jadi fail-closed; `verifyMidtransSignature` menolak komponen kosong dan
+  memakai `timingSafeEqual`. Tanpa signature → 503, palsu → 403, benar → 200.
+- **Race voucher ditutup** lewat klaim compare-and-swap: tiga webhook bersamaan kini menghasilkan
+  **3 kode berbeda** (sebelumnya 1 kode untuk 3 pelanggan), stok turun tepat 3.
+- **Idempotensi** ditambahkan — webhook yang dikirim ulang tidak menghabiskan voucher kedua.
+- **Bug ketiga di auto-redeem:** `redemption_logs.voucher_id` NOT NULL + FK sementara kode
+  mengisi `'NO-STOCK'`, sehingga kegagalan stok habis **tidak pernah tercatat**
+  (`ER_NO_REFERENCED_ROW_2`). Migrasi `0009` membuat kolomnya nullable; kini tercatat.
+
+**Peringatan migrasi `0009`:** hasil `drizzle-kit generate` **tidak bisa dipakai apa adanya** —
+ia men-`DROP FOREIGN KEY` dua constraint yang tidak pernah bisa ada (nama 66 dan 69 karakter),
+yang akan menggagalkan deploy. Ditulis ulang jadi berkondisi lewat `information_schema` +
+prepared statement, satu statement per breakpoint. Diuji terhadap kondisi mirip production:
+0 gagal, idempoten, tidak ada baris hilang.
+
+**WAJIB saat deploy:** isi `mayar_webhook_token` di Pengaturan. Selama kosong, pembayaran Mayar
+tidak tercatat otomatis — konsekuensi yang disengaja dari fail-closed.
+
+`npx tsc --noEmit`, lint terarah, dan `npm run build`: lulus.
+
+### Uji lanjutan - `docs/uji-lanjutan-2026-08-06.md`
+
+**Temuan paling serius sesi ini: migrasi `0003` tidak bisa dijalankan sama sekali.** Kedua
+statement backfill-nya gagal `ER_NON_UNIQ_ERROR` ("Column 'user_id' in field list is ambiguous")
+karena `ON DUPLICATE KEY UPDATE user_id = user_id` tidak menyebut nama tabel, sementara kolom itu
+ada juga di tabel yang di-join. Akibatnya tabel RBAC terbentuk tapi **kosong**, sehingga seluruh
+admin selain akun bootstrap terkunci — kebalikan dari yang dijanjikan komentar migrasinya.
+Lebih buruk: **mengulang deploy tidak menolong**, percobaan kedua gagal di 14 dari 14 statement
+mulai `ER_TABLE_EXISTS_ERROR`. **Sudah diperbaiki** dengan menyebut nama tabel; diverifikasi
+0 gagal dan 4 dari 4 user ter-backfill dengan pemetaan role yang benar.
+
+Migrasi lain yang belum pernah dijalankan kini sudah diuji: `0005`, `0006`, `0008` semuanya
+**0 statement gagal**. Dengan ini seluruh migrasi `0003`-`0009` sudah pernah diuji terhadap
+MySQL sungguhan.
+
+QA Fase 5 selebihnya: **bagian C, F, G, H lulus penuh** (G 9/9 — termasuk G2, inti Fase 4:
+lokasi baru dari admin langsung diterima endpoint publik tanpa deploy; audit log tidak membocorkan
+rahasia). Bagian D lulus kecuali **D3 yang mengembalikan 403** — dan itu **benar**, sesuai
+keputusan commit `6e2a1f1`; checklist QA dan PRD yang perlu diperbarui, bukan kodenya.
+
+**Temuan baru:** halaman IndiHome bisa menampilkan paket yang tidak bisa dipesan. Saat tabel
+produk kosong, katalog publik jatuh ke fallback statis (`internet-75` dsb.) tetapi POST lead
+memvalidasi `packageId` terhadap tabel — pengunjung mengisi form lengkap lalu ditolak 400 dengan
+pesan menyesatkan ("Paket tidak tersedia untuk lokasi yang dipilih", padahal lokasinya ada).
+Pola yang persis sama dengan yang diperbaiki Fase 4 untuk lokasi, belum ditutup untuk paket.
+
+**Temuan audit yang terbukti:** `/api/forms/[formId]/submit` menerima **20 dari 20** submission
+bersamaan tanpa satu pun 429 (endpoint IndiHome, sebagai pembanding sah, menolak mulai yang
+ke-6). Dua route penyaji upload menyimpang — berkas `.ico` identik disajikan `image/x-icon` vs
+`application/octet-stream`. SVG berisi `<script>` disajikan `image/svg+xml` tanpa CSP maupun
+`Content-Disposition`.
+
+**Koreksi:** klaim audit bahwa gerbang unggahan bisa dilewati dengan `file.type` kosong **tidak
+terbukti** — klien HTTP normal selalu mengisi content-type, dan hasilnya ditolak 400.
+
+### Uji live lokal (Chrome headless + CDP)
+
+Aplikasi dijalankan sungguhan terhadap MySQL WSL dan dikendalikan lewat Chrome headless
+(`--remote-debugging-port=9222`) dengan driver CDP kecil di `tmp/cdp-driver.mjs` — Node 22 sudah
+punya `WebSocket` bawaan, jadi tidak perlu menambah Playwright sebagai dependensi.
+
+Lima halaman publik (`/`, `/indihome`, `/program`, `/mitra`, `/cuan`) render penuh, **nol error
+konsol**, dan `scrollWidth == clientWidth` di 1440px. Panel admin: login lewat form sungguhan,
+`/api/admin/me` mengembalikan `role: SUPER_ADMIN`, dashboard menampilkan 3 hero slide dari
+database, `/admin/mitra/outlet` menampilkan 2 outlet. Field **"Webhook Token"** Mayar yang
+ditambahkan sesi ini terbukti ter-render lengkap dengan teks peringatannya.
+
+Sekaligus memverifikasi **I6** checklist QA yang sebelumnya ditandai belum diuji: Kategori Outlet,
+Hari PJP, Tipe PJP, dan Branding memang tampil sebagai **dropdown**, bukan input teks — hasil
+migrasi `0007`.
+
+**BUG DITEMUKAN: kredensial admin hasil `npm run db:seed` tidak pernah bisa login.**
+`src/db/seed.ts` mem-hash sandi dengan scrypt `r=8` tanpa normalisasi NFKC, sedangkan better-auth
+memverifikasi dengan `r=16` + NFKC (`node_modules/better-auth/dist/crypto/password.mjs`).
+Formatnya kebetulan sama (`salt:hex`) sehingga tidak ada error apa pun — kunci turunannya saja
+yang tidak pernah cocok, dan login selalu ditolak "Invalid email or password". Dibuktikan dengan
+menghitung ulang hash tersimpan: cocok dengan parameter seed, tidak cocok dengan parameter
+better-auth. **Sudah diperbaiki** di `src/db/seed.ts`; login terbukti berhasil setelahnya.
+
+Konsekuensi sebelum perbaikan: siapa pun yang menyiapkan proyek dari nol terkunci total sejak
+langkah pertama, tanpa petunjuk penyebabnya.
+
+**Pelajaran metode:** percobaan pertama memotret Beranda saat hero masih bertuliskan "Loading...",
+padahal HTTP 200, tidak ada error konsol, dan `readyState` sudah `complete`. Menunggu
+`document.readyState` tidak cukup untuk konten yang di-fetch dari klien — tunggu penanda
+pemuatannya hilang, dan **lihat screenshot-nya**, jangan percaya angka saja.
+
+### Catatan alat untuk sesi berikutnya
+
+- Sandbox memblokir WSL **secara diam-diam** (exit code 0, output kosong) dan juga koneksi TCP ke
+  MySQL. Jalankan perintah WSL dengan sandbox dimatikan.
+- WSL mematikan distro saat tidak ada proses yang menahannya, sehingga `localhost:3306` dari
+  Windows menjawab `ECONNREFUSED` walau MySQL aktif di dalam. Jalankan proses penahan
+  (`wsl -d Ubuntu -u root -e sleep 86400`) di latar belakang.
+- `bash -lc` tidak menghasilkan output di WSL ini; pakai `bash -c`, atau tulis file `.sh` lalu
+  jalankan lewat path `/mnt/...`.
