@@ -165,9 +165,26 @@ export function verifyMidtransSignature(
     serverKey: string,
     signatureKey: string
 ): boolean {
+    // Semua komponen wajib ada. Bila salah satunya kosong, payload yang dihitung tidak
+    // lagi mewakili transaksi yang diklaim, jadi tolak alih-alih membandingkan.
+    if (!orderId || !statusCode || !grossAmount || !serverKey || !signatureKey) return false;
+
     const payload = orderId + statusCode + grossAmount + serverKey;
     const expectedSignature = crypto.createHash("sha512").update(payload).digest("hex");
-    return expectedSignature === signatureKey;
+
+    return safeCompare(expectedSignature, signatureKey);
+}
+
+/**
+ * Perbandingan string dengan waktu tetap, supaya penyerang tidak bisa menebak signature
+ * karakter demi karakter dari selisih waktu balasan. `timingSafeEqual` melempar bila
+ * panjang buffer berbeda, jadi panjangnya diperiksa lebih dulu.
+ */
+function safeCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(a, "utf8");
+    const bufB = Buffer.from(b, "utf8");
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
 }
 
 /**

@@ -5,10 +5,27 @@ import Link from "next/link";
 import React from "react";
 import { ArrowRight, Loader2, MapPin, Route, Search, Store } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
 import { QrOutletScanner } from "@/components/mitra/qr-outlet-scanner";
+import type { OutletMarker } from "@/components/mitra/outlet-map";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+/**
+ * Leaflet menyentuh `window` saat modulnya dimuat, jadi tidak bisa dirender di server.
+ * Dimuat dinamis tanpa SSR sekaligus supaya bundel peta (leaflet + react-leaflet) tidak
+ * ikut membebani pengunjung halaman lain.
+ */
+const OutletMap = dynamic(() => import("@/components/mitra/outlet-map"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-[360px] w-full items-center justify-center bg-gray-100 text-sm text-muted-foreground sm:h-[460px]">
+            Memuat peta...
+        </div>
+    ),
+});
 
 interface PublicOutlet {
     publicToken: string;
@@ -33,6 +50,13 @@ interface OutletResponse {
     filters: { kabupaten: string[]; tap: string[] };
 }
 
+interface MapResponse {
+    markers: OutletMarker[];
+    totalCocok: number;
+    tanpaKoordinat: number;
+    dibatasi: boolean;
+}
+
 export default function MitraOutletDirectoryPage() {
     const [query, setQuery] = React.useState("");
     const [kabupaten, setKabupaten] = React.useState("");
@@ -41,6 +65,8 @@ export default function MitraOutletDirectoryPage() {
     const [data, setData] = React.useState<OutletResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
+    const [map, setMap] = React.useState<MapResponse | null>(null);
+    const [mapError, setMapError] = React.useState(false);
 
     React.useEffect(() => {
         const controller = new AbortController();
@@ -69,6 +95,39 @@ export default function MitraOutletDirectoryPage() {
             controller.abort();
         };
     }, [kabupaten, page, query, tap]);
+
+    /**
+     * Penanda peta diambil terpisah dari daftar dan sengaja TIDAK bergantung pada `page`.
+     * Daftar berhalaman 24 baris, sementara peta harus menampilkan seluruh outlet yang
+     * cocok dengan filter -- kalau ikut halaman, penandanya akan berpindah-pindah setiap
+     * kali pengguna menekan "berikutnya".
+     */
+    React.useEffect(() => {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            const params = new URLSearchParams({ view: "map" });
+            if (query.trim()) params.set("q", query.trim());
+            if (kabupaten) params.set("kabupaten", kabupaten);
+            if (tap) params.set("tap", tap);
+
+            setMapError(false);
+            fetch(`/api/public/mitra/outlets?${params}`, { signal: controller.signal })
+                .then(async (response) => {
+                    if (!response.ok) throw new Error("gagal");
+                    return response.json() as Promise<MapResponse>;
+                })
+                .then(setMap)
+                .catch((fetchError) => {
+                    // Peta bersifat pelengkap; kegagalannya tidak boleh menjatuhkan daftar.
+                    if (fetchError.name !== "AbortError") setMapError(true);
+                });
+        }, 300);
+
+        return () => {
+            window.clearTimeout(timer);
+            controller.abort();
+        };
+    }, [kabupaten, query, tap]);
 
     const resetFilters = () => {
         setQuery("");
@@ -107,6 +166,41 @@ export default function MitraOutletDirectoryPage() {
                         {(data?.filters.tap || []).map((item) => <option key={item} value={item}>{item}</option>)}
                     </select>
                     <Button type="button" variant="outline" onClick={resetFilters}>Reset</Button>
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+                <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
+                        <div>
+                            <h2 className="text-sm font-bold text-gray-950">Peta Sebaran Outlet</h2>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Mengikuti filter di atas. Klik penanda untuk membuka profil atau rutenya.
+                            </p>
+                        </div>
+                        {map && (
+                            <p className="text-xs text-muted-foreground">
+                                <span className="font-bold text-gray-950">{map.markers.length}</span> outlet berkoordinat
+                                {map.tanpaKoordinat > 0 && `, ${map.tanpaKoordinat} belum punya titik lokasi`}
+                            </p>
+                        )}
+                    </div>
+
+                    {mapError ? (
+                        <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+                            Peta sedang tidak dapat dimuat. Daftar outlet di bawah tetap bisa digunakan.
+                        </div>
+                    ) : map && map.markers.length === 0 ? (
+                        <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+                            Belum ada outlet berkoordinat untuk filter ini.
+                        </div>
+                    ) : map ? (
+                        <OutletMap markers={map.markers} />
+                    ) : (
+                        <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground sm:h-[460px]">
+                            Memuat peta...
+                        </div>
+                    )}
                 </div>
             </section>
 

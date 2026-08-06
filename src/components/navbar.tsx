@@ -100,13 +100,16 @@ export function Navbar() {
                         ))}
                     </nav>
 
-                    {/* Mobile Menu */}
+                    {/* Menu tablet / laptop kecil (768px - 1279px).
+                        Di bawah 768px navigasinya diambil alih BottomNav ala aplikasi,
+                        jadi tombol hamburger sengaja disembunyikan di sana agar tidak
+                        ada dua cara navigasi yang bersaing di layar yang sama. */}
                     <Sheet open={open} onOpenChange={setOpen}>
                         <SheetTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="xl:hidden"
+                                className="hidden md:inline-flex xl:hidden"
                                 aria-label="Open menu"
                             >
                                 <Menu className="h-5 w-5" />

@@ -1,6 +1,25 @@
+# Dependensi dan hasil build: dipasang/dibangun ulang di dalam image.
 node_modules
 .next
+*.tsbuildinfo
+
+# Rahasia dan riwayat: tidak boleh ikut ke dalam image.
 .env
+.env.*
+!.env.example
 .git
-prisma/dev.db
+
+# Berkas kerja lokal.
+tmp
+coverage
+*.log
+
+# Data unggahan pengguna dan basis data lokal: milik volume, bukan image.
 public/uploads
+prisma/dev.db
+
+# Dokumentasi dan skrip pengembangan: tidak dipakai saat runtime.
+docs
+.agents
+push.sh
+mock-vouchers.csv

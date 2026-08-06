@@ -1,4 +1,4 @@
-﻿-- Portal Mitra Outlet integration migration for an existing ABK Ciraya schema.
+-- Portal Mitra Outlet integration migration for an existing ABK Ciraya schema.
 -- Requires the existing better-auth `user` table.
 CREATE TABLE `mitra_audit_logs` (
 	`id` varchar(36) NOT NULL,
@@ -300,9 +300,16 @@ ALTER TABLE `mitra_whitelist_numbers` ADD CONSTRAINT `mitra_whitelist_numbers_te
 --> statement-breakpoint
 ALTER TABLE `mitra_whitelist_numbers` ADD CONSTRAINT `mitra_whitelist_numbers_created_by_user_id_fk` FOREIGN KEY (`created_by`) REFERENCES `user`(`id`) ON DELETE set null ON UPDATE no action;
 --> statement-breakpoint
-ALTER TABLE `mitra_whitelist_numbers` ADD CONSTRAINT `mitra_whitelist_numbers_source_batch_id_mitra_import_batches_id_fk` FOREIGN KEY (`source_batch_id`) REFERENCES `mitra_import_batches`(`id`) ON DELETE set null ON UPDATE no action;
+-- Nama constraint DIPENDEKKAN. Nama turunan otomatis Drizzle di sini panjangnya 66 karakter,
+-- melewati batas 64 karakter identifier MySQL, sehingga statement ini SELALU ditolak
+-- ER_TOO_LONG_IDENT dan menggagalkan seluruh migrasi 0000 pada database yang belum pernah
+-- menerapkannya. Aman diubah: drizzle memutuskan migrasi mana yang dilewati dari timestamp
+-- (`created_at` vs `folderMillis`), bukan dari hash isi berkas, jadi database yang sudah
+-- menerapkan 0000 tetap melewatinya. Nama ini sama dengan yang dipakai schema.ts dan 0009.
+ALTER TABLE `mitra_whitelist_numbers` ADD CONSTRAINT `mitra_whitelist_source_batch_fk` FOREIGN KEY (`source_batch_id`) REFERENCES `mitra_import_batches`(`id`) ON DELETE set null ON UPDATE no action;
 --> statement-breakpoint
-ALTER TABLE `mitra_whitelist_usage_logs` ADD CONSTRAINT `mitra_whitelist_usage_logs_whitelist_id_mitra_whitelist_numbers_id_fk` FOREIGN KEY (`whitelist_id`) REFERENCES `mitra_whitelist_numbers`(`id`) ON DELETE set null ON UPDATE no action;
+-- Sama seperti di atas: nama turunan otomatisnya 69 karakter, juga melewati batas 64.
+ALTER TABLE `mitra_whitelist_usage_logs` ADD CONSTRAINT `mitra_whitelist_usage_whitelist_fk` FOREIGN KEY (`whitelist_id`) REFERENCES `mitra_whitelist_numbers`(`id`) ON DELETE set null ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE `mitra_whitelist_usage_logs` ADD CONSTRAINT `mitra_whitelist_usage_logs_outlet_id_mitra_outlets_id_fk` FOREIGN KEY (`outlet_id`) REFERENCES `mitra_outlets`(`id`) ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint

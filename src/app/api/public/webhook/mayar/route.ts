@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { triggerAutoRedeem } from "@/lib/auto-redeem";
+import { getMayarWebhookToken, verifyMayarWebhook } from "@/lib/mayar";
 
 /**
  * Mayar.id Webhook Handler.
@@ -26,6 +27,26 @@ import { triggerAutoRedeem } from "@/lib/auto-redeem";
  */
 export async function POST(request: Request) {
     try {
+        // Verifikasi asal request SEBELUM menyentuh database. Fail-closed: tanpa token
+        // tersimpan, webhook tidak bisa dibuktikan berasal dari Mayar, jadi ditolak.
+        const token = await getMayarWebhookToken();
+
+        if (!token) {
+            console.error(
+                "[Mayar Webhook] Ditolak: mayar_webhook_token belum diisi di Pengaturan Website. " +
+                "Salin token webhook dari dashboard Mayar ke sana."
+            );
+            return NextResponse.json(
+                { error: "Webhook not configured" },
+                { status: 503 }
+            );
+        }
+
+        if (!verifyMayarWebhook(request.headers, token)) {
+            console.error("[Mayar Webhook] Ditolak: token webhook tidak cocok.");
+            return NextResponse.json({ error: "Invalid webhook token" }, { status: 403 });
+        }
+
         const body = await request.json();
 
         const event = body.event;

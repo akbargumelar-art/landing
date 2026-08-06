@@ -44,23 +44,42 @@ export async function POST(request: Request) {
             );
         }
 
-        // Verify signature
+        // Verifikasi signature. WAJIB fail-closed: sebelumnya blok ini dibungkus
+        // `if (config && signature_key)`, sehingga tidak adanya salah satu prasyarat
+        // berarti LOLOS, bukan ditolak. Terbukti di uji runtime 2026-08-06 bahwa cukup
+        // menghilangkan field `signature_key` dari body untuk melewatinya sepenuhnya dan
+        // menandai order apa pun sebagai lunas tanpa kredensial.
         const config = await getMidtransConfig();
-        if (config && signature_key) {
-            const isValid = verifyMidtransSignature(
-                order_id,
-                status_code,
-                gross_amount,
-                config.serverKey,
-                signature_key
+
+        if (!config) {
+            console.error(
+                "[Midtrans Webhook] Ditolak: midtrans_server_key belum diisi di Pengaturan, " +
+                "signature tidak bisa diverifikasi."
             );
-            if (!isValid) {
-                console.error("[Midtrans Webhook] Invalid signature for order:", order_id);
-                return NextResponse.json(
-                    { error: "Invalid signature" },
-                    { status: 403 }
-                );
-            }
+            return NextResponse.json(
+                { error: "Payment gateway not configured" },
+                { status: 503 }
+            );
+        }
+
+        if (!signature_key) {
+            console.error("[Midtrans Webhook] Ditolak: body tanpa signature_key. Order:", order_id);
+            return NextResponse.json({ error: "Missing signature" }, { status: 403 });
+        }
+
+        const isValid = verifyMidtransSignature(
+            order_id,
+            status_code,
+            gross_amount,
+            config.serverKey,
+            signature_key
+        );
+        if (!isValid) {
+            console.error("[Midtrans Webhook] Invalid signature for order:", order_id);
+            return NextResponse.json(
+                { error: "Invalid signature" },
+                { status: 403 }
+            );
         }
 
         // Find the order

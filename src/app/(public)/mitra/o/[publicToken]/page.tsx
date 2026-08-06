@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import React from "react";
 import { CheckCircle2, LockKeyhole, MapPin, QrCode, Send } from "lucide-react";
 
+import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,17 +75,36 @@ export default function MitraOutletProfilePage() {
         setSubmitting(false);
     };
 
+    // Tautan kembali ikut ditampilkan pada state memuat dan tidak ditemukan. Tanpa itu
+    // outlet yang tokennya salah atau sudah dihapus menjadi jalan buntu total.
     if (loading) {
-        return <main className="min-h-screen bg-gray-50 pt-24 text-center text-sm text-muted-foreground">Memuat profil outlet...</main>;
+        return (
+            <main className="min-h-screen bg-gray-50 pt-20">
+                <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+                    <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
+                    <p className="mt-8 text-center text-sm text-muted-foreground">Memuat profil outlet...</p>
+                </section>
+            </main>
+        );
     }
 
     if (!outlet) {
-        return <main className="min-h-screen bg-gray-50 pt-24 text-center text-sm text-muted-foreground">Outlet tidak ditemukan.</main>;
+        return (
+            <main className="min-h-screen bg-gray-50 pt-20">
+                <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+                    <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
+                    <p className="mt-8 text-center text-sm text-muted-foreground">Outlet tidak ditemukan.</p>
+                </section>
+            </main>
+        );
     }
 
     return (
         <main className="min-h-screen bg-gray-50 pt-20">
-            <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
+            <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 lg:px-8">
+                <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
+            </section>
+            <section className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
                 <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
                     <div className="relative h-48 bg-gradient-to-br from-red-600 to-orange-500">
                         {outlet.photoUrl && (
@@ -105,8 +125,12 @@ export default function MitraOutletProfilePage() {
                         <Info label="Branding" value={outlet.branding || "-"} />
                         <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
                     </div>
+                    {/* "Lokasi akurat" dihapus dari kalimat ini: sejak peta sebaran di /mitra
+                        menampilkan koordinat outlet secara publik, menjanjikannya sebagai data
+                        terkunci tidak lagi benar. Yang masih benar-benar di balik OTP adalah
+                        detail owner dan angka performa. */}
                     <div className="border-t p-5 text-sm text-muted-foreground">
-                        Detail owner, lokasi akurat, dan performansi hanya tersedia setelah OTP WhatsApp berhasil diverifikasi.
+                        Detail owner dan performansi hanya tersedia setelah OTP WhatsApp berhasil diverifikasi.
                     </div>
                 </div>
 

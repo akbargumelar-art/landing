@@ -64,6 +64,13 @@
       "when": 1785786473235,
       "tag": "0008_program_wa_template",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1786001964584,
+      "tag": "0009_redemption_log_nullable_voucher",
+      "breakpoints": true
     }
   ]
 }

@@ -30,9 +30,23 @@ import { v4 as uuid } from "uuid";
 import { scryptSync, randomBytes } from "crypto";
 import { programs as mockPrograms, heroSlides as mockSlides } from "../lib/mock-data";
 
+/**
+ * Harus PERSIS sama dengan better-auth, karena better-auth yang memverifikasinya saat login.
+ * Lihat node_modules/better-auth/dist/crypto/password.mjs: scrypt N=16384, r=16, p=1,
+ * dkLen=64, password dinormalisasi NFKC, format "salt:hex".
+ *
+ * Sebelumnya di sini r=8 tanpa normalisasi. Formatnya kebetulan sama sehingga tidak ada
+ * error, tetapi kunci turunannya tidak pernah cocok -- akun admin hasil seed SELALU
+ * ditolak "Invalid email or password". Terbukti di uji live 2026-08-06.
+ */
 function hashPassword(password: string): string {
     const salt = randomBytes(16).toString("hex");
-    const derivedKey = scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
+    const derivedKey = scryptSync(password.normalize("NFKC"), salt, 64, {
+        N: 16384,
+        r: 16,
+        p: 1,
+        maxmem: 128 * 16384 * 16 * 2,
+    });
     return `${salt}:${derivedKey.toString("hex")}`;
 }
 
