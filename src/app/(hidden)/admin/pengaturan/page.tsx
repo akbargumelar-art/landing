@@ -464,6 +464,21 @@ export default function PengaturanPage() {
                             />
                             <p className="text-xs text-muted-foreground">URL ini harus didaftarkan di Dashboard Mayar.id → Pengaturan → Webhooks.</p>
                         </div>
+                        <div className="space-y-2">
+                            <Label>Webhook Token</Label>
+                            <Input
+                                type="password"
+                                value={settings.mayar_webhook_token || ""}
+                                onChange={(e) => updateSetting("mayar_webhook_token", e.target.value)}
+                                placeholder="Token webhook dari Dashboard Mayar.id"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                <strong>Wajib diisi.</strong> Tanpa token ini webhook Mayar ditolak, sehingga
+                                pembayaran tidak akan tercatat otomatis. Token inilah yang membuktikan
+                                notifikasi benar-benar berasal dari Mayar dan bukan dari orang lain yang
+                                menebak nomor invoice.
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

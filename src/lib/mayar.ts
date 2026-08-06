@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import { db } from "@/db";
 import { siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -160,3 +162,53 @@ export async function createMayarInvoice(
  */
 export { getMayarConfig };
 export type { MayarConfig };
+
+// ========== Verifikasi Webhook ==========
+
+/**
+ * Token webhook Mayar dari Pengaturan Website. Dipisahkan dari `getMayarConfig()`
+ * karena webhook harus bisa diverifikasi tanpa membutuhkan API key pembuatan invoice.
+ */
+export async function getMayarWebhookToken(): Promise<string | null> {
+    const [row] = await db
+        .select()
+        .from(siteSettings)
+        .where(eq(siteSettings.key, "mayar_webhook_token"));
+
+    const token = row?.value?.trim();
+    return token ? token : null;
+}
+
+/** Perbandingan waktu tetap; `timingSafeEqual` melempar bila panjang buffer berbeda. */
+function safeCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(a, "utf8");
+    const bufB = Buffer.from(b, "utf8");
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Memeriksa apakah request webhook benar-benar datang dari Mayar.
+ *
+ * Mayar mengirimkan token webhook yang dikonfigurasi di dashboard mereka. Nama headernya
+ * berbeda-beda antar versi dokumentasi, jadi beberapa kandidat yang lazim diperiksa
+ * sekaligus; yang penting nilainya harus cocok dengan token yang tersimpan.
+ *
+ * Sebelum ini endpoint webhook Mayar TIDAK memverifikasi apa pun -- terbukti di uji
+ * runtime 2026-08-06 bahwa siapa pun yang tahu nomor invoice bisa menandai order lunas
+ * hanya dengan mengirim body JSON biasa.
+ */
+export function verifyMayarWebhook(headers: Headers, token: string): boolean {
+    const kandidat = [
+        headers.get("x-callback-token"),
+        headers.get("x-mayar-token"),
+        headers.get("x-webhook-token"),
+    ];
+
+    const auth = headers.get("authorization");
+    if (auth) {
+        kandidat.push(auth.replace(/^Bearer\s+/i, "").trim());
+    }
+
+    return kandidat.some((nilai) => typeof nilai === "string" && nilai.length > 0 && safeCompare(nilai, token));
+}
