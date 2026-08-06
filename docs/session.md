@@ -588,6 +588,29 @@ padahal HTTP 200, tidak ada error konsol, dan `readyState` sudah `complete`. Men
 `document.readyState` tidak cukup untuk konten yang di-fetch dari klien — tunggu penanda
 pemuatannya hilang, dan **lihat screenshot-nya**, jangan percaya angka saja.
 
+### Pembersihan menjelang deploy
+
+Kode mati yang sudah lama dicatat di audit akhirnya dihapus setelah dipastikan ulang nol
+referensi: `src/lib/db.ts` (re-export satu baris, 79 berkas mengimpor langsung dari `@/db`),
+`src/lib/doku.ts`, serta tombstone `/api/public/webhook/doku` dan `/api/public/webhook/lynkid`.
+Rantai deprecation-nya memang sudah menyesatkan — `lynkid` menunjuk ke `doku`, yang juga sudah
+mati. Yang tersisa kini hanya `mayar` dan `midtrans`.
+
+Dua route penyaji upload disatukan menjadi satu route catch-all, sekaligus menutup dua temuan
+audit: berkas `.ico` yang sama tidak lagi disajikan `image/x-icon` di root tetapi
+`application/octet-stream` di subfolder, dan SVG kini disajikan dengan
+`Content-Security-Policy: default-src 'none'; sandbox` sehingga skrip di dalamnya tidak berjalan
+walau dibuka langsung. Penjagaan directory traversal juga diganti: bukan lagi membuang pola
+`../` dengan regex, melainkan menyelesaikan path lalu memastikan hasilnya masih di dalam folder
+unggahan — diuji dengan tiga bentuk serangan termasuk yang tersandi persen, ketiganya 404.
+
+`.dockerignore` diperluas: sebelumnya hanya lima baris dan masih meloloskan `tmp/`, `docs/`,
+`.agents/`, `*.tsbuildinfo`, serta `.env.*` selain `.env` ke dalam image.
+
+Build produksi bersih dari nol: `tsc`, `next lint`, `drizzle-kit check`, `npm run env:check`,
+dan `npm run build` (67 halaman) semuanya lulus. Diverifikasi ulang setelah pembersihan bahwa
+navigasi responsif dan peta outlet masih berfungsi.
+
 ### Catatan alat untuk sesi berikutnya
 
 - Sandbox memblokir WSL **secara diam-diam** (exit code 0, output kosong) dan juga koneksi TCP ke
