@@ -68,7 +68,7 @@ export async function getWahaConfig(): Promise<WahaConfig> {
 export async function getOtpTemplate(): Promise<string> {
     try {
         const settings = await readSettings();
-        return settings.wa_otp_template?.trim() || settings.wa_gw_template?.trim() || DEFAULT_OTP_TEMPLATE;
+        return settings.wa_otp_template?.trim() || DEFAULT_OTP_TEMPLATE;
     } catch {
         return DEFAULT_OTP_TEMPLATE;
     }

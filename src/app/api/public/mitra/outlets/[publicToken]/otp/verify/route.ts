@@ -109,7 +109,10 @@ export async function POST(
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         maxAge: 15 * 60,
-        path: `/mitra/o/${publicToken}`,
+        // Cookie harus ikut terkirim ke API detail (/api/public/mitra/outlets/.../detail),
+        // bukan hanya ke halaman /mitra/o/{token}. Jika path dibatasi ke halaman,
+        // fetch detail langsung 401 dan UI menampilkan sesi sudah berakhir.
+        path: "/",
     });
 
     return response;
