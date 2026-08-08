@@ -78,6 +78,13 @@
       "when": 1786163929941,
       "tag": "0010_outlet_salesforce_photo",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1786167720583,
+      "tag": "0011_market_share_per_kecamatan",
+      "breakpoints": true
     }
   ]
 }

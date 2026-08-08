@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
+import { MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
 
 interface DetailData {
     outlet: Record<string, string | number | null>;
@@ -23,6 +24,7 @@ interface DetailData {
         periodYm: string;
         value: string;
     }[];
+    marketShare: (Record<MitraMarketShareKey, string> & { kabupaten: string; kecamatan: string }) | null;
 }
 
 export default function MitraOutletDetailPage() {
@@ -75,10 +77,13 @@ export default function MitraOutletDetailPage() {
                     </div>
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <Info label="Nama Owner" value={String(data.outlet.ownerName || "-")} />
                         <Info label="Nomor Owner" value={data.details.ownerPhone || "-"} />
                         <Info label="Nomor RS" value={String(data.outlet.rsNumber || "-")} />
                         <Info label="TAP" value={String(data.outlet.tap || "-")} />
                         <Info label="Salesforce" value={String(data.outlet.salesforce || "-")} />
+                        <Info label="Kabupaten" value={String(data.outlet.kabupaten || "-")} />
+                        <Info label="Kecamatan" value={String(data.outlet.kecamatan || "-")} />
                     </div>
 
                     {data.outlet.locationUrl && (
@@ -86,6 +91,47 @@ export default function MitraOutletDetailPage() {
                             <MapPin className="h-4 w-4" />
                             Buka lokasi outlet
                         </a>
+                    )}
+                </div>
+
+                <div className="rounded-lg border bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 className="font-bold">Market Share Kecamatan</h2>
+                        <p className="text-xs text-muted-foreground">
+                            {data.marketShare
+                                ? `${data.marketShare.kecamatan}, ${data.marketShare.kabupaten}`
+                                : "Angka wilayah, bukan angka outlet ini"}
+                        </p>
+                    </div>
+
+                    {data.marketShare ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {MITRA_MARKET_SHARE_OPERATORS.map((operator) => {
+                                const percent = Number(data.marketShare?.[operator.key] ?? 0);
+                                return (
+                                    <div key={operator.key} className="rounded-lg border bg-gray-50 p-3">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            <p className="text-xs font-semibold text-gray-700">{operator.label}</p>
+                                            <p className="text-base font-bold tabular-nums text-gray-950">
+                                                {percent.toLocaleString("id-ID", { maximumFractionDigits: 2 })}%
+                                            </p>
+                                        </div>
+                                        {/* Lebar bar dipotong di 100% supaya data keliru (mis. 250) tidak
+                                            merusak tata letak kartu di sebelahnya. */}
+                                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                                            <div
+                                                className="h-full rounded-full"
+                                                style={{ width: `${Math.min(Math.max(percent, 0), 100)}%`, background: operator.color }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            Belum ada data market share untuk kecamatan ini.
+                        </p>
                     )}
                 </div>
 

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
     mitraDetailSessions,
     mitraImportBatches,
+    mitraMarketShares,
     mitraMetricDefs,
     mitraOutletDetails,
     mitraOutletMetrics,
@@ -139,6 +140,20 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         .orderBy(desc(mitraOutletMetrics.periodYm), asc(mitraMetricDefs.label))
         .limit(120);
 
+    // Dicocokkan pada pasangan kabupaten + kecamatan persis seperti yang tersimpan di
+    // outlet. Selisih ejaan sekecil apa pun membuat baris tidak ketemu, dan itu memang
+    // disengaja: lebih baik tidak menampilkan angka daripada menampilkan angka wilayah lain.
+    const [marketShare] = outletRecord.kabupaten && outletRecord.kecamatan
+        ? await db
+            .select()
+            .from(mitraMarketShares)
+            .where(and(
+                eq(mitraMarketShares.kabupaten, outletRecord.kabupaten),
+                eq(mitraMarketShares.kecamatan, outletRecord.kecamatan)
+            ))
+            .limit(1)
+        : [];
+
     return {
         outlet: {
             ...outlet,
@@ -158,6 +173,7 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             rechargeDigipos: detailRow?.rechargeDigiposJson || {},
         },
         performance,
+        marketShare: marketShare || null,
     };
 }
 

@@ -537,6 +537,32 @@ export const mitraOutletDetails = mysqlTable("mitra_outlet_details", {
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
 
+/**
+ * Market share operator per kecamatan, dipakai halaman detail outlet setelah OTP.
+ *
+ * Dikunci pada pasangan kabupaten + kecamatan, bukan kecamatan saja: nama kecamatan
+ * berulang antar kabupaten (Jalaksana, Kesambi, dan seterusnya bisa ada di lebih dari
+ * satu daerah), jadi kecamatan saja akan menempelkan angka yang salah ke outlet.
+ *
+ * Satu baris per wilayah tanpa kolom periode -- angka terbaru menimpa yang lama. Kalau
+ * nanti perlu riwayat bulanan, tambahkan period_ym ke tabel dan ke unique index-nya.
+ */
+export const mitraMarketShares = mysqlTable("mitra_market_shares", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    kabupaten: varchar("kabupaten", { length: 255 }).notNull(),
+    kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
+    telkomsel: decimal("telkomsel", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    xl: decimal("xl", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    axis: decimal("axis", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    smartfren: decimal("smartfren", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    indosat: decimal("indosat", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    tri: decimal("tri", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_market_share_area_idx").on(table.kabupaten, table.kecamatan),
+]);
+
 export const mitraMetricDefs = mysqlTable("mitra_metric_defs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     key: varchar("key", { length: 120 }).notNull().unique(),

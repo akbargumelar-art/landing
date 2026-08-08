@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Activity, ClipboardList, Database, FileSpreadsheet, LayoutDashboard, MessageCircle, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
+import { Activity, ClipboardList, Database, FileSpreadsheet, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ const modules = [
     { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Users, text: "Tambah, edit, hapus outlet dan QR satuan." },
     { href: "/admin/mitra/import", label: "Upload Data", icon: FileSpreadsheet, text: "Import outlet dan performa: preview, validasi, commit." },
     { href: "/admin/mitra/performance", label: "Performance", icon: Activity, text: "Metric dan input performansi outlet." },
+    { href: "/admin/mitra/market-share", label: "Market Share", icon: PieChart, text: "Pangsa pasar operator per kecamatan." },
     { href: "/admin/mitra/qr", label: "QR Bulk", icon: QrCode, text: "Export kartu QR 2 x 5 per lembar A4." },
     { href: "/admin/mitra/audit", label: "Audit", icon: ClipboardList, text: "Jejak perubahan dan export." },
 ];

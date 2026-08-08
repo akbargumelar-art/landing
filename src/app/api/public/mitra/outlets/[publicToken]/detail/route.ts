@@ -23,5 +23,6 @@ export async function GET(
         outlet: data.outlet,
         details: data.details,
         performance: data.performance,
+        marketShare: data.marketShare,
     });
 }
