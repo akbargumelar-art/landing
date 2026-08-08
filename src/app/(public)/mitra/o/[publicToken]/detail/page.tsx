@@ -191,7 +191,7 @@ export default function MitraOutletDetailPage() {
                 <div className="grid gap-6 lg:grid-cols-2">
                     <div className="rounded-lg border bg-white p-5 shadow-sm">
                         <h2 className="font-bold">Lokasi Outlet</h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Diambil dari GPS perangkat, bukan diketik manual, supaya titiknya akurat.</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Diambil dari GPS perangkat, bukan diketik manual, supaya titiknya akurat. Dilakukan sesekali saja, saat memang dibutuhkan.</p>
 
                         <div className="mt-4 rounded-lg border bg-gray-50 p-4">
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
@@ -213,7 +213,8 @@ export default function MitraOutletDetailPage() {
                             {menandaiLokasi ? "Membaca lokasi..." : "Tandai Lokasi Saya Sekarang"}
                         </Button>
                         <p className="mt-2 text-xs text-muted-foreground">
-                            Tekan tombol ini <strong>saat berada di depan outlet</strong>. Koordinat dengan ketelitian di atas 200 m akan ditolak.
+                            Tekan tombol ini <strong>saat berada di depan outlet</strong>, dan hanya bila titiknya belum ada
+                            atau sudah tidak sesuai. Koordinat dengan ketelitian di atas 200 m akan ditolak.
                         </p>
                     </div>
 
@@ -223,8 +224,14 @@ export default function MitraOutletDetailPage() {
                             Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu berjalan.
                         </p>
                         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                            Perbarui foto langsung dari lokasi outlet memakai kamera perangkat, lalu tandai titik lokasi.
-                            Setiap perubahan tercatat pada riwayat di bawah beserta nomor yang melakukannya.
+                            Perbarui foto langsung dari lokasi outlet memakai kamera perangkat. Setiap perubahan
+                            tercatat pada riwayat di bawah beserta nomor yang melakukannya.
+                        </p>
+                        {/* Ditegaskan terpisah: tanpa ini, keberadaan tombol lokasi tepat di
+                            sebelahnya membuat orang mengira keduanya satu paket tiap kunjungan. */}
+                        <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
+                            <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap kunjungan.</strong>{" "}
+                            Cukup sekali saat outlet belum punya titik, atau saat outlet pindah dan titiknya keliru.
                         </p>
                     </div>
                 </div>
