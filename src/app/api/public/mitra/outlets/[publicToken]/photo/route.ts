@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
-import { getEditableOutlet, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
+import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
 import { findPhotoSlot } from "@/lib/mitra-outlet-photos";
 import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
 import { saveUploadedImage } from "@/lib/uploads";
@@ -17,11 +17,13 @@ export async function POST(
 ) {
     const { publicToken } = await params;
     const sessionToken = request.cookies.get(MITRA_DETAIL_SESSION_COOKIE)?.value;
-    const akses = await getEditableOutlet(publicToken, sessionToken);
+    const izin = await pastikanBolehEdit(publicToken, sessionToken);
 
-    if (!akses) {
-        return NextResponse.json({ error: "Verifikasi OTP diperlukan untuk mengubah foto outlet" }, { status: 401 });
+    if (!izin.ok) {
+        return NextResponse.json({ error: izin.error }, { status: izin.status });
     }
+
+    const akses = izin.akses;
 
     const formData = await request.formData().catch(() => null);
     if (!formData) {

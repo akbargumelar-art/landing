@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraQrTemplates } from "@/db/schema";
-import { QR_FIELDS, TEMPLATE_BAWAAN, type QrElement, type QrTemplate } from "@/lib/qr-template";
+import { QR_FIELDS, TEMPLATE_BAWAAN, type QrElement, type QrImage, type QrTemplate } from "@/lib/qr-template";
 
 const FIELD_KEYS = new Set(QR_FIELDS.map((field) => field.key as string));
 
@@ -37,15 +37,31 @@ export function sanitizeElements(input: unknown): QrElement[] {
     });
 }
 
+/** Membersihkan daftar gambar: hanya entri ber-URL yang lolos, ukuran dijepit ke kartu. */
+export function sanitizeImages(input: unknown): QrImage[] {
+    if (!Array.isArray(input)) return [];
+
+    return input
+        .slice(0, 8)
+        .map((raw, index) => {
+            const item = (raw || {}) as Record<string, unknown>;
+            return {
+                id: String(item.id || `img-${index + 1}`),
+                url: String(item.url || ""),
+                x: Math.min(Math.max(angka(item.x, 4), 0), 90),
+                y: Math.min(Math.max(angka(item.y, 4), 0), 55),
+                width: Math.min(Math.max(angka(item.width, 18), 2), 90),
+            };
+        })
+        .filter((image) => image.url.length > 0);
+}
+
 export function rowToTemplate(row: typeof mitraQrTemplates.$inferSelect): QrTemplate {
     return {
         name: row.name,
         backgroundColor: row.backgroundColor,
         backgroundImageUrl: row.backgroundImageUrl,
-        logoUrl: row.logoUrl,
-        logoX: Number(row.logoX),
-        logoY: Number(row.logoY),
-        logoWidth: Number(row.logoWidth),
+        images: sanitizeImages(row.imagesJson),
         qrX: Number(row.qrX),
         qrY: Number(row.qrY),
         qrSize: Number(row.qrSize),

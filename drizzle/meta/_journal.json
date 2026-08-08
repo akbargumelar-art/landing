@@ -127,6 +127,13 @@
       "when": 1786226016417,
       "tag": "0017_outlet_edit_branding",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786229695046,
+      "tag": "0018_qr_template_multi_images",
+      "breakpoints": true
     }
   ]
 }

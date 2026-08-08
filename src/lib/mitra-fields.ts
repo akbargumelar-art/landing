@@ -12,6 +12,8 @@ export interface MitraDetailRow {
     key: string;
     label: string;
     unit: "qty" | "rev";
+    /** 0 = parameter induk, 1 = rincian di bawahnya (mis. per masa aktif voucher). */
+    level: 0 | 1;
     m1Key: string;
     mKey: string;
     momKey: string;
@@ -28,11 +30,12 @@ export interface MitraDetailFieldGroup {
 
 const UNIT_LABEL: Record<MitraDetailRow["unit"], string> = { qty: "qty", rev: "rev." };
 
-function buildRow(base: string, label: string, unit: MitraDetailRow["unit"]): MitraDetailRow {
+function buildRow(base: string, label: string, unit: MitraDetailRow["unit"], level: 0 | 1 = 0): MitraDetailRow {
     return {
         key: `${base}_${unit}`,
         label,
         unit,
+        level,
         m1Key: `${base}_m_1_${unit}`,
         mKey: `${base}_m_${unit}`,
         momKey: `mom_${base}_${unit}`,
@@ -48,13 +51,26 @@ function rowToFields(row: MitraDetailRow): MitraDetailField[] {
     ];
 }
 
-const sellthruProducts = [
+/**
+ * Masa aktif voucher internet. Hanya produk voucher yang dirinci begini; perdana, KPK,
+ * dan vokos tidak punya pembagian masa aktif.
+ */
+const VALIDITAS_VOUCHER = [
+    { key: "1h", label: "1 Hari" },
+    { key: "2h", label: "2 Hari" },
+    { key: "3h", label: "3 Hari" },
+    { key: "5h", label: "5 Hari" },
+    { key: "7h", label: "7 Hari" },
+    { key: "28h", label: "28 Hari" },
+];
+
+const sellthruProducts: { key: string; label: string; validitas?: typeof VALIDITAS_VOUCHER }[] = [
     { key: "perdana_telkomsel", label: "Perdana Telkomsel" },
     { key: "perdana_byu", label: "Perdana byU" },
     { key: "kpk_telkomsel", label: "KPK Telkomsel" },
     { key: "kpk_byu", label: "KPK byU" },
-    { key: "voucher_telkomsel", label: "Voucher Telkomsel" },
-    { key: "voucher_byu", label: "Voucher byU" },
+    { key: "voucher_telkomsel", label: "Voucher Telkomsel", validitas: VALIDITAS_VOUCHER },
+    { key: "voucher_byu", label: "Voucher byU", validitas: VALIDITAS_VOUCHER },
     { key: "vokos_telkomsel", label: "Vokos Telkomsel" },
     { key: "vokos_byu", label: "Vokos byU" },
 ];
@@ -63,7 +79,23 @@ function buildSellthruRows(prefix: "st" | "st_nota", labelPrefix: string): Mitra
     return sellthruProducts.flatMap((product) => {
         const base = `${prefix}_${product.key}`;
         const label = `${labelPrefix} ${product.label}`;
-        return [buildRow(base, label, "qty"), buildRow(base, label, "rev")];
+
+        // Baris induk tetap ada walau produknya dirinci: angkanya adalah total seluruh masa
+        // aktif, dan itu yang selama ini dipakai laporan. Rincian ditambahkan di bawahnya,
+        // bukan menggantikannya, sehingga key lama tidak ada yang berubah.
+        const induk = [buildRow(base, label, "qty"), buildRow(base, label, "rev")];
+        if (!product.validitas) return induk;
+
+        const rincian = product.validitas.flatMap((validitas) => {
+            const baseRincian = `${base}_${validitas.key}`;
+            const labelRincian = `${label} ${validitas.label}`;
+            return [
+                buildRow(baseRincian, labelRincian, "qty", 1),
+                buildRow(baseRincian, labelRincian, "rev", 1),
+            ];
+        });
+
+        return [...induk, ...rincian];
     });
 }
 

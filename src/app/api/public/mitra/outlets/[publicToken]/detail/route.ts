@@ -25,5 +25,7 @@ export async function GET(
         performance: data.performance,
         marketShare: data.marketShare,
         editLogs: data.editLogs,
+        bolehEdit: data.bolehEdit,
+        peranPengakses: data.peranPengakses,
     });
 }

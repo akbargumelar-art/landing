@@ -37,14 +37,22 @@ export interface QrElement {
     maxWidth: number;
 }
 
+/** Gambar tempelan: logo perusahaan, logo operator, stiker, dan sebagainya. */
+export interface QrImage {
+    id: string;
+    url: string;
+    /** Posisi kiri-atas dalam mm dari sudut kiri-atas kartu. */
+    x: number;
+    y: number;
+    /** Lebar dalam mm; tingginya mengikuti rasio asli gambar. */
+    width: number;
+}
+
 export interface QrTemplate {
     name: string;
     backgroundColor: string;
     backgroundImageUrl: string | null;
-    logoUrl: string | null;
-    logoX: number;
-    logoY: number;
-    logoWidth: number;
+    images: QrImage[];
     qrX: number;
     qrY: number;
     qrSize: number;
@@ -69,10 +77,7 @@ export const TEMPLATE_BAWAAN: QrTemplate = {
     name: "Bawaan ABK",
     backgroundColor: "#ffffff",
     backgroundImageUrl: null,
-    logoUrl: null,
-    logoX: 4,
-    logoY: 4,
-    logoWidth: 18,
+    images: [],
     qrX: 4.2,
     qrY: 12,
     qrSize: 29,
@@ -171,19 +176,23 @@ export async function gambarKartu(options: {
         }
     }
 
-    if (template.logoUrl) {
-        const logo = await muatGambar(doc, template.logoUrl, origin);
-        if (logo) {
-            const lebarLogo = template.logoWidth * MM;
-            // Tinggi mengikuti rasio asli supaya logo tidak gepeng.
-            const tinggiLogo = lebarLogo * (logo.height / logo.width);
-            page.drawImage(logo, {
-                x: originX + template.logoX * MM,
-                y: dariAtas(template.logoY) - tinggiLogo,
-                width: lebarLogo,
-                height: tinggiLogo,
-            });
-        }
+    // Digambar berurutan sesuai daftar, jadi gambar berikutnya menimpa yang sebelumnya
+    // bila posisinya bertumpuk -- urutan pada editor menentukan lapisannya.
+    for (const image of template.images) {
+        if (!image.url) continue;
+
+        const gambar = await muatGambar(doc, image.url, origin);
+        if (!gambar) continue;
+
+        const lebar = image.width * MM;
+        // Tinggi mengikuti rasio asli supaya gambar tidak gepeng.
+        const tinggi = lebar * (gambar.height / gambar.width);
+        page.drawImage(gambar, {
+            x: originX + image.x * MM,
+            y: dariAtas(image.y) - tinggi,
+            width: lebar,
+            height: tinggi,
+        });
     }
 
     const qrPng = await QRCode.toBuffer(data.url, { type: "png", margin: 0, scale: 8 });
