@@ -600,6 +600,36 @@ export const mitraMarketShares = mysqlTable("mitra_market_shares", {
     uniqueIndex("mitra_market_share_area_idx").on(table.kabupaten, table.kecamatan),
 ]);
 
+/**
+ * Template kartu QR 90 x 55 mm.
+ *
+ * Semua koordinat dan ukuran disimpan dalam MILIMETER, bukan piksel: kartunya benda
+ * cetak, dan mm adalah satuan yang sama dipakai editor maupun pembuat PDF. Kalau piksel
+ * yang disimpan, setiap perubahan skala pratinjau akan menggeser hasil cetaknya.
+ *
+ * Elemen teks disimpan sebagai JSON karena jumlah dan jenisnya bebas; QR, logo, dan latar
+ * dapat kolomnya sendiri karena selalu ada tepat satu.
+ */
+export const mitraQrTemplates = mysqlTable("mitra_qr_templates", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    backgroundColor: varchar("background_color", { length: 20 }).notNull().default("#ffffff"),
+    backgroundImageUrl: varchar("background_image_url", { length: 500 }),
+    logoUrl: varchar("logo_url", { length: 500 }),
+    logoX: decimal("logo_x", { precision: 6, scale: 2 }).notNull().default("4.00"),
+    logoY: decimal("logo_y", { precision: 6, scale: 2 }).notNull().default("4.00"),
+    logoWidth: decimal("logo_width", { precision: 6, scale: 2 }).notNull().default("18.00"),
+    qrX: decimal("qr_x", { precision: 6, scale: 2 }).notNull().default("5.00"),
+    qrY: decimal("qr_y", { precision: 6, scale: 2 }).notNull().default("14.00"),
+    qrSize: decimal("qr_size", { precision: 6, scale: 2 }).notNull().default("34.00"),
+    elementsJson: json("elements_json").$type<unknown[]>(),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_qr_templates_default_idx").on(table.isDefault),
+]);
+
 export const mitraMetricDefs = mysqlTable("mitra_metric_defs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     key: varchar("key", { length: 120 }).notNull().unique(),
@@ -725,7 +755,7 @@ export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
     actorType: mysqlEnum("actor_type", ["MITRA", "ADMIN"]).notNull(),
     actorPhone: varchar("actor_phone", { length: 50 }),
     actorUserId: varchar("actor_user_id", { length: 36 }),
-    action: mysqlEnum("action", ["PHOTO", "LOCATION"]).notNull(),
+    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING"]).notNull(),
     beforeJson: json("before_json").$type<Record<string, unknown>>(),
     afterJson: json("after_json").$type<Record<string, unknown>>(),
     ip: varchar("ip", { length: 120 }),

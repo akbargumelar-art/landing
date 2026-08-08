@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { mitraDetailSessions, mitraOutletEditLogs, mitraOutlets } from "@/db/schema";
 import { hashSessionToken, maskPhone } from "@/lib/mitra-utils";
 
-export type MitraEditAction = "PHOTO" | "LOCATION";
+export type MitraEditAction = "PHOTO" | "LOCATION" | "BRANDING";
 
 /**
  * Mengembalikan outlet beserta sesi detail yang sah, atau null.

@@ -113,6 +113,20 @@
       "when": 1786190891064,
       "tag": "0015_whitelist_tap_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1786225387854,
+      "tag": "0016_qr_card_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1786226016417,
+      "tag": "0017_outlet_edit_branding",
+      "breakpoints": true
     }
   ]
 }

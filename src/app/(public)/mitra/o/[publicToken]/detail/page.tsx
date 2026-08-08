@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, Camera, Crosshair, History, Loader2, MapPin, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Camera, Crosshair, History, Loader2, MapPin, ShieldCheck, Tag } from "lucide-react";
 
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
 import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
+import { OUTLET_BRANDINGS } from "@/lib/mitra-outlet-options";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
 
@@ -32,7 +33,7 @@ interface DetailData {
 
 interface EditLog {
     id: string;
-    action: "PHOTO" | "LOCATION";
+    action: "PHOTO" | "LOCATION" | "BRANDING";
     actorType: "MITRA" | "ADMIN";
     actorLabel: string;
     createdAt: string;
@@ -45,6 +46,7 @@ export default function MitraOutletDetailPage() {
     const [loading, setLoading] = React.useState(true);
     const [mengunggah, setMengunggah] = React.useState<MitraPhotoSlotKey | null>(null);
     const [menandaiLokasi, setMenandaiLokasi] = React.useState(false);
+    const [menyimpanBranding, setMenyimpanBranding] = React.useState(false);
     const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
 
     const muat = React.useCallback(() => {
@@ -77,6 +79,30 @@ export default function MitraOutletDetailPage() {
             setPesan({ ok: false, teks: "Koneksi bermasalah saat mengunggah foto." });
         } finally {
             setMengunggah(null);
+        }
+    };
+
+    const simpanBranding = async (branding: string) => {
+        setMenyimpanBranding(true);
+        setPesan(null);
+
+        try {
+            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/branding`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ branding }),
+            });
+            const hasil = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setPesan({ ok: false, teks: hasil.error || "Branding gagal disimpan." });
+            } else {
+                setPesan({ ok: true, teks: `Branding outlet diperbarui menjadi ${branding}.` });
+                await muat();
+            }
+        } catch {
+            setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan branding." });
+        } finally {
+            setMenyimpanBranding(false);
         }
     };
 
@@ -219,19 +245,37 @@ export default function MitraOutletDetailPage() {
                     </div>
 
                     <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <h2 className="font-bold">Validasi Kunjungan</h2>
+                        <div className="flex items-center gap-2">
+                            <Tag className="h-4 w-4 text-red-600" />
+                            <h2 className="font-bold">Branding Outlet</h2>
+                        </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu berjalan.
+                            Materi promosi yang terpasang di outlet. Ubah bila brandingnya berganti.
                         </p>
-                        <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                            Perbarui foto langsung dari lokasi outlet memakai kamera perangkat. Setiap perubahan
-                            tercatat pada riwayat di bawah beserta nomor yang melakukannya.
-                        </p>
-                        {/* Ditegaskan terpisah: tanpa ini, keberadaan tombol lokasi tepat di
-                            sebelahnya membuat orang mengira keduanya satu paket tiap kunjungan. */}
-                        <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
-                            <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap kunjungan.</strong>{" "}
-                            Cukup sekali saat outlet belum punya titik, atau saat outlet pindah dan titiknya keliru.
+
+                        <div className="mt-4 space-y-2">
+                            <label htmlFor="branding" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                Branding Terpasang
+                            </label>
+                            <select
+                                id="branding"
+                                value={String(data.outlet.branding || "")}
+                                onChange={(event) => simpanBranding(event.target.value)}
+                                disabled={menyimpanBranding}
+                                className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                            >
+                                {OUTLET_BRANDINGS.map((pilihan) => (
+                                    <option key={pilihan} value={pilihan}>{pilihan}</option>
+                                ))}
+                            </select>
+                            {menyimpanBranding && <p className="text-xs text-muted-foreground">Menyimpan...</p>}
+                        </div>
+
+                        <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
+                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu
+                            berjalan. <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap
+                            kunjungan</strong> -- cukup sekali saat outlet belum punya titik, atau saat outlet pindah
+                            dan titiknya keliru. Setiap perubahan tercatat pada riwayat di bawah.
                         </p>
                     </div>
                 </div>
@@ -317,9 +361,17 @@ export default function MitraOutletDetailPage() {
                             {data.editLogs.map((log) => (
                                 <li key={log.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-gray-50 px-4 py-3 text-sm">
                                     <span className="flex items-center gap-2">
-                                        {log.action === "PHOTO" ? <Camera className="h-4 w-4 text-muted-foreground" /> : <MapPin className="h-4 w-4 text-muted-foreground" />}
+                                        {log.action === "PHOTO"
+                                            ? <Camera className="h-4 w-4 text-muted-foreground" />
+                                            : log.action === "BRANDING"
+                                                ? <Tag className="h-4 w-4 text-muted-foreground" />
+                                                : <MapPin className="h-4 w-4 text-muted-foreground" />}
                                         <span className="font-semibold text-gray-950">
-                                            {log.action === "PHOTO" ? "Foto outlet diperbarui" : "Lokasi outlet diperbarui"}
+                                            {log.action === "PHOTO"
+                                                ? "Foto outlet diperbarui"
+                                                : log.action === "BRANDING"
+                                                    ? "Branding outlet diperbarui"
+                                                    : "Lokasi outlet diperbarui"}
                                         </span>
                                         <span className="rounded-full bg-white px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-gray-200">
                                             {log.actorLabel}

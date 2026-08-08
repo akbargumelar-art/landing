@@ -31,6 +31,19 @@ import {
     toDecimalString,
 } from "@/lib/mitra-utils";
 
+/**
+ * Tautan wa.me beserta pesan pembuka yang sudah menyebut nama outlet, supaya salesforce
+ * langsung tahu konteksnya tanpa mitra perlu mengetik ulang.
+ */
+function buildWhatsAppUrl(phone: string | null, outletName: string): string | null {
+    if (!phone) return null;
+    const angka = phone.replace(/\D/g, "");
+    if (!angka) return null;
+
+    const pesan = encodeURIComponent(`Halo, saya dari outlet ${outletName}. Mohon bantuannya.`);
+    return `https://wa.me/${angka}?text=${pesan}`;
+}
+
 export type PublicMitraOutlet = NonNullable<Awaited<ReturnType<typeof getPublicOutletByToken>>>;
 
 export async function getMitraOutletRecordByToken(publicToken: string) {
@@ -49,6 +62,7 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             // halaman publik tidak perlu tahu asalnya berubah.
             salesforce: mitraSalesforces.name,
             salesforcePhotoUrl: mitraSalesforces.photoUrl,
+            salesforcePhone: mitraSalesforces.phone,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
             longitude: mitraOutlets.longitude,
@@ -111,6 +125,11 @@ export async function getPublicOutletByToken(publicToken: string) {
         tap: row.tap,
         salesforce: row.salesforce,
         salesforcePhotoUrl: row.salesforcePhotoUrl,
+        // Nomor ditampilkan tersamar, tetapi tautan wa.me memang membawa nomor utuhnya --
+        // itu justru tujuan tombolnya. Penyamaran di sini soal kerapian tampilan, bukan
+        // kerahasiaan: siapa pun bisa membaca nomor itu dari tautannya.
+        salesforcePhoneMasked: row.salesforcePhone ? maskPhone(row.salesforcePhone) : null,
+        salesforceWaUrl: buildWhatsAppUrl(row.salesforcePhone, row.name),
         ownerPhoneMasked: maskPhone(row.ownerPhone),
     };
 }

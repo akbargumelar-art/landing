@@ -28,6 +28,8 @@ interface PublicOutlet extends Record<string, unknown> {
     tap?: string;
     salesforce?: string;
     salesforcePhotoUrl?: string | null;
+    salesforcePhoneMasked?: string | null;
+    salesforceWaUrl?: string | null;
     ownerPhoneMasked: string;
 }
 
@@ -144,7 +146,12 @@ export default function MitraOutletProfilePage() {
                         <Info label="Jadwal PJP" value={`${outlet.pjpDay} / ${outlet.pjpType}`} />
                         <Info label="Branding" value={outlet.branding || "-"} />
                         <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
-                        <SalesforceInfo name={outlet.salesforce} photoUrl={outlet.salesforcePhotoUrl} />
+                        <SalesforceInfo
+                            name={outlet.salesforce}
+                            photoUrl={outlet.salesforcePhotoUrl}
+                            phoneMasked={outlet.salesforcePhoneMasked}
+                            waUrl={outlet.salesforceWaUrl}
+                        />
                     </div>
                     {/* Kartu foto ikut tampil sebelum OTP: foto outlet bukan data terkunci,
                         dan kebaruannya justru yang ingin dilihat pengunjung. */}
@@ -235,7 +242,12 @@ export default function MitraOutletProfilePage() {
 // Salesforce dapat kartunya sendiri (selebar dua kolom) karena hanya kolom ini yang
 // membawa foto; menaruhnya di grid Info biasa akan membuat satu sel jauh lebih tinggi
 // daripada tetangganya. Tanpa foto, inisial nama dipakai sebagai penggantinya.
-function SalesforceInfo({ name, photoUrl }: { name?: string; photoUrl?: string | null }) {
+function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
+    name?: string;
+    photoUrl?: string | null;
+    phoneMasked?: string | null;
+    waUrl?: string | null;
+}) {
     const displayName = name?.trim() || "-";
     const initials = displayName === "-"
         ? ""
@@ -254,7 +266,22 @@ function SalesforceInfo({ name, photoUrl }: { name?: string; photoUrl?: string |
                         </span>
                     )}
                 </div>
-                <p className="text-lg font-semibold text-gray-950">{displayName}</p>
+                <div className="min-w-0">
+                    <p className="text-lg font-semibold text-gray-950">{displayName}</p>
+                    {phoneMasked && <p className="mt-0.5 text-sm text-muted-foreground">{phoneMasked}</p>}
+
+                    {waUrl && (
+                        <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+                        >
+                            <MessageCircle className="h-4 w-4" />
+                            Kirim WhatsApp
+                        </a>
+                    )}
+                </div>
             </div>
         </div>
     );
