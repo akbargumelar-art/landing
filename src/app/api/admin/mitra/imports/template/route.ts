@@ -8,11 +8,12 @@ import {
     PJP_DAYS,
     PJP_TYPES,
 } from "@/lib/mitra-outlet-options";
+import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type TemplateType = "whitelist" | "performance" | "program_score" | "outlet";
+type TemplateType = "whitelist" | "performance" | "program_score" | "outlet" | "outlet_detail";
 
 // Contoh baris data untuk setiap tipe import. Baris ini menjadi panduan kolom
 // yang wajib diisi beserta format nilai yang benar.
@@ -62,6 +63,19 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
             periodYm: "2026-08",
             rawValue: 500000,
             points: 50,
+        },
+    ],
+    /**
+     * Satu baris per outlet, satu kolom per parameter. Kolomnya dibangun dari
+     * MITRA_DETAIL_FIELD_GROUPS supaya template tidak pernah tertinggal ketika daftar
+     * parameternya berubah. Nilai contohnya 0 -- yang dicari pengisi adalah nama kolomnya.
+     */
+    outlet_detail: [
+        {
+            outletCode: "2201055482",
+            ...Object.fromEntries(
+                MITRA_DETAIL_FIELD_GROUPS.flatMap((group) => group.fields.map((field) => [field.key, 0]))
+            ),
         },
     ],
     outlet: [

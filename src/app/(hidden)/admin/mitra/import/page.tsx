@@ -64,7 +64,7 @@ export default function AdminMitraImportPage() {
 
             <div>
                 <h1 className="text-2xl font-bold">Import Data Mitra</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, program score, dan penambahan outlet baru. Unduh contoh file untuk melihat format kolom yang benar.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, program score, penambahan outlet baru, dan detail outlet (Sellthru Digipos, Sellthru Nota, Recharge Digipos). Unduh contoh file untuk melihat format kolom yang benar.</p>
             </div>
 
             <Card>
@@ -76,6 +76,7 @@ export default function AdminMitraImportPage() {
                             <option value="performance">Performance</option>
                             <option value="program_score">Program Score</option>
                             <option value="outlet">Outlet Baru</option>
+                            <option value="outlet_detail">Detail Outlet (Sellthru & Recharge)</option>
                         </select>
                         <Button
                             variant="link"

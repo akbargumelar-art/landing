@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
     mitraImportBatches,
     mitraMetricDefs,
+    mitraOutletDetails,
     mitraOutletMetrics,
     mitraOutlets,
     mitraProgramParams,
@@ -18,6 +19,7 @@ import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
 import { normalizeSalesforceName, resolveSalesforceIds } from "@/lib/mitra-salesforce";
+import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import {
     buildOutletMapsUrl,
     normalizeOutletBranding,
@@ -29,8 +31,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ImportType = "whitelist" | "performance" | "program_score" | "outlet";
-type ImportExecutor = Pick<typeof db, "insert">;
+type ImportType = "whitelist" | "performance" | "program_score" | "outlet" | "outlet_detail";
+// select dan update ikut dipakai jalur outlet_detail, yang menggabungkan nilai baru
+// dengan yang sudah tersimpan alih-alih menimpanya.
+type ImportExecutor = Pick<typeof db, "insert" | "select" | "update">;
 
 export async function GET() {
     const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
@@ -97,6 +101,9 @@ export async function POST(request: Request) {
             }
             if (type === "outlet") {
                 await commitOutletRows(tx, validation.validRows);
+            }
+            if (type === "outlet_detail") {
+                await commitOutletDetailRows(tx, validation.validRows);
             }
         });
 
@@ -216,6 +223,41 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
             else validRows.push({ ...row, outletId: outlet.id, programId: program.id, paramId: param.id, periodYm });
         }
 
+        if (type === "outlet_detail") {
+            const outletCode = String(row.outletCode || row.kodeOutlet || "").trim();
+            const outlet = outletByCode.get(outletCode);
+
+            if (!outletCode) {
+                errors.push({ row: rowNum, message: "Kode Outlet wajib diisi" });
+            } else if (!outlet) {
+                errors.push({ row: rowNum, message: "Outlet tidak ditemukan" });
+            } else {
+                // Hanya kolom yang benar-benar ada di berkas yang diambil. Kolom lain
+                // dibiarkan apa adanya di database, sehingga satu berkas boleh memuat
+                // sebagian grup saja -- misal hanya Recharge Digipos.
+                const terisi: Record<string, Record<string, unknown>> = {};
+                let jumlahKolom = 0;
+
+                for (const group of MITRA_DETAIL_FIELD_GROUPS) {
+                    for (const field of group.fields) {
+                        if (!(field.key in row)) continue;
+                        const nilai = row[field.key];
+                        if (nilai === "" || nilai === null || nilai === undefined) continue;
+
+                        terisi[group.storageKey] = terisi[group.storageKey] || {};
+                        terisi[group.storageKey][field.key] = nilai;
+                        jumlahKolom += 1;
+                    }
+                }
+
+                if (jumlahKolom === 0) {
+                    errors.push({ row: rowNum, message: "Tidak ada kolom parameter yang terisi" });
+                } else {
+                    validRows.push({ outletId: outlet.id, outletCode, nilai: terisi });
+                }
+            }
+        }
+
         if (type === "outlet") {
             const outletCode = String(row.outletCode || row.kodeOutlet || "").trim();
             const name = String(row.name || row.nama || "").trim();
@@ -318,6 +360,48 @@ async function commitProgramScoreRows(executor: ImportExecutor, batchId: string,
     }
 
     return Array.from(touchedProgramIds);
+}
+
+/**
+ * Nilai baru DIGABUNG dengan yang sudah tersimpan, bukan menimpa seluruh grup. Berkas yang
+ * hanya memuat sebagian kolom -- misal cuma angka bulan berjalan -- karena itu tidak
+ * menghapus angka bulan sebelumnya yang tidak ikut dikirim.
+ */
+async function commitOutletDetailRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
+    for (const row of rows) {
+        const outletId = String(row.outletId);
+        const nilai = (row.nilai || {}) as Record<string, Record<string, unknown>>;
+
+        const [existing] = await executor
+            .select()
+            .from(mitraOutletDetails)
+            .where(eq(mitraOutletDetails.outletId, outletId))
+            .limit(1);
+
+        const gabung = (storageKey: "sellthruDigiposJson" | "sellthruNotaJson" | "rechargeDigiposJson", index: number) => {
+            const lama = (existing?.[storageKey] || {}) as Record<string, number>;
+            const baru = nilai[storageKey];
+            if (!baru) return lama;
+
+            return sanitizeDetailGroup(
+                { ...lama, ...baru },
+                MITRA_DETAIL_FIELD_GROUPS[index].fields.map((field) => field.key)
+            );
+        };
+
+        const values = {
+            outletId,
+            sellthruDigiposJson: gabung("sellthruDigiposJson", 0),
+            sellthruNotaJson: gabung("sellthruNotaJson", 1),
+            rechargeDigiposJson: gabung("rechargeDigiposJson", 2),
+        };
+
+        if (existing) {
+            await executor.update(mitraOutletDetails).set(values).where(eq(mitraOutletDetails.outletId, outletId));
+        } else {
+            await executor.insert(mitraOutletDetails).values(values);
+        }
+    }
 }
 
 async function commitOutletRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
