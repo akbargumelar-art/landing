@@ -300,7 +300,113 @@ export async function getPublicMitraProgramDetail(slug: string, search = "") {
         .where(and(eq(mitraProgramWinners.programId, program.id), eq(mitraProgramWinners.isPublished, true)))
         .orderBy(asc(mitraProgramWinners.rank));
 
-    return { program, params, leaderboard, winners };
+    /**
+     * Peserta yang belum punya satu pun skor tidak pernah masuk papan peringkat --
+     * peringkat dibangun dari tabel skor. Dari sisi peserta itu terlihat seperti tidak
+     * terdaftar, padahal terdaftar. Karena itu mereka ikut ditarik dan digabungkan di
+     * bawah daftar dengan nilai nol.
+     */
+    const peringkatIds = new Set(leaderboard.map((row) => row.outletId));
+    const pesertaWhere = searchFilter
+        ? and(eq(mitraProgramParticipants.programId, program.id), searchFilter)
+        : eq(mitraProgramParticipants.programId, program.id);
+
+    const semuaPeserta = await db
+        .select({
+            outletId: mitraOutlets.id,
+            outletName: mitraOutlets.name,
+            outletCode: mitraOutlets.outletCode,
+            kabupaten: mitraOutlets.kabupaten,
+            kecamatan: mitraOutlets.kecamatan,
+        })
+        .from(mitraProgramParticipants)
+        .innerJoin(mitraOutlets, eq(mitraProgramParticipants.outletId, mitraOutlets.id))
+        .where(pesertaWhere)
+        .orderBy(asc(mitraOutlets.name))
+        .limit(200);
+
+    const tanpaSkor = semuaPeserta
+        .filter((peserta) => !peringkatIds.has(peserta.outletId))
+        .map((peserta) => ({
+            ...peserta,
+            totalPoints: "0.00",
+            rank: null as number | null,
+            prevRank: null as number | null,
+            computedAt: null as Date | null,
+        }));
+
+    const barisTampil = [...leaderboard.map((row) => ({ ...row, rank: row.rank as number | null })), ...tanpaSkor];
+
+    /**
+     * Pencapaian per parameter. Skor mentahnya sudah lama tersimpan per bulan, tetapi
+     * belum pernah dikirim ke halaman publik -- yang dikirim hanya total poin.
+     *
+     * Digabungkan di JavaScript, bukan lewat SUM() di SQL, karena tiap parameter punya
+     * mode agregasinya sendiri (SUM/AVG/LAST) dan LAST berarti "ambil periode terbaru",
+     * yang tidak bisa diwakili satu fungsi agregat SQL.
+     */
+    const outletIds = barisTampil.map((row) => row.outletId);
+    const skorRows = outletIds.length > 0 && params.length > 0
+        ? await db
+            .select({
+                outletId: mitraProgramScores.outletId,
+                paramId: mitraProgramScores.paramId,
+                periodYm: mitraProgramScores.periodYm,
+                rawValue: mitraProgramScores.rawValue,
+                points: mitraProgramScores.points,
+            })
+            .from(mitraProgramScores)
+            .where(and(
+                eq(mitraProgramScores.programId, program.id),
+                inArray(mitraProgramScores.outletId, outletIds)
+            ))
+        : [];
+
+    const paramById = new Map(params.map((param) => [param.id, param]));
+    const kumpulan = new Map<string, { raw: number[]; points: number[]; periodTerakhir: string }>();
+
+    for (const skor of skorRows) {
+        const kunci = `${skor.outletId}::${skor.paramId}`;
+        const param = paramById.get(skor.paramId);
+        if (!param) continue;
+
+        const bucket = kumpulan.get(kunci) || { raw: [], points: [], periodTerakhir: "" };
+
+        if (param.aggregation === "LAST") {
+            // Hanya periode terbaru yang dipakai; periode lama dibuang saat ketemu yang lebih baru.
+            if (skor.periodYm > bucket.periodTerakhir) {
+                bucket.periodTerakhir = skor.periodYm;
+                bucket.raw = [Number(skor.rawValue)];
+                bucket.points = [Number(skor.points)];
+            }
+        } else {
+            bucket.raw.push(Number(skor.rawValue));
+            bucket.points.push(Number(skor.points));
+            if (skor.periodYm > bucket.periodTerakhir) bucket.periodTerakhir = skor.periodYm;
+        }
+
+        kumpulan.set(kunci, bucket);
+    }
+
+    const ringkas = (nilai: number[], mode: string) => {
+        if (nilai.length === 0) return 0;
+        if (mode === "AVG") return nilai.reduce((total, item) => total + item, 0) / nilai.length;
+        // SUM dan LAST sama-sama menjumlah; untuk LAST isinya memang tinggal satu nilai.
+        return nilai.reduce((total, item) => total + item, 0);
+    };
+
+    const barisDenganMetrik = barisTampil.map((row) => ({
+        ...row,
+        metrics: Object.fromEntries(params.map((param) => {
+            const bucket = kumpulan.get(`${row.outletId}::${param.id}`);
+            return [param.key, {
+                raw: ringkas(bucket?.raw || [], param.aggregation),
+                points: ringkas(bucket?.points || [], param.aggregation),
+            }];
+        })),
+    }));
+
+    return { program, params, leaderboard: barisDenganMetrik, winners };
 }
 
 export async function recomputeMitraProgramLeaderboard(programId: string) {
