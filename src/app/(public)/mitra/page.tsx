@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
-import { ArrowRight, Loader2, MapPin, Navigation, Route, Search, Store } from "lucide-react";
+import { ArrowRight, Loader2, MapPin, Route, Search, Store } from "lucide-react";
 
 import dynamic from "next/dynamic";
 
@@ -239,7 +239,11 @@ export default function MitraOutletDirectoryPage() {
                             const isFocused = focusedOutlet === outlet.publicToken;
                             const hasCoord = map?.markers.some((m) => m.publicToken === outlet.publicToken);
                             return (
-                            <article key={outlet.publicToken} className={`overflow-hidden rounded-lg border bg-white shadow-sm transition-all duration-300 ${isFocused ? "ring-2 ring-red-500 ring-offset-2" : ""}`}>
+                            <article
+                                key={outlet.publicToken}
+                                onClick={() => hasCoord && handleFocusOutlet(outlet.publicToken)}
+                                className={`overflow-hidden rounded-lg border bg-white shadow-sm transition-all duration-300 ${hasCoord ? "cursor-pointer hover:shadow-md" : ""} ${isFocused ? "ring-2 ring-red-500 ring-offset-2" : ""}`}
+                            >
                                 <div className="grid grid-cols-[104px_1fr]">
                                     <div className="relative min-h-40 bg-gray-100">
                                         {outlet.photoUrl ? <Image src={outlet.photoUrl} alt={outlet.name} fill sizes="104px" className="object-cover" /> : <div className="flex h-full min-h-40 items-center justify-center text-red-600"><Store className="h-8 w-8" /></div>}
@@ -258,25 +262,11 @@ export default function MitraOutletDirectoryPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between border-t px-4 py-3">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-muted-foreground">PJP {outlet.pjpDay} · {outlet.pjpType}</span>
-                                        {hasCoord && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleFocusOutlet(outlet.publicToken)}
-                                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
-                                                    isFocused
-                                                        ? "bg-red-100 text-red-700"
-                                                        : "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600"
-                                                }`}
-                                                title="Lihat lokasi outlet ini di peta"
-                                            >
-                                                <Navigation className="h-3 w-3" />
-                                                Peta
-                                            </button>
-                                        )}
-                                    </div>
-                                    <Link href={`/mitra/o/${outlet.publicToken}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-700">Lihat Profil <ArrowRight className="h-4 w-4" /></Link>
+                                    <span className="text-xs text-muted-foreground">PJP {outlet.pjpDay} · {outlet.pjpType}</span>
+                                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
+                                    <span onClick={(e) => e.stopPropagation()} role="presentation">
+                                        <Link href={`/mitra/o/${outlet.publicToken}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-700">Lihat Profil <ArrowRight className="h-4 w-4" /></Link>
+                                    </span>
                                 </div>
                             </article>
                             );
