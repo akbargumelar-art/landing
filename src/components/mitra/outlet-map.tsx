@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 
 import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
@@ -58,6 +58,30 @@ const ikonOutletFokus = L.divIcon({
     iconSize: [30, 30],
     iconAnchor: [15, 15],
     popupAnchor: [0, -16],
+});
+
+/**
+ * Titik posisi pengguna dibuat biru dan berdenyut supaya tidak tertukar dengan penanda
+ * outlet yang merah -- keduanya sering berdekatan justru ketika fitur ini dipakai.
+ */
+const ikonPengguna = L.divIcon({
+    className: "",
+    html: `
+        <span style="
+            display:block;width:18px;height:18px;border-radius:9999px;
+            background:#2563eb;border:3px solid #fff;
+            box-shadow:0 0 0 5px rgba(37,99,235,.25), 0 2px 6px rgba(0,0,0,.35);
+            animation:pulsa-pengguna 1.6s ease-in-out infinite;
+        "></span>
+        <style>
+            @keyframes pulsa-pengguna {
+                0%, 100% { box-shadow: 0 0 0 5px rgba(37,99,235,.25), 0 2px 6px rgba(0,0,0,.35); }
+                50%      { box-shadow: 0 0 0 11px rgba(37,99,235,.10), 0 2px 6px rgba(0,0,0,.35); }
+            }
+        </style>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10],
 });
 
 /** Menyesuaikan tampilan peta agar seluruh penanda muat setiap kali daftarnya berubah. */
@@ -153,15 +177,42 @@ function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null
     return null;
 }
 
+/**
+ * Terbang ke posisi pengguna setiap kali pembacaan baru masuk. `stempel` dipakai sebagai
+ * pemicu, bukan koordinatnya: menekan tombol dua kali di tempat yang sama menghasilkan
+ * koordinat identik, dan tanpa stempel peta tidak akan bergerak kembali setelah pengguna
+ * menggeser petanya sendiri.
+ */
+function TerbangKePengguna({ posisi }: { posisi: PosisiPengguna | null }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!posisi) return;
+        map.invalidateSize({ animate: false });
+        map.flyTo([posisi.lat, posisi.lng], 16, { duration: 1.2 });
+    }, [map, posisi]);
+
+    return null;
+}
+
+export interface PosisiPengguna {
+    lat: number;
+    lng: number;
+    accuracy: number;
+    stempel: number;
+}
+
 export default function OutletMap({
     markers,
     focusedToken = null,
     onStreetView,
+    userPosition = null,
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
     /** Tidak diisi bila API key Street View belum dipasang; tombolnya ikut hilang. */
     onStreetView?: (publicToken: string) => void;
+    userPosition?: PosisiPengguna | null;
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -182,8 +233,29 @@ export default function OutletMap({
                 maxZoom={19}
             />
             <SesuaikanTampilan markers={markers} />
+            <TerbangKePengguna posisi={userPosition} />
             <IkutiUkuranKotak focusedToken={focusedToken} markers={markers} />
             <TerbangKeFokus focusedToken={focusedToken} markers={markers} />
+
+            {userPosition && (
+                <>
+                    {/* Lingkaran ketelitian menjelaskan mengapa titiknya bisa meleset --
+                        tanpa itu pengguna mengira aplikasinya yang salah membaca lokasi. */}
+                    <Circle
+                        center={[userPosition.lat, userPosition.lng]}
+                        radius={Math.max(userPosition.accuracy, 15)}
+                        pathOptions={{ color: "#2563eb", fillColor: "#2563eb", fillOpacity: 0.12, weight: 1 }}
+                    />
+                    <Marker position={[userPosition.lat, userPosition.lng]} icon={ikonPengguna}>
+                        <Popup>
+                            <span className="block text-sm font-bold text-gray-950">Lokasi Anda</span>
+                            <span className="mt-0.5 block text-xs text-gray-600">
+                                Ketelitian sekitar {Math.round(userPosition.accuracy)} m
+                            </span>
+                        </Popup>
+                    </Marker>
+                </>
+            )}
 
             {markers.map((outlet) => (
                 <Marker
