@@ -2,8 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
+
+import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
 
 import "leaflet/dist/leaflet.css";
 
@@ -37,6 +39,51 @@ const ikonOutlet = L.divIcon({
     popupAnchor: [0, -12],
 });
 
+/** Ikon lebih besar & berdenyut untuk outlet yang sedang difokuskan. */
+const ikonOutletFokus = L.divIcon({
+    className: "",
+    html: `
+        <span style="
+            display:block;width:30px;height:30px;border-radius:9999px;
+            background:#dc2626;border:4px solid #fef08a;
+            box-shadow:0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4);
+            animation:pulsa-marker 1.2s ease-in-out infinite;
+        "></span>
+        <style>
+            @keyframes pulsa-marker {
+                0%, 100% { box-shadow: 0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4); }
+                50%      { box-shadow: 0 0 0 12px rgba(220,38,38,.12), 0 2px 8px rgba(0,0,0,.4); }
+            }
+        </style>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -16],
+});
+
+/**
+ * Titik posisi pengguna dibuat biru dan berdenyut supaya tidak tertukar dengan penanda
+ * outlet yang merah -- keduanya sering berdekatan justru ketika fitur ini dipakai.
+ */
+const ikonPengguna = L.divIcon({
+    className: "",
+    html: `
+        <span style="
+            display:block;width:18px;height:18px;border-radius:9999px;
+            background:#2563eb;border:3px solid #fff;
+            box-shadow:0 0 0 5px rgba(37,99,235,.25), 0 2px 6px rgba(0,0,0,.35);
+            animation:pulsa-pengguna 1.6s ease-in-out infinite;
+        "></span>
+        <style>
+            @keyframes pulsa-pengguna {
+                0%, 100% { box-shadow: 0 0 0 5px rgba(37,99,235,.25), 0 2px 6px rgba(0,0,0,.35); }
+                50%      { box-shadow: 0 0 0 11px rgba(37,99,235,.10), 0 2px 6px rgba(0,0,0,.35); }
+            }
+        </style>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10],
+});
+
 /** Menyesuaikan tampilan peta agar seluruh penanda muat setiap kali daftarnya berubah. */
 function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
     const map = useMap();
@@ -56,7 +103,117 @@ function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
     return null;
 }
 
-export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
+/**
+ * Leaflet menghitung titik tengah dari ukuran kotak yang ia simpan sendiri, dan ukuran
+ * itu hanya diperbarui lewat invalidateSize(). Begitu panel Street View terbuka dan peta
+ * menyempit jadi setengah lebar, Leaflet masih memakai lebar lama -- penanda yang
+ * seharusnya di tengah jadi bergeser ke kanan, persis seperti yang terlihat.
+ *
+ * ResizeObserver dipakai, bukan event resize window, karena yang berubah adalah kotak
+ * petanya sendiri sementara ukuran jendela sama sekali tidak berubah.
+ */
+function IkutiUkuranKotak({ focusedToken, markers }: { focusedToken: string | null; markers: OutletMarker[] }) {
+    const map = useMap();
+    // Disimpan di ref supaya observer tidak dibuat ulang tiap penanda berubah.
+    const fokusRef = React.useRef<OutletMarker | null>(null);
+    fokusRef.current = markers.find((m) => m.publicToken === focusedToken) || null;
+
+    React.useEffect(() => {
+        const container = map.getContainer();
+        const observer = new ResizeObserver(() => {
+            map.invalidateSize({ animate: false });
+
+            // Setelah ukuran benar, penanda yang sedang difokuskan dikembalikan ke tengah.
+            const target = fokusRef.current;
+            if (target) {
+                map.setView([target.latitude, target.longitude], map.getZoom(), { animate: false });
+            }
+        });
+
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [map]);
+
+    return null;
+}
+
+/** Terbang halus ke outlet yang difokuskan dan buka popup-nya secara otomatis. */
+function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null; markers: OutletMarker[] }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!focusedToken) return;
+
+        const target = markers.find((m) => m.publicToken === focusedToken);
+        if (!target) return;
+
+        // Ukuran disegarkan lebih dulu: panel Street View terbuka pada saat yang sama
+        // dengan pemanggilan ini, jadi tanpa ini tujuan terbangnya dihitung dari lebar lama.
+        map.invalidateSize({ animate: false });
+        map.flyTo([target.latitude, target.longitude], 17, { duration: 1.2 });
+
+        // Buka popup penanda yang cocok setelah animasi selesai.
+        const timer = window.setTimeout(() => {
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    const pos = layer.getLatLng();
+                    if (
+                        Math.abs(pos.lat - target.latitude) < 0.00001 &&
+                        Math.abs(pos.lng - target.longitude) < 0.00001
+                    ) {
+                        layer.openPopup();
+                    }
+                }
+            });
+
+            // Popup yang terbuka memicu autoPan bawaan Leaflet bila dirasa tidak muat,
+            // dan itu menggeser penanda dari tengah lagi. Dikembalikan setelahnya.
+            map.setView([target.latitude, target.longitude], map.getZoom(), { animate: false });
+        }, 1300);
+
+        return () => window.clearTimeout(timer);
+    }, [focusedToken, map, markers]);
+
+    return null;
+}
+
+/**
+ * Terbang ke posisi pengguna setiap kali pembacaan baru masuk. `stempel` dipakai sebagai
+ * pemicu, bukan koordinatnya: menekan tombol dua kali di tempat yang sama menghasilkan
+ * koordinat identik, dan tanpa stempel peta tidak akan bergerak kembali setelah pengguna
+ * menggeser petanya sendiri.
+ */
+function TerbangKePengguna({ posisi }: { posisi: PosisiPengguna | null }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!posisi) return;
+        map.invalidateSize({ animate: false });
+        map.flyTo([posisi.lat, posisi.lng], 16, { duration: 1.2 });
+    }, [map, posisi]);
+
+    return null;
+}
+
+export interface PosisiPengguna {
+    lat: number;
+    lng: number;
+    accuracy: number;
+    stempel: number;
+}
+
+export default function OutletMap({
+    markers,
+    focusedToken = null,
+    onStreetView,
+    userPosition = null,
+}: {
+    markers: OutletMarker[];
+    focusedToken?: string | null;
+    /** Tidak diisi bila API key Street View belum dipasang; tombolnya ikut hilang. */
+    onStreetView?: (publicToken: string) => void;
+    userPosition?: PosisiPengguna | null;
+}) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
     const tengahAwal: [number, number] = [-6.732, 108.549];
@@ -76,12 +233,35 @@ export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
                 maxZoom={19}
             />
             <SesuaikanTampilan markers={markers} />
+            <TerbangKePengguna posisi={userPosition} />
+            <IkutiUkuranKotak focusedToken={focusedToken} markers={markers} />
+            <TerbangKeFokus focusedToken={focusedToken} markers={markers} />
+
+            {userPosition && (
+                <>
+                    {/* Lingkaran ketelitian menjelaskan mengapa titiknya bisa meleset --
+                        tanpa itu pengguna mengira aplikasinya yang salah membaca lokasi. */}
+                    <Circle
+                        center={[userPosition.lat, userPosition.lng]}
+                        radius={Math.max(userPosition.accuracy, 15)}
+                        pathOptions={{ color: "#2563eb", fillColor: "#2563eb", fillOpacity: 0.12, weight: 1 }}
+                    />
+                    <Marker position={[userPosition.lat, userPosition.lng]} icon={ikonPengguna}>
+                        <Popup>
+                            <span className="block text-sm font-bold text-gray-950">Lokasi Anda</span>
+                            <span className="mt-0.5 block text-xs text-gray-600">
+                                Ketelitian sekitar {Math.round(userPosition.accuracy)} m
+                            </span>
+                        </Popup>
+                    </Marker>
+                </>
+            )}
 
             {markers.map((outlet) => (
                 <Marker
                     key={outlet.publicToken}
                     position={[outlet.latitude, outlet.longitude]}
-                    icon={ikonOutlet}
+                    icon={focusedToken === outlet.publicToken ? ikonOutletFokus : ikonOutlet}
                 >
                     <Popup>
                         <span className="block text-sm font-bold text-gray-950">{outlet.name}</span>
@@ -90,6 +270,15 @@ export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
                             {outlet.kecamatan}, {outlet.kabupaten}
                         </span>
                         <span className="mt-2 flex flex-col gap-1">
+                            {onStreetView && (
+                                <button
+                                    type="button"
+                                    onClick={() => onStreetView(outlet.publicToken)}
+                                    className="text-left text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                    Lihat Street View
+                                </button>
+                            )}
                             <Link
                                 href={`/mitra/o/${outlet.publicToken}`}
                                 className="text-xs font-semibold text-red-600 hover:underline"
@@ -97,7 +286,7 @@ export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
                                 Lihat profil outlet
                             </Link>
                             <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${outlet.latitude},${outlet.longitude}`}
+                                href={buildOutletMapsUrl(outlet.latitude, outlet.longitude)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs font-semibold text-red-600 hover:underline"

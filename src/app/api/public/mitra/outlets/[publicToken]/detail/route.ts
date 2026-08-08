@@ -17,10 +17,13 @@ export async function GET(
         return NextResponse.json({ error: "Sesi detail tidak valid atau sudah berakhir" }, { status: 401 });
     }
 
+    // expiresAt tidak dikirim: akses detail tidak lagi dibatasi waktu setelah OTP
+    // terverifikasi, jadi tidak ada hitungan mundur yang perlu ditampilkan.
     return NextResponse.json({
         outlet: data.outlet,
         details: data.details,
         performance: data.performance,
-        expiresAt: data.detailSession.expiresAt,
+        marketShare: data.marketShare,
+        editLogs: data.editLogs,
     });
 }

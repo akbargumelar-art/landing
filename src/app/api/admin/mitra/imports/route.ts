@@ -12,12 +12,12 @@ import {
     mitraProgramParams,
     mitraProgramScores,
     mitraPrograms,
-    mitraTerritories,
     mitraWhitelistNumbers,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
+import { normalizeSalesforceName, resolveSalesforceIds } from "@/lib/mitra-salesforce";
 import {
     buildOutletMapsUrl,
     normalizeOutletBranding,
@@ -162,13 +162,12 @@ function parseRows(buffer: ArrayBuffer) {
 
 async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
     const outlets = await db.select().from(mitraOutlets);
-    const territories = await db.select().from(mitraTerritories);
     const metricDefs = await db.select().from(mitraMetricDefs);
     const programs = await db.select().from(mitraPrograms);
     const params = await db.select().from(mitraProgramParams);
 
     const outletByCode = new Map(outlets.map((outlet) => [outlet.outletCode, outlet]));
-    const territoryByName = new Map(territories.map((territory) => [territory.name.toLowerCase(), territory]));
+    const tapTersedia = new Set(outlets.map((outlet) => (outlet.tap || "").trim().toLowerCase()).filter(Boolean));
     const metricByKey = new Map(metricDefs.map((metric) => [metric.key, metric]));
     const programBySlug = new Map(programs.map((program) => [program.slug, program]));
     const paramByProgramKey = new Map(params.map((param) => [`${param.programId}:${param.key}`, param]));
@@ -183,15 +182,16 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
             const phone = normalizePhoneE164(String(row.phone || row.nomor || row.phoneE164 || ""));
             const scope = String(row.scope || "ALL").toUpperCase();
             const outletCode = String(row.outletCode || row.kodeOutlet || "");
-            const territoryName = String(row.territoryName || row.wilayah || "").toLowerCase();
+            // Scope wilayah diganti TAP; nilainya dicocokkan ke daftar TAP yang benar-benar
+            // dipakai outlet, bukan ke tabel master tersendiri.
+            const tap = String(row.tap || "").trim();
             const outlet = outletCode ? outletByCode.get(outletCode) : null;
-            const territory = territoryName ? territoryByName.get(territoryName) : null;
 
             if (!phone) errors.push({ row: rowNum, message: "Nomor wajib diisi" });
-            else if (!["ALL", "OUTLET", "TERRITORY"].includes(scope)) errors.push({ row: rowNum, message: "Scope tidak valid" });
+            else if (!["ALL", "OUTLET", "TAP"].includes(scope)) errors.push({ row: rowNum, message: "Scope tidak valid" });
             else if (scope === "OUTLET" && !outlet) errors.push({ row: rowNum, message: "Outlet tidak ditemukan" });
-            else if (scope === "TERRITORY" && !territory) errors.push({ row: rowNum, message: "Wilayah tidak ditemukan" });
-            else validRows.push({ ...row, phoneE164: phone, scope, outletId: outlet?.id || null, territoryId: territory?.id || null });
+            else if (scope === "TAP" && !tapTersedia.has(tap.toLowerCase())) errors.push({ row: rowNum, message: "TAP tidak ditemukan pada data outlet" });
+            else validRows.push({ ...row, phoneE164: phone, scope, outletId: outlet?.id || null, tap: scope === "TAP" ? tap : null });
         }
 
         if (type === "performance") {
@@ -262,9 +262,10 @@ async function commitWhitelistRows(executor: ImportExecutor, batchId: string, ro
         id: uuid(),
         phoneE164: String(row.phoneE164),
         name: row.name ? String(row.name) : null,
-        scope: row.scope as "ALL" | "OUTLET" | "TERRITORY",
+        scope: row.scope as "ALL" | "OUTLET" | "TAP",
         outletId: row.outletId ? String(row.outletId) : null,
-        territoryId: row.territoryId ? String(row.territoryId) : null,
+        tap: row.tap ? String(row.tap) : null,
+        keterangan: row.keterangan ? String(row.keterangan) : null,
         isActive: true,
         createdBy: userId,
         sourceBatchId: batchId,
@@ -321,6 +322,9 @@ async function commitProgramScoreRows(executor: ImportExecutor, batchId: string,
 
 async function commitOutletRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
     if (rows.length === 0) return;
+    // Nama salesforce di file hanya teks, jadi diterjemahkan lebih dulu menjadi id master
+    // (dibuatkan bila belum ada) supaya satu nama tidak tersimpan berulang di tiap outlet.
+    const salesforceIds = await resolveSalesforceIds(rows.map((row) => row.salesforce));
     const values = rows.map((row) => {
         const latitude = typeof row.latitude === "number" ? row.latitude : null;
         const longitude = typeof row.longitude === "number" ? row.longitude : null;
@@ -334,7 +338,7 @@ async function commitOutletRows(executor: ImportExecutor, rows: Record<string, u
             rsNumber: String(row.rsNumber || ""),
             ownerName: String(row.ownerName || ""),
             tap: String(row.tap || ""),
-            salesforce: String(row.salesforce || ""),
+            salesforceId: salesforceIds.get(normalizeSalesforceName(row.salesforce).toLowerCase()) || null,
             kabupaten: String(row.kabupaten || ""),
             kecamatan: String(row.kecamatan || ""),
             latitude,

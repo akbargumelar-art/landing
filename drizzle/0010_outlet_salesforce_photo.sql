@@ -1,0 +1,1 @@
+ALTER TABLE `mitra_outlets` ADD `salesforce_photo_url` varchar(500);

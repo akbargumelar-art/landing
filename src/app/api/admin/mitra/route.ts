@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, asc, count, desc, eq, inArray, like, lt, type SQL } from "drizzle-orm";
+import {and, asc, count, desc, eq, like, lt, type SQL} from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
@@ -8,12 +8,12 @@ import {
     mitraDetailSessions,
     mitraOtpRequests,
     mitraTerritories,
-    siteSettings,
     user,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getMitraAdminSummary } from "@/lib/mitra-data";
 import { getClientIp } from "@/lib/mitra-utils";
+import { testWahaConnection } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -27,34 +27,32 @@ export async function GET(request: Request) {
         const admin = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
         if (admin.error) return admin.error;
 
-        const settings = await db
-            .select({ key: siteSettings.key, value: siteSettings.value })
-            .from(siteSettings)
-            .where(inArray(siteSettings.key, ["wa_gw_endpoint", "wa_gw_session"]));
-        const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
-        const endpoint = settingMap.get("wa_gw_endpoint") || process.env.WAHA_BASE_URL || "";
-        let reachable = false;
-
-        if (endpoint) {
-            try {
-                const origin = new URL(endpoint).origin;
-                const response = await fetch(`${origin}/api/server/status`, {
-                    headers: process.env.WAHA_API_KEY ? { "X-Api-Key": process.env.WAHA_API_KEY } : undefined,
-                    signal: AbortSignal.timeout(3000),
-                    cache: "no-store",
-                });
-                reachable = response.ok;
-            } catch {
-                reachable = false;
-            }
-        }
+        /**
+         * Memakai testWahaConnection() yang sama dengan jalur pengiriman, bukan pemeriksaan
+         * sendiri.
+         *
+         * Versi sebelumnya membaca API key HANYA dari process.env.WAHA_API_KEY, padahal
+         * getWahaConfig() mengutamakan wa_gw_token dari Pengaturan. Bila token diisi lewat
+         * halaman Pengaturan -- cara yang memang dianjurkan -- permintaan pemeriksaan
+         * terkirim tanpa header X-Api-Key, WAHA membalas 401, dan indikator menyatakan
+         * "tidak terjangkau" padahal pengiriman OTP berjalan normal.
+         *
+         * Perbedaan lain yang ikut hilang: endpoint /api/server/status (versi lama) vs
+         * /api/sessions/{session} yang benar-benar dipakai, dan timeout 3 detik yang terlalu
+         * pendek untuk server yang sedang sibuk.
+         */
+        const waha = await testWahaConnection();
 
         return NextResponse.json({
             database: { ok: true },
             waha: {
-                configured: Boolean(endpoint),
-                reachable,
-                session: settingMap.get("wa_gw_session") || process.env.WAHA_SESSION || "default",
+                configured: waha.configured,
+                reachable: waha.reachable,
+                session: waha.session,
+                sessionStatus: waha.sessionStatus,
+                // Alasan spesifik supaya admin tahu harus memperbaiki apa, bukan sekadar
+                // "tidak terjangkau" yang tidak bisa ditindaklanjuti.
+                error: waha.error,
             },
         });
     }

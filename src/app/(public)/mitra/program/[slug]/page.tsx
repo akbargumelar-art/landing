@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, Medal, Search, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, Crown, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface LeaderboardRow {
     outletId: string;
@@ -16,8 +15,11 @@ interface LeaderboardRow {
     kabupaten: string;
     kecamatan: string;
     totalPoints: string;
-    rank: number;
+    /** null untuk peserta yang belum punya skor sama sekali. */
+    rank: number | null;
     prevRank?: number | null;
+    computedAt?: string | null;
+    metrics?: Record<string, { raw: number; points: number }>;
 }
 
 interface WinnerRow {
@@ -28,120 +30,439 @@ interface WinnerRow {
     prizeLabel?: string | null;
 }
 
+interface ProgramParam {
+    id: string;
+    key: string;
+    label: string;
+    unit?: string | null;
+    weight: string;
+}
+
+interface ProgramDetail {
+    program?: {
+        name: string;
+        descriptionMd?: string | null;
+        mechanismMd?: string | null;
+        periodStart?: string | null;
+        periodEnd?: string | null;
+        status?: string;
+    };
+    params?: ProgramParam[];
+    leaderboard: LeaderboardRow[];
+    winners: WinnerRow[];
+}
+
+function formatTanggal(value?: string | null) {
+    if (!value) return "";
+    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date(value));
+}
+
+function formatPoin(value: string | number) {
+    return Number(value).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
+
+/** Emas, perak, perunggu untuk tiga besar; sisanya netral. */
+function gayaPeringkat(rank: number | null) {
+    if (!rank) return "bg-gray-100 text-gray-400 ring-gray-200";
+    if (rank === 1) return "bg-amber-100 text-amber-700 ring-amber-300";
+    if (rank === 2) return "bg-slate-100 text-slate-700 ring-slate-300";
+    if (rank === 3) return "bg-orange-100 text-orange-700 ring-orange-300";
+    return "bg-gray-100 text-gray-600 ring-gray-200";
+}
+
 export default function MitraProgramDetailPage() {
     const params = useParams();
     const searchParams = useSearchParams();
     const slug = String(params.slug || "");
     const initialQuery = searchParams.get("q") || "";
-    const [query, setQuery] = React.useState(initialQuery);
-    const [loading, setLoading] = React.useState(true);
-    const [data, setData] = React.useState<{
-        program?: { name: string; descriptionMd?: string; mechanismMd?: string };
-        leaderboard: LeaderboardRow[];
-        winners: WinnerRow[];
-    } | null>(null);
 
-    const load = React.useCallback((q = "") => {
+    const [data, setData] = React.useState<ProgramDetail | null>(null);
+    const [loading, setLoading] = React.useState(true);
+    const [query, setQuery] = React.useState(initialQuery);
+    const [mencari, setMencari] = React.useState(false);
+    // null = belum pernah mencari; array kosong = sudah dicari tapi tidak ketemu.
+    const [hasilCari, setHasilCari] = React.useState<LeaderboardRow[] | null>(null);
+
+    React.useEffect(() => {
         setLoading(true);
-        fetch(`/api/public/mitra/programs/${slug}?q=${encodeURIComponent(q)}`)
+        fetch(`/api/public/mitra/programs/${slug}`)
             .then((res) => res.ok ? res.json() : null)
             .then(setData)
             .finally(() => setLoading(false));
     }, [slug]);
 
+    /**
+     * Pencarian tidak lagi menyaring tabel peringkat, melainkan mengisi panel di atasnya.
+     * Peserta ingin tahu posisinya sendiri tanpa kehilangan konteks papan peringkat penuh
+     * -- kalau tabelnya ikut tersaring, ia hanya melihat satu baris tanpa pembanding.
+     */
+    const cariPeserta = React.useCallback(async (keyword: string) => {
+        const clean = keyword.trim();
+        if (!clean) {
+            setHasilCari(null);
+            return;
+        }
+
+        setMencari(true);
+        try {
+            const res = await fetch(`/api/public/mitra/programs/${slug}?q=${encodeURIComponent(clean)}`);
+            const hasil = res.ok ? await res.json() : null;
+            setHasilCari(Array.isArray(hasil?.leaderboard) ? hasil.leaderboard : []);
+        } catch {
+            setHasilCari([]);
+        } finally {
+            setMencari(false);
+        }
+    }, [slug]);
+
     React.useEffect(() => {
-        load(initialQuery);
-    }, [initialQuery, load]);
+        if (initialQuery) cariPeserta(initialQuery);
+    }, [initialQuery, cariPeserta]);
+
+    const program = data?.program;
+    const leaderboard = data?.leaderboard || [];
+    const winners = data?.winners || [];
+    const periode = [formatTanggal(program?.periodStart), formatTanggal(program?.periodEnd)].filter(Boolean).join(" - ");
+    const diperbarui = leaderboard[0]?.computedAt;
+    const programParams = data?.params || [];
+
+    /**
+     * Selama admin belum mempublikasikan pemenang resmi, podium diisi tiga teratas
+     * papan peringkat berjalan dan ditandai "sementara". Tanpa ini halaman program yang
+     * sedang berlangsung tidak punya sorotan sama sekali -- padahal justru itu yang
+     * membuat peserta rutin membukanya.
+     */
+    const adaPemenangResmi = winners.length > 0;
+    const pemenangSementara: WinnerRow[] = leaderboard
+        .filter((row) => row.rank !== null)
+        .slice(0, 3)
+        .map((row) => ({
+            outletId: row.outletId,
+            outletName: row.outletName,
+            outletCode: row.outletCode,
+            rank: row.rank as number,
+            prizeLabel: `${formatPoin(row.totalPoints)} poin`,
+        }));
+    const podium = adaPemenangResmi ? winners : pemenangSementara;
+    // 5 kolom tetap (rangking, kode, nama, kecamatan, total) + satu kolom per parameter.
+    const jumlahKolom = 5 + programParams.length;
 
     return (
         <main className="min-h-screen bg-gray-50 pt-20">
-            <section className="border-b bg-white">
-                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                    <Link href="/program" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-red-600">
+            <section className="bg-gradient-to-br from-red-700 via-red-600 to-orange-500">
+                <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+                    <Link href="/program" className="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white">
                         <ArrowLeft className="h-4 w-4" />
                         Kembali
                     </Link>
-                    <p className="text-sm font-bold uppercase tracking-widest text-red-600">Leaderboard Program</p>
-                    <h1 className="mt-2 text-3xl font-extrabold text-gray-950">{data?.program?.name || "Program Mitra"}</h1>
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{data?.program?.descriptionMd || "Memuat data program..."}</p>
+
+                    <div className="mt-6 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white">
+                            <Trophy className="h-3.5 w-3.5" />
+                            Leaderboard Program
+                        </span>
+                        {program?.status && (
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-red-600">
+                                {program.status}
+                            </span>
+                        )}
+                    </div>
+
+                    <h1 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">
+                        {program?.name || (loading ? "Memuat program..." : "Program Mitra")}
+                    </h1>
+                    {periode && <p className="mt-2 text-sm font-semibold text-white/90">Periode Program {periode}</p>}
+                    {program?.descriptionMd && (
+                        <p className="mt-4 max-w-3xl text-sm leading-6 text-white/85">{program.descriptionMd}</p>
+                    )}
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                {/* Kartu pencarian sengaja menumpuk hero supaya jadi hal pertama yang
+                    dilihat peserta ketika membuka halaman dari tautan atau QR. */}
+                <div className="-mt-6 rounded-lg border bg-white p-5 shadow-md">
+                    <h2 className="text-sm font-bold text-gray-950">Cari Peringkat Outlet</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Masukkan kode outlet, nama outlet, atau kecamatan.</p>
+
+                    <form
+                        className="mt-3 flex flex-col gap-2 sm:flex-row"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            cariPeserta(query);
+                        }}
+                    >
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Contoh: 2201043676"
+                            className="sm:max-w-sm"
+                            aria-label="Kode atau nama outlet"
+                        />
+                        <Button type="submit" disabled={mencari || !query.trim()}>
+                            <Search className="h-4 w-4" />
+                            {mencari ? "Mencari..." : "Cari"}
+                        </Button>
+                        {hasilCari !== null && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => { setQuery(""); setHasilCari(null); }}
+                            >
+                                Reset
+                            </Button>
+                        )}
+                    </form>
+
+                    {hasilCari !== null && (
+                        hasilCari.length === 0 ? (
+                            <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">
+                                Outlet tidak ditemukan! Silakan masukkan kode outlet yang sesuai.
+                            </p>
+                        ) : (
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                {hasilCari.slice(0, 4).map((row) => (
+                                    <div key={row.outletId} className="rounded-lg border-2 border-red-100 bg-red-50/40 p-4">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="truncate font-bold text-gray-950">{row.outletName}</p>
+                                                <p className="text-xs text-muted-foreground">{row.outletCode}</p>
+                                            </div>
+                                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${gayaPeringkat(row.rank)}`}>
+                                                #{row.rank}
+                                            </span>
+                                        </div>
+                                        <p className="mt-3 text-xs text-muted-foreground">{row.kecamatan}, {row.kabupaten}</p>
+                                        <p className="mt-2 text-lg font-extrabold text-red-600">{formatPoin(row.totalPoints)} <span className="text-xs font-semibold text-muted-foreground">poin</span></p>
+                                        <PergerakanPeringkat rank={row.rank} prevRank={row.prevRank} />
+
+                                        {programParams.length > 0 && (
+                                            <dl className="mt-3 space-y-1 border-t pt-3">
+                                                {programParams.map((param) => (
+                                                    <div key={param.id} className="flex items-baseline justify-between gap-2 text-xs">
+                                                        <dt className="truncate text-muted-foreground">{param.label}</dt>
+                                                        <dd className="shrink-0 font-semibold tabular-nums text-gray-950">
+                                                            {formatPoin(row.metrics?.[param.key]?.raw ?? 0)}
+                                                            {param.unit ? ` ${param.unit}` : ""}
+                                                        </dd>
+                                                    </div>
+                                                ))}
+                                            </dl>
+                                        )}
+                                    </div>
+                                ))}
+                                {hasilCari.length > 4 && (
+                                    <p className="self-center text-xs text-muted-foreground">
+                                        dan {hasilCari.length - 4} outlet lain cocok. Persempit kata kuncinya.
+                                    </p>
+                                )}
+                            </div>
+                        )
+                    )}
                 </div>
             </section>
 
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-                {data?.winners && data.winners.length > 0 && (
+                {podium.length > 0 && <PodiumPemenang winners={podium} sementara={!adaPemenangResmi} />}
+
+                {(data?.params?.length || program?.mechanismMd) && (
                     <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <div className="mb-4 flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-orange-500" />
-                            <h2 className="font-bold">Pemenang Dipublikasikan</h2>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-3">
-                            {data.winners.map((winner) => (
-                                <div key={`${winner.outletId}-${winner.rank}`} className="rounded-lg border bg-orange-50/50 p-4">
-                                    <p className="text-xs font-bold text-orange-600">Peringkat #{winner.rank}</p>
-                                    <p className="mt-1 font-semibold">{winner.outletName}</p>
-                                    <p className="text-xs text-muted-foreground">{winner.outletCode}</p>
-                                    {winner.prizeLabel && <p className="mt-2 text-sm">{winner.prizeLabel}</p>}
-                                </div>
-                            ))}
-                        </div>
+                        <h2 className="font-bold">Mekanisme &amp; Parameter Penilaian</h2>
+                        {program?.mechanismMd && (
+                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">{program.mechanismMd}</p>
+                        )}
+                        {data?.params && data.params.length > 0 && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {data.params.map((param) => (
+                                    <span key={param.id} className="inline-flex items-center gap-2 rounded-full border bg-gray-50 px-3 py-1.5 text-xs">
+                                        <span className="font-semibold text-gray-950">{param.label}</span>
+                                        {param.unit && <span className="text-muted-foreground">({param.unit})</span>}
+                                        <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">
+                                            bobot {Number(param.weight).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                        </span>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 
-                <div className="rounded-lg border bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
                         <div>
-                            <h2 className="font-bold">Ranking Outlet</h2>
-                            <p className="text-sm text-muted-foreground">Cari berdasarkan nama, kode outlet, kecamatan, atau kabupaten.</p>
+                            <h2 className="font-bold">Papan Peringkat Peserta</h2>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {leaderboard.length > 0
+                                    ? `${leaderboard.length.toLocaleString("id-ID")} outlet peserta - tiap kolom parameter berisi pencapaiannya${diperbarui ? `, diperbarui ${formatTanggal(diperbarui)}` : ""}`
+                                    : "Peringkat dihitung ulang setiap kali data performa masuk."}
+                            </p>
                         </div>
-                        <form
-                            className="flex gap-2"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                load(query);
-                            }}
-                        >
-                            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari outlet" className="w-full md:w-72" />
-                            <Button type="submit" size="icon" aria-label="Cari">
-                                <Search className="h-4 w-4" />
-                            </Button>
-                        </form>
                     </div>
 
-                    <div className="mt-5 overflow-hidden rounded-lg border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-20">Rank</TableHead>
-                                    <TableHead>Outlet</TableHead>
-                                    <TableHead>Wilayah</TableHead>
-                                    <TableHead className="text-right">Poin</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm" style={{ minWidth: `${560 + programParams.length * 120}px` }}>
+                            <thead>
+                                {/* Kolom parameter dibangun dari konfigurasi program, jadi tiap
+                                    program otomatis punya kolom pencapaiannya sendiri. */}
+                                <tr className="border-b bg-gray-50 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    <th className="w-24 px-4 py-3 text-left">Rangking</th>
+                                    <th className="px-4 py-3 text-left">Kode Outlet</th>
+                                    <th className="px-4 py-3 text-left">Nama Outlet</th>
+                                    <th className="px-4 py-3 text-left">Kecamatan</th>
+                                    {programParams.map((param) => (
+                                        <th key={param.id} className="px-4 py-3 text-right">
+                                            {param.label}{param.unit ? ` (${param.unit})` : ""}
+                                        </th>
+                                    ))}
+                                    <th className="px-4 py-3 text-right">Total Poin</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 {loading ? (
-                                    <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                                ) : data?.leaderboard?.length ? data.leaderboard.map((row) => (
-                                    <TableRow key={row.outletId}>
-                                        <TableCell>
-                                            <span className="inline-flex items-center gap-1 font-bold text-red-600">
-                                                <Medal className="h-4 w-4" /> {row.rank}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <p className="font-semibold">{row.outletName}</p>
-                                            <p className="text-xs text-muted-foreground">{row.outletCode}</p>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">{row.kecamatan}, {row.kabupaten}</TableCell>
-                                        <TableCell className="text-right font-bold">{Number(row.totalPoints).toLocaleString("id-ID")}</TableCell>
-                                    </TableRow>
+                                    <tr><td colSpan={jumlahKolom} className="h-24 text-center text-muted-foreground">Memuat...</td></tr>
+                                ) : leaderboard.length ? leaderboard.map((row) => (
+                                    <tr key={row.outletId} className="border-b last:border-0 odd:bg-gray-50/50 hover:bg-red-50/40">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-extrabold ring-1 ${gayaPeringkat(row.rank)}`}>
+                                                    {row.rank ?? "-"}
+                                                </span>
+                                                <PergerakanPeringkat rank={row.rank} prevRank={row.prevRank} ringkas />
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{row.outletCode}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="font-semibold text-gray-950">{row.outletName}</span>
+                                            {row.rank === null && (
+                                                <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">belum ada data</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">{row.kecamatan || "-"}</td>
+                                        {programParams.map((param) => (
+                                            <td key={param.id} className="px-4 py-3 text-right tabular-nums text-gray-700">
+                                                {formatPoin(row.metrics?.[param.key]?.raw ?? 0)}
+                                            </td>
+                                        ))}
+                                        <td className="px-4 py-3 text-right font-extrabold tabular-nums text-gray-950">{formatPoin(row.totalPoints)}</td>
+                                    </tr>
                                 )) : (
-                                    <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Leaderboard belum tersedia.</TableCell></TableRow>
+                                    <tr><td colSpan={jumlahKolom} className="h-24 text-center text-muted-foreground">Leaderboard belum tersedia.</td></tr>
                                 )}
-                            </TableBody>
-                        </Table>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+
+                <p className="text-center text-xs text-muted-foreground">
+                    Peringkat mengikuti data performa yang sudah diverifikasi admin.{" "}
+                    <Link href="/mitra" className="inline-flex items-center gap-1 font-semibold text-red-600 hover:underline">
+                        Lihat direktori outlet <ArrowRight className="h-3 w-3" />
+                    </Link>
+                </p>
             </section>
         </main>
+    );
+}
+
+/**
+ * prevRank sudah lama disimpan tetapi belum pernah ditampilkan. Arah pergerakan justru
+ * bagian yang paling dicari peserta setelah data periode baru masuk.
+ */
+function PergerakanPeringkat({ rank, prevRank, ringkas = false }: { rank: number | null; prevRank?: number | null; ringkas?: boolean }) {
+    // Peserta tanpa peringkat belum punya posisi untuk dibandingkan.
+    if (!rank || !prevRank) {
+        return ringkas ? null : <p className="mt-1 text-xs text-muted-foreground">Peserta baru</p>;
+    }
+
+    const selisih = prevRank - rank;
+    if (selisih === 0) {
+        return ringkas
+            ? <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+            : <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground"><Minus className="h-3.5 w-3.5" /> Tetap</p>;
+    }
+
+    const naik = selisih > 0;
+    const Ikon = naik ? TrendingUp : TrendingDown;
+    const warna = naik ? "text-green-600" : "text-red-600";
+
+    return (
+        <span className={`inline-flex items-center gap-1 text-xs font-semibold ${warna} ${ringkas ? "" : "mt-1"}`}>
+            <Ikon className="h-3.5 w-3.5" />
+            {Math.abs(selisih)}
+        </span>
+    );
+}
+
+/** Juara 1 ditaruh di tengah dan dibuat lebih tinggi, seperti podium sungguhan. */
+function PodiumPemenang({ winners, sementara }: { winners: WinnerRow[]; sementara: boolean }) {
+    const urut = [...winners].sort((a, b) => a.rank - b.rank);
+    const podium = urut.slice(0, 3);
+    const sisanya = urut.slice(3);
+    // Urutan tampil: 2 - 1 - 3, sedangkan pada layar sempit tetap 1 - 2 - 3.
+    const urutanPodium = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
+
+    return (
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+                <Trophy className="h-5 w-5 text-amber-500" />
+                <h2 className="font-bold">{sementara ? "Pemenang Sementara" : "Pemenang Program"}</h2>
+                {sementara && (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                        Belum final - mengikuti data terakhir yang masuk
+                    </span>
+                )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+                {urutanPodium.map((winner) => {
+                    const juara = winner.rank === 1;
+                    return (
+                        <div
+                            key={`${winner.outletId}-${winner.rank}`}
+                            // order-first hanya berlaku di layar sempit: di sana kolomnya
+                            // menumpuk, jadi juara 1 harus naik ke atas. Kelasnya ditulis
+                            // utuh, bukan dirangkai dari variabel, supaya ikut ter-generate.
+                            className={`${juara ? "order-first sm:order-none" : ""} rounded-lg border-2 p-4 text-center ${
+                                juara
+                                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white sm:-mt-3 sm:pb-7"
+                                    : winner.rank === 2
+                                        ? "border-slate-200 bg-slate-50/60"
+                                        : "border-orange-200 bg-orange-50/50"
+                            }`}
+                        >
+                            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
+                                {juara ? <Crown className="h-5 w-5 text-amber-500" /> : <Award className={`h-5 w-5 ${winner.rank === 2 ? "text-slate-400" : "text-orange-400"}`} />}
+                            </div>
+                            <p className={`text-xs font-extrabold uppercase tracking-wide ${juara ? "text-amber-600" : "text-muted-foreground"}`}>
+                                Juara {winner.rank}
+                            </p>
+                            <p className="mt-1 font-bold text-gray-950">{winner.outletName}</p>
+                            <p className="text-xs text-muted-foreground">{winner.outletCode}</p>
+                            {winner.prizeLabel && (
+                                <p className="mt-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                                    {winner.prizeLabel}
+                                </p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {sisanya.length > 0 && (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {sisanya.map((winner) => (
+                        <div key={`${winner.outletId}-${winner.rank}`} className="flex items-center gap-3 rounded-lg border bg-gray-50 px-4 py-3">
+                            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-extrabold text-gray-600 ring-1 ring-gray-200">
+                                {winner.rank}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-gray-950">{winner.outletName}</p>
+                                <p className="text-xs text-muted-foreground">{winner.prizeLabel || winner.outletCode}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }

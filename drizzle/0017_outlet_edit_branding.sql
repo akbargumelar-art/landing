@@ -1,0 +1,1 @@
+ALTER TABLE `mitra_outlet_edit_logs` MODIFY COLUMN `action` enum('PHOTO','LOCATION','BRANDING') NOT NULL;

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
     mitraDetailSessions,
     mitraImportBatches,
+    mitraMarketShares,
     mitraMetricDefs,
     mitraOutletDetails,
     mitraOutletMetrics,
@@ -17,10 +18,11 @@ import {
     mitraProgramScores,
     mitraPrograms,
     mitraProgramWinners,
-    mitraTerritories,
+    mitraSalesforces,
     mitraWhitelistNumbers,
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
+import { getOutletEditLogs } from "@/lib/mitra-outlet-edit";
 import {
     hashSessionToken,
     isFuture,
@@ -28,6 +30,19 @@ import {
     normalizePhoneE164,
     toDecimalString,
 } from "@/lib/mitra-utils";
+
+/**
+ * Tautan wa.me beserta pesan pembuka yang sudah menyebut nama outlet, supaya salesforce
+ * langsung tahu konteksnya tanpa mitra perlu mengetik ulang.
+ */
+function buildWhatsAppUrl(phone: string | null, outletName: string): string | null {
+    if (!phone) return null;
+    const angka = phone.replace(/\D/g, "");
+    if (!angka) return null;
+
+    const pesan = encodeURIComponent(`Halo, saya dari outlet ${outletName}. Mohon bantuannya.`);
+    return `https://wa.me/${angka}?text=${pesan}`;
+}
 
 export type PublicMitraOutlet = NonNullable<Awaited<ReturnType<typeof getPublicOutletByToken>>>;
 
@@ -42,7 +57,12 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             ownerName: mitraOutlets.ownerName,
             ownerPhone: mitraOutlets.ownerPhone,
             tap: mitraOutlets.tap,
-            salesforce: mitraOutlets.salesforce,
+            // Nama dan foto salesforce datang dari master lewat join, tetapi tetap
+            // dikembalikan dengan nama field yang sama seperti sebelumnya supaya
+            // halaman publik tidak perlu tahu asalnya berubah.
+            salesforce: mitraSalesforces.name,
+            salesforcePhotoUrl: mitraSalesforces.photoUrl,
+            salesforcePhone: mitraSalesforces.phone,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
             longitude: mitraOutlets.longitude,
@@ -54,11 +74,19 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             branding: mitraOutlets.branding,
             status: mitraOutlets.status,
             photoUrl: mitraOutlets.photoUrl,
-            territoryName: mitraTerritories.name,
+            photoUpdatedAt: mitraOutlets.photoUpdatedAt,
+            photoEtalaseUrl: mitraOutlets.photoEtalaseUrl,
+            photoEtalaseUpdatedAt: mitraOutlets.photoEtalaseUpdatedAt,
+            photoPopTelkomselUrl: mitraOutlets.photoPopTelkomselUrl,
+            photoPopTelkomselUpdatedAt: mitraOutlets.photoPopTelkomselUpdatedAt,
+            photoPopKompetitorUrl: mitraOutlets.photoPopKompetitorUrl,
+            photoPopKompetitorUpdatedAt: mitraOutlets.photoPopKompetitorUpdatedAt,
+            // Nama territory tidak lagi diambil: profil publik menampilkan TAP dan
+            // salesforce, sedangkan territoryId saja sudah cukup untuk pencocokan whitelist.
             territoryId: mitraOutlets.territoryId,
         })
         .from(mitraOutlets)
-        .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
+        .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
         .where(eq(mitraOutlets.publicToken, publicToken))
         .limit(1);
 
@@ -82,8 +110,26 @@ export async function getPublicOutletByToken(publicToken: string) {
         pjpType: row.pjpType,
         branding: row.branding,
         status: row.status,
+        // Keempat slot foto ikut dibuka di profil publik: foto outlet bukan data
+        // sensitif, dan kebaruannya justru bukti kunjungan yang ingin dilihat.
         photoUrl: row.photoUrl,
-        territoryName: row.territoryName,
+        photoUpdatedAt: row.photoUpdatedAt,
+        photoEtalaseUrl: row.photoEtalaseUrl,
+        photoEtalaseUpdatedAt: row.photoEtalaseUpdatedAt,
+        photoPopTelkomselUrl: row.photoPopTelkomselUrl,
+        photoPopTelkomselUpdatedAt: row.photoPopTelkomselUpdatedAt,
+        photoPopKompetitorUrl: row.photoPopKompetitorUrl,
+        photoPopKompetitorUpdatedAt: row.photoPopKompetitorUpdatedAt,
+        // Territory diganti TAP + salesforce di profil publik: nama cabang dan petugas
+        // yang mengunjungi outlet jauh lebih berarti bagi mitra daripada kode wilayah internal.
+        tap: row.tap,
+        salesforce: row.salesforce,
+        salesforcePhotoUrl: row.salesforcePhotoUrl,
+        // Nomor ditampilkan tersamar, tetapi tautan wa.me memang membawa nomor utuhnya --
+        // itu justru tujuan tombolnya. Penyamaran di sini soal kerapian tampilan, bukan
+        // kerahasiaan: siapa pun bisa membaca nomor itu dari tautannya.
+        salesforcePhoneMasked: row.salesforcePhone ? maskPhone(row.salesforcePhone) : null,
+        salesforceWaUrl: buildWhatsAppUrl(row.salesforcePhone, row.name),
         ownerPhoneMasked: maskPhone(row.ownerPhone),
     };
 }
@@ -135,13 +181,25 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         .orderBy(desc(mitraOutletMetrics.periodYm), asc(mitraMetricDefs.label))
         .limit(120);
 
+    // Dicocokkan pada pasangan kabupaten + kecamatan persis seperti yang tersimpan di
+    // outlet. Selisih ejaan sekecil apa pun membuat baris tidak ketemu, dan itu memang
+    // disengaja: lebih baik tidak menampilkan angka daripada menampilkan angka wilayah lain.
+    const [marketShare] = outletRecord.kabupaten && outletRecord.kecamatan
+        ? await db
+            .select()
+            .from(mitraMarketShares)
+            .where(and(
+                eq(mitraMarketShares.kabupaten, outletRecord.kabupaten),
+                eq(mitraMarketShares.kecamatan, outletRecord.kecamatan)
+            ))
+            .limit(1)
+        : [];
+
     return {
         outlet: {
             ...outlet,
             ownerName: outletRecord.ownerName,
             rsNumber: outletRecord.rsNumber,
-            tap: outletRecord.tap,
-            salesforce: outletRecord.salesforce,
             longitude: outletRecord.longitude,
             latitude: outletRecord.latitude,
             // Diturunkan dari koordinat supaya tautan selalu cocok dengan lat/long tersimpan.
@@ -156,10 +214,12 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             rechargeDigipos: detailRow?.rechargeDigiposJson || {},
         },
         performance,
+        marketShare: marketShare || null,
+        editLogs: await getOutletEditLogs(outletRecord.id),
     };
 }
 
-export async function findMatchingWhitelist(phone: string, outlet: { id: string; territoryId: string | null }) {
+export async function findMatchingWhitelist(phone: string, outlet: { id: string; tap: string | null }) {
     const phoneE164 = normalizePhoneE164(phone);
     if (!phoneE164) return null;
 
@@ -177,7 +237,13 @@ export async function findMatchingWhitelist(phone: string, outlet: { id: string;
         if (candidate.expiresAt && !isFuture(candidate.expiresAt)) return false;
         if (candidate.scope === "ALL") return true;
         if (candidate.scope === "OUTLET") return candidate.outletId === outlet.id;
-        if (candidate.scope === "TERRITORY") return Boolean(outlet.territoryId && candidate.territoryId === outlet.territoryId);
+        // Dicocokkan tanpa membedakan huruf besar/kecil dan spasi tepi: nama TAP diketik
+        // manusia di dua tempat berbeda (data outlet dan form whitelist).
+        if (candidate.scope === "TAP") {
+            const tapOutlet = (outlet.tap || "").trim().toLowerCase();
+            const tapKandidat = (candidate.tap || "").trim().toLowerCase();
+            return Boolean(tapOutlet && tapKandidat && tapOutlet === tapKandidat);
+        }
         return false;
     }) || null;
 }
@@ -277,7 +343,113 @@ export async function getPublicMitraProgramDetail(slug: string, search = "") {
         .where(and(eq(mitraProgramWinners.programId, program.id), eq(mitraProgramWinners.isPublished, true)))
         .orderBy(asc(mitraProgramWinners.rank));
 
-    return { program, params, leaderboard, winners };
+    /**
+     * Peserta yang belum punya satu pun skor tidak pernah masuk papan peringkat --
+     * peringkat dibangun dari tabel skor. Dari sisi peserta itu terlihat seperti tidak
+     * terdaftar, padahal terdaftar. Karena itu mereka ikut ditarik dan digabungkan di
+     * bawah daftar dengan nilai nol.
+     */
+    const peringkatIds = new Set(leaderboard.map((row) => row.outletId));
+    const pesertaWhere = searchFilter
+        ? and(eq(mitraProgramParticipants.programId, program.id), searchFilter)
+        : eq(mitraProgramParticipants.programId, program.id);
+
+    const semuaPeserta = await db
+        .select({
+            outletId: mitraOutlets.id,
+            outletName: mitraOutlets.name,
+            outletCode: mitraOutlets.outletCode,
+            kabupaten: mitraOutlets.kabupaten,
+            kecamatan: mitraOutlets.kecamatan,
+        })
+        .from(mitraProgramParticipants)
+        .innerJoin(mitraOutlets, eq(mitraProgramParticipants.outletId, mitraOutlets.id))
+        .where(pesertaWhere)
+        .orderBy(asc(mitraOutlets.name))
+        .limit(200);
+
+    const tanpaSkor = semuaPeserta
+        .filter((peserta) => !peringkatIds.has(peserta.outletId))
+        .map((peserta) => ({
+            ...peserta,
+            totalPoints: "0.00",
+            rank: null as number | null,
+            prevRank: null as number | null,
+            computedAt: null as Date | null,
+        }));
+
+    const barisTampil = [...leaderboard.map((row) => ({ ...row, rank: row.rank as number | null })), ...tanpaSkor];
+
+    /**
+     * Pencapaian per parameter. Skor mentahnya sudah lama tersimpan per bulan, tetapi
+     * belum pernah dikirim ke halaman publik -- yang dikirim hanya total poin.
+     *
+     * Digabungkan di JavaScript, bukan lewat SUM() di SQL, karena tiap parameter punya
+     * mode agregasinya sendiri (SUM/AVG/LAST) dan LAST berarti "ambil periode terbaru",
+     * yang tidak bisa diwakili satu fungsi agregat SQL.
+     */
+    const outletIds = barisTampil.map((row) => row.outletId);
+    const skorRows = outletIds.length > 0 && params.length > 0
+        ? await db
+            .select({
+                outletId: mitraProgramScores.outletId,
+                paramId: mitraProgramScores.paramId,
+                periodYm: mitraProgramScores.periodYm,
+                rawValue: mitraProgramScores.rawValue,
+                points: mitraProgramScores.points,
+            })
+            .from(mitraProgramScores)
+            .where(and(
+                eq(mitraProgramScores.programId, program.id),
+                inArray(mitraProgramScores.outletId, outletIds)
+            ))
+        : [];
+
+    const paramById = new Map(params.map((param) => [param.id, param]));
+    const kumpulan = new Map<string, { raw: number[]; points: number[]; periodTerakhir: string }>();
+
+    for (const skor of skorRows) {
+        const kunci = `${skor.outletId}::${skor.paramId}`;
+        const param = paramById.get(skor.paramId);
+        if (!param) continue;
+
+        const bucket = kumpulan.get(kunci) || { raw: [], points: [], periodTerakhir: "" };
+
+        if (param.aggregation === "LAST") {
+            // Hanya periode terbaru yang dipakai; periode lama dibuang saat ketemu yang lebih baru.
+            if (skor.periodYm > bucket.periodTerakhir) {
+                bucket.periodTerakhir = skor.periodYm;
+                bucket.raw = [Number(skor.rawValue)];
+                bucket.points = [Number(skor.points)];
+            }
+        } else {
+            bucket.raw.push(Number(skor.rawValue));
+            bucket.points.push(Number(skor.points));
+            if (skor.periodYm > bucket.periodTerakhir) bucket.periodTerakhir = skor.periodYm;
+        }
+
+        kumpulan.set(kunci, bucket);
+    }
+
+    const ringkas = (nilai: number[], mode: string) => {
+        if (nilai.length === 0) return 0;
+        if (mode === "AVG") return nilai.reduce((total, item) => total + item, 0) / nilai.length;
+        // SUM dan LAST sama-sama menjumlah; untuk LAST isinya memang tinggal satu nilai.
+        return nilai.reduce((total, item) => total + item, 0);
+    };
+
+    const barisDenganMetrik = barisTampil.map((row) => ({
+        ...row,
+        metrics: Object.fromEntries(params.map((param) => {
+            const bucket = kumpulan.get(`${row.outletId}::${param.id}`);
+            return [param.key, {
+                raw: ringkas(bucket?.raw || [], param.aggregation),
+                points: ringkas(bucket?.points || [], param.aggregation),
+            }];
+        })),
+    }));
+
+    return { program, params, leaderboard: barisDenganMetrik, winners };
 }
 
 export async function recomputeMitraProgramLeaderboard(programId: string) {

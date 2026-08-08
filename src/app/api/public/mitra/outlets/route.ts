@@ -113,6 +113,16 @@ export async function GET(request: Request) {
     ]);
 
     const total = totalRow?.value || 0;
+
+    /**
+     * Kedua daftar filter saling menyaring: pilihan TAP dibatasi kabupaten yang sedang
+     * dipilih, dan sebaliknya. Nilai yang sedang terpilih selalu dimasukkan kembali,
+     * kalau tidak kombinasi yang tidak punya outlet akan membuat select-nya tampak
+     * kosong padahal state-nya masih terisi.
+     */
+    const opsiUnik = (nilai: (string | null)[], terpilih: string) =>
+        Array.from(new Set([...nilai, terpilih].filter((item): item is string => Boolean(item)))).sort();
+
     return NextResponse.json({
         outlets,
         total,
@@ -120,8 +130,14 @@ export async function GET(request: Request) {
         pageSize,
         pageCount: Math.max(Math.ceil(total / pageSize), 1),
         filters: {
-            kabupaten: Array.from(new Set(filterRows.map((row) => row.kabupaten).filter(Boolean))).sort(),
-            tap: Array.from(new Set(filterRows.map((row) => row.tap).filter(Boolean))).sort(),
+            kabupaten: opsiUnik(
+                filterRows.filter((row) => !tap || row.tap === tap).map((row) => row.kabupaten),
+                kabupaten
+            ),
+            tap: opsiUnik(
+                filterRows.filter((row) => !kabupaten || row.kabupaten === kabupaten).map((row) => row.tap),
+                tap
+            ),
         },
     });
 }

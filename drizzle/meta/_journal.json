@@ -71,6 +71,62 @@
       "when": 1786001964584,
       "tag": "0009_redemption_log_nullable_voucher",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1786163929941,
+      "tag": "0010_outlet_salesforce_photo",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1786167720583,
+      "tag": "0011_market_share_per_kecamatan",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1786172527766,
+      "tag": "0012_salesforce_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1786189479361,
+      "tag": "0013_outlet_edit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1786190831064,
+      "tag": "0014_outlet_photo_slots",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1786190891064,
+      "tag": "0015_whitelist_tap_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1786225387854,
+      "tag": "0016_qr_card_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1786226016417,
+      "tag": "0017_outlet_edit_branding",
+      "breakpoints": true
     }
   ]
 }

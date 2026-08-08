@@ -7,6 +7,7 @@ import { mitraDetailSessions, mitraOtpRequests } from "@/db/schema";
 import { getMitraOutletRecordByToken, writeWhitelistUsage } from "@/lib/mitra-data";
 import {
     MITRA_DETAIL_SESSION_COOKIE,
+    MITRA_DETAIL_SESSION_TTL_MINUTES,
     addMinutes,
     generateSessionToken,
     getClientIp,
@@ -87,7 +88,7 @@ export async function POST(
         tokenHash: hashSessionToken(sessionToken),
         phoneE164,
         outletId: outlet.id,
-        expiresAt: addMinutes(now, 15),
+        expiresAt: addMinutes(now, MITRA_DETAIL_SESSION_TTL_MINUTES),
         createdAt: now,
     });
 
@@ -108,7 +109,10 @@ export async function POST(
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
-        maxAge: 15 * 60,
+        // Sesi detail sengaja tidak dibatasi waktu; yang dibatasi hanya masa berlaku
+        // kode OTP. Browser tetap memangkas umur cookie ke batasnya sendiri (~400 hari),
+        // dan setelah itu pengunjung tinggal minta OTP baru.
+        maxAge: MITRA_DETAIL_SESSION_TTL_MINUTES * 60,
         // Cookie harus ikut terkirim ke API detail (/api/public/mitra/outlets/.../detail),
         // bukan hanya ke halaman /mitra/o/{token}. Jika path dibatasi ke halaman,
         // fetch detail langsung 401 dan UI menampilkan sesi sudah berakhir.

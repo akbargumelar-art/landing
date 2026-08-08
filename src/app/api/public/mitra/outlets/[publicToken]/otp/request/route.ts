@@ -7,6 +7,7 @@ import { mitraOtpRequests } from "@/db/schema";
 import { findMatchingWhitelist, getMitraOutletRecordByToken, writeWhitelistUsage } from "@/lib/mitra-data";
 import { getOtpTemplate, sendTemplatedWhatsApp } from "@/lib/whatsapp";
 import {
+    MITRA_OTP_TTL_MINUTES,
     addMinutes,
     createOtpHash,
     generateOtpCode,
@@ -16,7 +17,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const GENERIC_MESSAGE = "Jika nomor terdaftar, kode OTP akan dikirim melalui WhatsApp.";
+// Balasan sengaja tidak lagi generik: pemilik outlet meminta pengunjung langsung tahu
+// apakah nomornya berhak atau tidak. Konsekuensinya endpoint ini bisa dipakai menebak
+// nomor mana yang masuk whitelist, jadi rate limit di bawah adalah pengaman utamanya.
+const NOT_ELIGIBLE_MESSAGE = "Nomor WhatsApp ini tidak berhak membuka detail outlet. Hubungi admin bila menurut Anda ini keliru.";
 
 export async function POST(
     request: Request,
@@ -26,7 +30,10 @@ export async function POST(
     const outlet = await getMitraOutletRecordByToken(publicToken);
 
     if (!outlet) {
-        return NextResponse.json({ message: GENERIC_MESSAGE });
+        return NextResponse.json(
+            { eligible: false, title: "Outlet Tidak Ditemukan", message: "Outlet tidak ditemukan atau tautannya sudah tidak berlaku." },
+            { status: 404 }
+        );
     }
 
     const body = await request.json().catch(() => ({}));
@@ -35,7 +42,10 @@ export async function POST(
     const userAgent = request.headers.get("user-agent") || "";
 
     if (!phoneE164) {
-        return NextResponse.json({ message: GENERIC_MESSAGE });
+        return NextResponse.json(
+            { eligible: false, title: "Nomor Tidak Valid", message: "Nomor WhatsApp tidak valid. Contoh penulisan: 081234567890." },
+            { status: 400 }
+        );
     }
 
     const now = new Date();
@@ -51,12 +61,15 @@ export async function POST(
     ]);
 
     if ((recentPhone?.value || 0) >= 1 || (hourPhone?.value || 0) >= 5 || (dayPhone?.value || 0) >= 10 || (hourIp?.value || 0) >= 15) {
-        return NextResponse.json({ message: GENERIC_MESSAGE }, { status: 429 });
+        return NextResponse.json(
+            { eligible: false, title: "Terlalu Sering Meminta OTP", message: "Permintaan OTP terlalu sering. Tunggu beberapa menit sebelum mencoba lagi." },
+            { status: 429 }
+        );
     }
 
     const whitelist = await findMatchingWhitelist(phoneE164, {
         id: outlet.id,
-        territoryId: outlet.territoryId,
+        tap: outlet.tap,
     });
 
     if (!whitelist) {
@@ -66,7 +79,7 @@ export async function POST(
             action: "OTP_REJECTED",
             ip,
         });
-        return NextResponse.json({ message: GENERIC_MESSAGE });
+        return NextResponse.json({ eligible: false, title: "Nomor Tidak Berhak", message: NOT_ELIGIBLE_MESSAGE }, { status: 403 });
     }
 
     const code = generateOtpCode();
@@ -81,7 +94,7 @@ export async function POST(
         codeSalt: salt,
         purpose: "OUTLET_DETAIL",
         attempts: 0,
-        expiresAt: addMinutes(now, 5),
+        expiresAt: addMinutes(now, MITRA_OTP_TTL_MINUTES),
         ip,
         userAgent,
         createdAt: now,
@@ -101,14 +114,20 @@ export async function POST(
         programName: "Portal Mitra Outlet",
         otp: code,
         outlet: outlet.name,
-        expires: "5 menit",
+        expires: `${MITRA_OTP_TTL_MINUTES} menit`,
     });
 
     if (!sent.ok) {
-        // Balasan ke pengunjung tetap generik agar tidak membocorkan status nomor,
-        // tetapi kegagalannya dicatat supaya admin bisa menelusurinya.
         console.error("[OTP] Gagal mengirim OTP via WAHA:", sent.error);
+        return NextResponse.json(
+            { eligible: true, title: "Pengiriman OTP Gagal", message: "Nomor Anda terdaftar, tetapi pengiriman WhatsApp sedang gagal. Coba lagi beberapa saat." },
+            { status: 502 }
+        );
     }
 
-    return NextResponse.json({ message: GENERIC_MESSAGE });
+    return NextResponse.json({
+        eligible: true,
+        title: "Cek WhatsApp Anda",
+        message: `Kode OTP sudah dikirim. Silakan cek WhatsApp Anda, kode berlaku ${MITRA_OTP_TTL_MINUTES} menit.`,
+    });
 }

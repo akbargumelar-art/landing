@@ -3,6 +3,7 @@
 import React from "react";
 import { FileSpreadsheet, Loader2, Upload, Download } from "lucide-react";
 
+import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,8 @@ export default function AdminMitraImportPage() {
 
     return (
         <div className="space-y-6">
+            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
+
             <div>
                 <h1 className="text-2xl font-bold">Import Data Mitra</h1>
                 <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, program score, dan penambahan outlet baru. Unduh contoh file untuk melihat format kolom yang benar.</p>

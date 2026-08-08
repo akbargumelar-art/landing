@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
-import QRCode from "qrcode";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 
 import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { buildOutletPublicUrl, getClientIp } from "@/lib/mitra-utils";
+import { KARTU_LEBAR_MM, KARTU_TINGGI_MM, MM, gambarKartu, siapkanFont, type QrCardData, type QrTemplate } from "@/lib/qr-template";
+import { ambilTemplateCetak } from "@/lib/qr-template-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,12 +22,19 @@ export async function POST(request: Request) {
         ? await db.select().from(mitraOutlets).where(inArray(mitraOutlets.id, outletIds))
         : await db.select().from(mitraOutlets).limit(100);
 
+    const template = await ambilTemplateCetak(body.templateId ? String(body.templateId) : null);
     const pdf = await buildBulkCardsPdf(
         outlets.map((outlet) => ({
-            name: outlet.name,
-            code: outlet.outletCode,
+            outletName: outlet.name,
+            outletCode: outlet.outletCode,
+            tap: outlet.tap,
+            kabupaten: outlet.kabupaten,
+            kecamatan: outlet.kecamatan,
+            ownerName: outlet.ownerName,
             url: buildOutletPublicUrl(outlet.publicToken, request),
-        }))
+        })),
+        template,
+        new URL(request.url).origin
     );
 
     await writeAdminAuditLog({
@@ -45,86 +53,45 @@ export async function POST(request: Request) {
     });
 }
 
-async function buildBulkCardsPdf(cards: { name: string; code: string; url: string }[]) {
-    const mm = 2.834645669;
-    const a4Width = 210 * mm;
-    const a4Height = 297 * mm;
-    const cardWidth = 90 * mm;
-    const cardHeight = 55 * mm;
-    const gapX = 8 * mm;
-    const gapY = 4 * mm;
+/**
+ * Susunan 2 kolom x 5 baris per A4 dipertahankan; isi tiap kartunya kini digambar
+ * gambarKartu() yang sama dengan kartu satuan, sehingga template yang dipilih berlaku
+ * pada kedua jalur cetak tanpa ada dua tata letak yang harus dijaga selaras.
+ */
+async function buildBulkCardsPdf(cards: QrCardData[], template: QrTemplate, origin: string) {
+    const a4Width = 210 * MM;
+    const a4Height = 297 * MM;
+    const cardWidth = KARTU_LEBAR_MM * MM;
+    const cardHeight = KARTU_TINGGI_MM * MM;
+    const gapX = 8 * MM;
+    const gapY = 4 * MM;
     const startX = (a4Width - cardWidth * 2 - gapX) / 2;
-    const startY = a4Height - 12 * mm - cardHeight;
+    const startY = a4Height - 12 * MM - cardHeight;
 
     const doc = await PDFDocument.create();
-    const font = await doc.embedFont(StandardFonts.HelveticaBold);
-    const normal = await doc.embedFont(StandardFonts.Helvetica);
-    let page = doc.addPage([a4Width, a4Height]);
+    const { fontBiasa, fontTebal } = await siapkanFont(doc);
 
-    for (let index = 0; index < cards.length; index++) {
-        if (index > 0 && index % 10 === 0) {
-            page = doc.addPage([a4Width, a4Height]);
+    const perHalaman = 10;
+    for (let index = 0; index < Math.max(cards.length, 1); index += perHalaman) {
+        const page = doc.addPage([a4Width, a4Height]);
+        const kelompok = cards.slice(index, index + perHalaman);
+
+        for (const [posisi, card] of kelompok.entries()) {
+            const kolom = posisi % 2;
+            const baris = Math.floor(posisi / 2);
+
+            await gambarKartu({
+                doc,
+                page,
+                template,
+                data: card,
+                originX: startX + kolom * (cardWidth + gapX),
+                originY: startY - baris * (cardHeight + gapY),
+                fontBiasa,
+                fontTebal,
+                origin,
+            });
         }
-
-        const slot = index % 10;
-        const col = slot % 2;
-        const row = Math.floor(slot / 2);
-        const x = startX + col * (cardWidth + gapX);
-        const y = startY - row * (cardHeight + gapY);
-        const card = cards[index];
-        const qr = await QRCode.toBuffer(card.url, { type: "png", margin: 1, scale: 6 });
-        const qrImage = await doc.embedPng(qr);
-
-        page.drawRectangle({
-            x,
-            y,
-            width: cardWidth,
-            height: cardHeight,
-            color: rgb(1, 1, 1),
-            borderColor: rgb(0.86, 0.86, 0.86),
-            borderWidth: 0.8,
-        });
-        page.drawRectangle({
-            x,
-            y: y + cardHeight - 18,
-            width: cardWidth,
-            height: 18,
-            color: rgb(0.93, 0.01, 0.15),
-        });
-        page.drawText("ABK Ciraya Mitra Outlet", {
-            x: x + 10,
-            y: y + cardHeight - 12,
-            size: 7,
-            font,
-            color: rgb(1, 1, 1),
-        });
-        page.drawImage(qrImage, {
-            x: x + 10,
-            y: y + 20,
-            width: 75,
-            height: 75,
-        });
-        page.drawText(trim(card.name, 26), {
-            x: x + 95,
-            y: y + cardHeight - 42,
-            size: 8.5,
-            font,
-            color: rgb(0.1, 0.1, 0.1),
-        });
-        page.drawText(card.code, {
-            x: x + 95,
-            y: y + cardHeight - 56,
-            size: 7,
-            font: normal,
-            color: rgb(0.35, 0.35, 0.35),
-        });
-        page.drawText("Scan profil outlet", {
-            x: x + 95,
-            y: y + 26,
-            size: 7,
-            font: normal,
-            color: rgb(0.2, 0.2, 0.2),
-        });
     }
 
     return toArrayBuffer(await doc.save());
@@ -134,6 +101,3 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-function trim(value: string, max: number) {
-    return value.length > max ? `${value.slice(0, max - 3)}...` : value;
-}

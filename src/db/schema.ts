@@ -492,6 +492,27 @@ export const mitraUserTerritories = mysqlTable("mitra_user_territories", {
     index("mitra_user_territories_territory_idx").on(table.territoryId),
 ]);
 
+/**
+ * Master salesforce: satu baris per petugas, dipakai bersama oleh semua outlet yang
+ * dikunjunginya. Sebelumnya nama dan fotonya disimpan berulang di tiap baris outlet,
+ * sehingga ganti nama atau ganti foto berarti menyunting puluhan outlet satu per satu.
+ *
+ * Nama dijadikan unique karena itulah kunci pencocokan dari file import (kolom
+ * `salesforce` di CSV hanya berisi nama, tanpa id).
+ */
+export const mitraSalesforces = mysqlTable("mitra_salesforces", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull().unique(),
+    photoUrl: varchar("photo_url", { length: 500 }),
+    phone: varchar("phone", { length: 50 }),
+    tap: varchar("tap", { length: 255 }).notNull().default(""),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_salesforces_active_idx").on(table.isActive),
+]);
+
 export const mitraOutlets = mysqlTable("mitra_outlets", {
     id: varchar("id", { length: 36 }).primaryKey(),
     outletCode: varchar("outlet_code", { length: 100 }).notNull().unique(),
@@ -501,7 +522,9 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     ownerName: varchar("owner_name", { length: 255 }).notNull(),
     ownerPhone: varchar("owner_phone", { length: 50 }).notNull(),
     tap: varchar("tap", { length: 255 }).notNull().default(""),
-    salesforce: varchar("salesforce", { length: 255 }).notNull().default(""),
+    // Nama dan foto salesforce hidup di mitra_salesforces, bukan di sini. Import CSV
+    // yang hanya membawa nama diselesaikan lewat resolveSalesforceId() di lib/mitra-salesforce.
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "set null" }),
     kabupaten: varchar("kabupaten", { length: 255 }).notNull().default(""),
     kecamatan: varchar("kecamatan", { length: 255 }).notNull().default(""),
     longitude: double("longitude"),
@@ -515,7 +538,23 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     pjpType: mysqlEnum("pjp_type", PJP_TYPES).notNull().default(DEFAULT_PJP_TYPE),
     branding: mysqlEnum("branding", OUTLET_BRANDINGS).notNull().default(DEFAULT_OUTLET_BRANDING),
     status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).notNull().default("ACTIVE"),
+    /**
+     * Empat slot foto outlet. photoUrl adalah foto tampak depan sekaligus foto utama
+     * yang dipakai kartu direktori, hero profil, dan popup peta -- karena itu namanya
+     * dipertahankan, supaya seluruh pembaca lama tetap bekerja tanpa join.
+     *
+     * Kolom *_updated_at bukan sekadar hiasan: kunjungan salesforce divalidasi lewat
+     * kebaruan foto, jadi tanggalnya adalah datanya. Diisi eksplisit saat foto diunggah,
+     * bukan lewat onUpdateNow, supaya perubahan kolom lain tidak ikut menyegarkannya.
+     */
     photoUrl: varchar("photo_url", { length: 500 }),
+    photoUpdatedAt: datetime("photo_updated_at"),
+    photoEtalaseUrl: varchar("photo_etalase_url", { length: 500 }),
+    photoEtalaseUpdatedAt: datetime("photo_etalase_updated_at"),
+    photoPopTelkomselUrl: varchar("photo_pop_telkomsel_url", { length: 500 }),
+    photoPopTelkomselUpdatedAt: datetime("photo_pop_telkomsel_updated_at"),
+    photoPopKompetitorUrl: varchar("photo_pop_kompetitor_url", { length: 500 }),
+    photoPopKompetitorUpdatedAt: datetime("photo_pop_kompetitor_updated_at"),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
@@ -524,6 +563,7 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     index("mitra_outlets_owner_phone_idx").on(table.ownerPhone),
     index("mitra_outlets_territory_idx").on(table.territoryId),
     index("mitra_outlets_status_idx").on(table.status),
+    index("mitra_outlets_salesforce_idx").on(table.salesforceId),
 ]);
 
 export const mitraOutletDetails = mysqlTable("mitra_outlet_details", {
@@ -533,6 +573,62 @@ export const mitraOutletDetails = mysqlTable("mitra_outlet_details", {
     rechargeDigiposJson: json("recharge_digipos_json").$type<MitraDetailGroup>(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
+
+/**
+ * Market share operator per kecamatan, dipakai halaman detail outlet setelah OTP.
+ *
+ * Dikunci pada pasangan kabupaten + kecamatan, bukan kecamatan saja: nama kecamatan
+ * berulang antar kabupaten (Jalaksana, Kesambi, dan seterusnya bisa ada di lebih dari
+ * satu daerah), jadi kecamatan saja akan menempelkan angka yang salah ke outlet.
+ *
+ * Satu baris per wilayah tanpa kolom periode -- angka terbaru menimpa yang lama. Kalau
+ * nanti perlu riwayat bulanan, tambahkan period_ym ke tabel dan ke unique index-nya.
+ */
+export const mitraMarketShares = mysqlTable("mitra_market_shares", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    kabupaten: varchar("kabupaten", { length: 255 }).notNull(),
+    kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
+    telkomsel: decimal("telkomsel", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    xl: decimal("xl", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    axis: decimal("axis", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    smartfren: decimal("smartfren", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    indosat: decimal("indosat", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    tri: decimal("tri", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_market_share_area_idx").on(table.kabupaten, table.kecamatan),
+]);
+
+/**
+ * Template kartu QR 90 x 55 mm.
+ *
+ * Semua koordinat dan ukuran disimpan dalam MILIMETER, bukan piksel: kartunya benda
+ * cetak, dan mm adalah satuan yang sama dipakai editor maupun pembuat PDF. Kalau piksel
+ * yang disimpan, setiap perubahan skala pratinjau akan menggeser hasil cetaknya.
+ *
+ * Elemen teks disimpan sebagai JSON karena jumlah dan jenisnya bebas; QR, logo, dan latar
+ * dapat kolomnya sendiri karena selalu ada tepat satu.
+ */
+export const mitraQrTemplates = mysqlTable("mitra_qr_templates", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    backgroundColor: varchar("background_color", { length: 20 }).notNull().default("#ffffff"),
+    backgroundImageUrl: varchar("background_image_url", { length: 500 }),
+    logoUrl: varchar("logo_url", { length: 500 }),
+    logoX: decimal("logo_x", { precision: 6, scale: 2 }).notNull().default("4.00"),
+    logoY: decimal("logo_y", { precision: 6, scale: 2 }).notNull().default("4.00"),
+    logoWidth: decimal("logo_width", { precision: 6, scale: 2 }).notNull().default("18.00"),
+    qrX: decimal("qr_x", { precision: 6, scale: 2 }).notNull().default("5.00"),
+    qrY: decimal("qr_y", { precision: 6, scale: 2 }).notNull().default("14.00"),
+    qrSize: decimal("qr_size", { precision: 6, scale: 2 }).notNull().default("34.00"),
+    elementsJson: json("elements_json").$type<unknown[]>(),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_qr_templates_default_idx").on(table.isDefault),
+]);
 
 export const mitraMetricDefs = mysqlTable("mitra_metric_defs", {
     id: varchar("id", { length: 36 }).primaryKey(),
@@ -582,9 +678,16 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     id: varchar("id", { length: 36 }).primaryKey(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
     name: varchar("name", { length: 255 }),
-    scope: mysqlEnum("scope", ["ALL", "OUTLET", "TERRITORY"]).notNull().default("ALL"),
+    /** Status pemegang nomor: Outlet Owner, Salesforce, Manager, Organik Telkomsel, dan sejenisnya. */
+    keterangan: varchar("keterangan", { length: 255 }),
+    /**
+     * TERRITORY diganti TAP: territory adalah pengelompokan internal yang jarang diisi,
+     * sedangkan TAP sudah melekat di tiap outlet dan itu yang dipakai orang lapangan.
+     * Nilainya nama TAP apa adanya, dicocokkan ke mitra_outlets.tap.
+     */
+    scope: mysqlEnum("scope", ["ALL", "OUTLET", "TAP"]).notNull().default("ALL"),
     outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }),
     isActive: boolean("is_active").notNull().default(true),
     createdBy: varchar("created_by", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
     // FK dinamai eksplisit: nama turunan otomatis Drizzle untuk kolom ini
@@ -598,7 +701,7 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     index("mitra_whitelist_phone_idx").on(table.phoneE164),
     index("mitra_whitelist_scope_idx").on(table.scope),
     index("mitra_whitelist_outlet_idx").on(table.outletId),
-    index("mitra_whitelist_territory_idx").on(table.territoryId),
+    index("mitra_whitelist_tap_idx").on(table.tap),
     foreignKey({
         columns: [table.sourceBatchId],
         foreignColumns: [mitraImportBatches.id],
@@ -636,6 +739,30 @@ export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
 }, (table) => [
     index("mitra_detail_sessions_outlet_idx").on(table.outletId),
     index("mitra_detail_sessions_expiry_idx").on(table.expiresAt),
+]);
+
+/**
+ * Jejak perubahan outlet yang bisa dilakukan dua pihak berbeda: mitra pemegang OTP
+ * (diidentifikasi nomor WhatsApp-nya dari mitra_detail_sessions) dan admin (user id).
+ * Karena itu keduanya nullable -- yang terisi menentukan siapa pelakunya.
+ *
+ * Terpisah dari admin_audit_logs supaya riwayatnya bisa ditampilkan di halaman detail
+ * publik tanpa ikut membuka jejak perubahan seluruh sistem.
+ */
+export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    actorType: mysqlEnum("actor_type", ["MITRA", "ADMIN"]).notNull(),
+    actorPhone: varchar("actor_phone", { length: 50 }),
+    actorUserId: varchar("actor_user_id", { length: 36 }),
+    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING"]).notNull(),
+    beforeJson: json("before_json").$type<Record<string, unknown>>(),
+    afterJson: json("after_json").$type<Record<string, unknown>>(),
+    ip: varchar("ip", { length: 120 }),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_outlet_edit_logs_outlet_idx").on(table.outletId),
+    index("mitra_outlet_edit_logs_created_idx").on(table.createdAt),
 ]);
 
 export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {

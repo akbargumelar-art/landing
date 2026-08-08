@@ -88,6 +88,17 @@ if (port && !/^\d+$/.test(port)) {
     errors.push("PORT harus berupa angka.");
 }
 
+// Opsional: tanpa key ini halaman /mitra tetap jalan, hanya panel Street View-nya
+// yang tidak muncul. Diperingatkan supaya hilangnya fitur tidak dikira bug.
+const streetViewKey = readEnv(
+    "NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY",
+    envFileValues.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY || ""
+);
+
+if (!streetViewKey) {
+    warnings.push("NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY kosong: panel Street View di /mitra tidak ditampilkan.");
+}
+
 if (errors.length > 0) {
     console.error("Environment validation failed:");
     for (const error of errors) {
