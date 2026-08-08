@@ -122,7 +122,14 @@ export default function AdminLayout({
 
             {/* Sidebar */}
             <aside
-                className={`fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-border flex flex-col transition-all duration-300 ${collapsed ? "w-16" : "w-64"
+                /**
+                 * Di layar lebar sidebar dibuat sticky setinggi layar, bukan static.
+                 * Sebagai elemen static tingginya hanya setinggi isinya, sehingga pada
+                 * halaman panjang menu ikut tergulir ke atas dan hilang dari pandangan.
+                 * Daftar menunya sendiri sudah punya overflow-y-auto, jadi menu yang
+                 * panjang tetap bisa digulir di dalam sidebar.
+                 */
+                className={`fixed lg:sticky inset-y-0 left-0 lg:top-0 lg:h-screen z-50 bg-white border-r border-border flex flex-col transition-all duration-300 ${collapsed ? "w-16" : "w-64"
                     } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
             >
                 {/* Sidebar Header */}
