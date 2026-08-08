@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React from "react";
 import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldAlert, User } from "lucide-react";
@@ -195,10 +194,17 @@ export default function MitraOutletProfilePage() {
 
                         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-                        <Link href={`/api/public/mitra/outlets/${publicToken}/qr`} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">
+                        {/* download + ?dl=1: berkas tersimpan langsung dan pengunjung tetap di
+                            halaman ini. Sebelumnya tautan ini membuka SVG mentah yang tidak
+                            punya jalan kembali ke profil outlet. */}
+                        <a
+                            href={`/api/public/mitra/outlets/${publicToken}/qr?dl=1`}
+                            download={`qr-${outlet.outletCode}.svg`}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold"
+                        >
                             <QrCode className="h-4 w-4" />
                             Download QR SVG
-                        </Link>
+                        </a>
                     </div>
                 </aside>
             </section>

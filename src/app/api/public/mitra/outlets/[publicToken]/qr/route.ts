@@ -19,14 +19,20 @@ export async function GET(
     }
 
     const url = buildOutletPublicUrl(publicToken, request);
-    const format = new URL(request.url).searchParams.get("format") || "svg";
+    const searchParams = new URL(request.url).searchParams;
+    const format = searchParams.get("format") || "svg";
+    // Tanpa ?dl=1 berkas dibuka inline supaya admin bisa mengintipnya di tab baru.
+    // Dengan ?dl=1 browser menyimpannya sebagai unduhan dan pengunjung tidak berpindah
+    // halaman -- ini yang dipakai tombol "Download QR" di profil publik, karena halaman
+    // SVG mentah tidak punya jalan kembali ke profil.
+    const disposition = searchParams.get("dl") === "1" ? "attachment" : "inline";
 
     if (format === "png") {
         const png = await QRCode.toBuffer(url, { type: "png", margin: 1, scale: 10 });
         return new NextResponse(toArrayBuffer(png), {
             headers: {
                 "Content-Type": "image/png",
-                "Content-Disposition": `inline; filename="qr-${outlet.outletCode}.png"`,
+                "Content-Disposition": `${disposition}; filename="qr-${outlet.outletCode}.png"`,
             },
         });
     }
@@ -36,7 +42,7 @@ export async function GET(
         return new NextResponse(pdf, {
             headers: {
                 "Content-Type": "application/pdf",
-                "Content-Disposition": `inline; filename="qr-card-${outlet.outletCode}.pdf"`,
+                "Content-Disposition": `${disposition}; filename="qr-card-${outlet.outletCode}.pdf"`,
             },
         });
     }
@@ -45,7 +51,7 @@ export async function GET(
     return new NextResponse(svg, {
         headers: {
             "Content-Type": "image/svg+xml; charset=utf-8",
-            "Content-Disposition": `inline; filename="qr-${outlet.outletCode}.svg"`,
+            "Content-Disposition": `${disposition}; filename="qr-${outlet.outletCode}.svg"`,
         },
     });
 }
