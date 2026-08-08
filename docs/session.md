@@ -620,3 +620,122 @@ navigasi responsif dan peta outlet masih berfungsi.
   (`wsl -d Ubuntu -u root -e sleep 86400`) di latar belakang.
 - `bash -lc` tidak menghasilkan output di WSL ini; pakai `bash -c`, atau tulis file `.sh` lalu
   jalankan lewat path `/mnt/...`.
+
+## 2026-08-08 - Portal Mitra: profil outlet, OTP, Street View, market share, master salesforce, dan halaman program
+
+Sebelas commit dalam satu sesi, seluruhnya di modul Mitra Outlet (`35bf544` sampai `a00d2cf`).
+Migrasi `0010`, `0011`, dan `0012` belum dijalankan pada database mana pun ketika catatan ini
+ditulis.
+
+### Profil outlet publik
+
+Territory dihapus dari profil dan diganti TAP serta nama salesforce. Alasannya: nama cabang dan
+petugas yang benar-benar mengunjungi outlet lebih berarti bagi mitra daripada kode wilayah
+internal yang tidak pernah mereka pakai.
+
+Tombol "Download QR SVG" dulu membuka berkas SVG mentah, dan halaman itu **tidak punya jalan
+kembali** ke profil. Diperbaiki dengan atribut `download` + `?dl=1`; tanpa parameter itu
+perilakunya tetap `inline` supaya pratinjau QR di admin (dibuka di tab baru) tidak berubah.
+
+### Batas waktu OTP dipindahkan ke tempat yang benar
+
+Sesi detail sebelumnya hangus 15 menit setelah verifikasi. Sekarang yang dibatasi hanya kode
+OTP-nya (5 menit); sesi detail praktis tidak kedaluwarsa. Kolom `expires_at` tetap `NOT NULL` dan
+masih dipakai job pembersih, jadi diisi jauh ke depan lewat `MITRA_DETAIL_SESSION_TTL_MINUTES`
+alih-alih dibuat nullable. Badge hitung mundur di halaman detail ikut dihapus.
+
+**Perubahan sikap yang perlu diingat:** permintaan OTP tidak lagi menjawab generik "jika nomor
+terdaftar...". Sekarang pengunjung langsung diberi tahu apakah nomornya berhak, lewat dialog.
+Konsekuensinya endpoint ini bisa dipakai menebak nomor mana yang masuk whitelist; rate limit yang
+sudah ada (1/menit, 5/jam, 10/hari per nomor, 15/jam per IP) adalah satu-satunya pengaman. Ini
+diminta eksplisit oleh pemilik setelah trade-off-nya disampaikan.
+
+### Data detail: kartu menjadi tabel
+
+Tiap parameter selalu punya tiga angka (M-1, M, MoM), jadi 141 kartu diganti 47 baris tabel
+`Parameter | M-1 | M | MoM`. `mitra-fields.ts` dibalik arahnya: **baris parameter kini sumber
+kebenaran**, dan daftar `fields` untuk editor admin diturunkan darinya, supaya tabel publik dan
+form admin tidak bisa berbeda. Diverifikasi dengan skrip pembanding terhadap logika lama:
+48/48/45 field, seluruh key dan label identik, sehingga data JSON yang sudah tersimpan aman.
+
+### Street View di direktori outlet
+
+Memakai **Maps Embed API, bukan Maps JavaScript API** — mode embed tidak ditagih per pemuatan,
+jadi peta sebaran tetap Leaflet/OpenStreetMap dan Google hanya dipakai untuk panoramanya.
+Konsekuensinya isi iframe tidak bisa dikendalikan dari halaman; hanya titik awal panorama yang
+bisa diatur lewat URL.
+
+Tanpa `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` seluruh jejaknya tidak dirender, jadi aman di-deploy
+sebelum key-nya siap. `npm run env:check` mengingatkan lewat warning, bukan error. Langkah membuat
+dan membatasi key ada di `docs/google-street-view.md`.
+
+### Market share per kecamatan - migrasi 0011
+
+Tabel `mitra_market_shares` dikunci pada pasangan **kabupaten + kecamatan**, bukan kecamatan saja:
+nama kecamatan berulang antar kabupaten, jadi kecamatan saja akan menempelkan angka wilayah lain
+ke outlet. Pencocokan ke outlet memakai teks persis — lebih baik tidak menampilkan angka daripada
+menampilkan angka yang salah — karena itu form admin memakai datalist berisi wilayah yang benar-
+benar dipakai outlet. Total tidak dipaksa 100% karena data survei biasa menyisakan kategori di
+luar enam operator.
+
+Satu baris per wilayah tanpa kolom periode; input baru menimpa yang lama. Kalau perlu riwayat
+bulanan, tambahkan `period_ym` ke tabel dan ke unique index-nya.
+
+### Master salesforce - migrasi 0012
+
+Nama dan foto salesforce dipindahkan dari kolom teks di tiap outlet ke tabel `mitra_salesforces`,
+ditaut lewat `mitra_outlets.salesforce_id`. Ganti nama atau foto sekarang cukup sekali.
+
+**Migrasi hasil generate drizzle-kit berbahaya dan tidak boleh dipakai apa adanya:** ia langsung
+`DROP COLUMN salesforce` tanpa memindahkan apa pun, yang akan menghapus nama salesforce seluruh
+outlet. Versi yang dipakai menyalin nama dan foto ke master, mengisi `salesforce_id` lewat
+pencocokan nama, baru membuang kolom lama — dengan penjagaan `information_schema` mengikuti pola
+migrasi `0009`, agar aman untuk database yang dibangun `drizzle-kit push`.
+
+Bentuk file import tidak berubah: kolom `salesforce` tetap berisi nama, lalu diterjemahkan ke id
+master saat commit dan **dibuatkan otomatis bila belum ada**. Auto-create dipilih supaya baris
+import yang datanya sah tidak gagal hanya karena salesforce-nya baru; efek sampingnya salah ketik
+memunculkan master baru yang harus dirapikan lewat menu Salesforce.
+
+### Halaman program dibangun ulang
+
+Diminta menyerupai `digistar.youthcrm.id/salesforce-champion`, **tampilannya saja** — peserta tetap
+outlet, hanya parameternya berbeda. Sempat dimulai sebagai generalisasi engine (kolom `outlet_id`
+menjadi `subject_id` polimorfik) lalu dibatalkan seluruhnya setelah klarifikasi; `schema.ts`
+dikembalikan ke HEAD.
+
+Tiga hal yang sebelumnya tidak mungkin, kini bisa tanpa perubahan database:
+
+- **Pemenang sementara.** Podium terisi tiga teratas peringkat berjalan selama admin belum
+  mempublikasikan pemenang resmi, dan berganti sendiri begitu dipublikasikan.
+- **Peserta tanpa skor.** Sebelumnya hilang total dari halaman karena papan peringkat dibangun
+  dari tabel skor — dari sisi peserta terlihat seperti tidak terdaftar padahal terdaftar. Kini
+  ikut tampil dengan nilai nol dan penanda "belum ada data".
+- **Pencapaian per parameter.** Skornya sudah lama tersimpan per bulan tetapi tidak pernah dikirim
+  ke halaman publik. Agregasinya dihitung di JavaScript, bukan `SUM()` di SQL, karena tiap
+  parameter punya modenya sendiri (SUM/AVG/LAST) dan **LAST berarti "ambil periode terbaru", yang
+  tidak bisa diwakili satu fungsi agregat SQL**.
+
+Pencarian juga diubah: dulu menyaring tabel peringkat sehingga peserta hanya melihat satu baris
+tanpa pembanding. Sekarang mengisi panel di atas tabel, lengkap dengan rincian per parameter —
+penting karena tabelnya dibatasi 100 teratas, dan peserta di peringkat 350 justru butuh pencarian
+untuk menemukan dirinya. `prevRank` yang sudah lama disimpan akhirnya dipakai sebagai indikator
+naik/turun.
+
+### Belum dikerjakan / menunggu
+
+- **Migrasi `0010`, `0011`, `0012` belum dijalankan.** Backup dulu: `0012` menghapus kolom setelah
+  memindahkan isinya. Setelah jalan, `SELECT COUNT(*) FROM mitra_salesforces` harus sama dengan
+  jumlah nama salesforce unik yang lama.
+- `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` belum diisi, jadi panel Street View belum pernah tampil.
+- Belum diuji runtime: backfill migrasi `0012` pada data asli, panel Street View, alur simpan/
+  tampil market share, dan halaman program dengan data program yang benar-benar terisi.
+- Dua warning ESLint `<img>` di `src/app/(hidden)/admin/pengaturan/page.tsx` sudah ada sebelum
+  sesi ini dan sengaja dibiarkan.
+- Dua liga terpisah (Regional & Branch) dan peserta berupa salesforce ber-SF Code tetap tidak
+  didukung; itu butuh generalisasi engine yang dibatalkan di atas.
+
+### Verifikasi
+
+`tsc`, `eslint src scripts`, `npm run build`, dan `npm run env:check` lulus di setiap commit.
+Tidak ada pengujian runtime pada sesi ini.
