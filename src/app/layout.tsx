@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { BackToTop } from "@/components/back-to-top";
 import { DynamicFavicon } from "@/components/dynamic-favicon";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -41,7 +42,12 @@ export default function RootLayout({
             <head>
                 <DynamicFavicon />
             </head>
-            <body className={`min-h-screen ${inter.className}`}>{children}</body>
+            {/* Dipasang di layout root supaya berlaku untuk seluruh halaman -- publik,
+                admin, maupun profil outlet -- tanpa perlu diulang di tiap layout. */}
+            <body className={`min-h-screen ${inter.className}`}>
+                {children}
+                <BackToTop />
+            </body>
         </html>
     );
 }
