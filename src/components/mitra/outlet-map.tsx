@@ -79,6 +79,40 @@ function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
     return null;
 }
 
+/**
+ * Leaflet menghitung titik tengah dari ukuran kotak yang ia simpan sendiri, dan ukuran
+ * itu hanya diperbarui lewat invalidateSize(). Begitu panel Street View terbuka dan peta
+ * menyempit jadi setengah lebar, Leaflet masih memakai lebar lama -- penanda yang
+ * seharusnya di tengah jadi bergeser ke kanan, persis seperti yang terlihat.
+ *
+ * ResizeObserver dipakai, bukan event resize window, karena yang berubah adalah kotak
+ * petanya sendiri sementara ukuran jendela sama sekali tidak berubah.
+ */
+function IkutiUkuranKotak({ focusedToken, markers }: { focusedToken: string | null; markers: OutletMarker[] }) {
+    const map = useMap();
+    // Disimpan di ref supaya observer tidak dibuat ulang tiap penanda berubah.
+    const fokusRef = React.useRef<OutletMarker | null>(null);
+    fokusRef.current = markers.find((m) => m.publicToken === focusedToken) || null;
+
+    React.useEffect(() => {
+        const container = map.getContainer();
+        const observer = new ResizeObserver(() => {
+            map.invalidateSize({ animate: false });
+
+            // Setelah ukuran benar, penanda yang sedang difokuskan dikembalikan ke tengah.
+            const target = fokusRef.current;
+            if (target) {
+                map.setView([target.latitude, target.longitude], map.getZoom(), { animate: false });
+            }
+        });
+
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [map]);
+
+    return null;
+}
+
 /** Terbang halus ke outlet yang difokuskan dan buka popup-nya secara otomatis. */
 function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null; markers: OutletMarker[] }) {
     const map = useMap();
@@ -89,6 +123,9 @@ function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null
         const target = markers.find((m) => m.publicToken === focusedToken);
         if (!target) return;
 
+        // Ukuran disegarkan lebih dulu: panel Street View terbuka pada saat yang sama
+        // dengan pemanggilan ini, jadi tanpa ini tujuan terbangnya dihitung dari lebar lama.
+        map.invalidateSize({ animate: false });
         map.flyTo([target.latitude, target.longitude], 17, { duration: 1.2 });
 
         // Buka popup penanda yang cocok setelah animasi selesai.
@@ -104,6 +141,10 @@ function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null
                     }
                 }
             });
+
+            // Popup yang terbuka memicu autoPan bawaan Leaflet bila dirasa tidak muat,
+            // dan itu menggeser penanda dari tengah lagi. Dikembalikan setelahnya.
+            map.setView([target.latitude, target.longitude], map.getZoom(), { animate: false });
         }, 1300);
 
         return () => window.clearTimeout(timer);
@@ -141,6 +182,7 @@ export default function OutletMap({
                 maxZoom={19}
             />
             <SesuaikanTampilan markers={markers} />
+            <IkutiUkuranKotak focusedToken={focusedToken} markers={markers} />
             <TerbangKeFokus focusedToken={focusedToken} markers={markers} />
 
             {markers.map((outlet) => (
