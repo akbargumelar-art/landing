@@ -25,7 +25,13 @@ interface Territory {
 
 interface HealthStatus {
     database: { ok: boolean };
-    waha: { configured: boolean; reachable: boolean; session: string };
+    waha: {
+        configured: boolean;
+        reachable: boolean;
+        session: string;
+        sessionStatus?: string;
+        error?: string;
+    };
 }
 
 const modules = [
@@ -128,9 +134,22 @@ export default function AdminMitraPage() {
                             <Database className="h-4 w-4 text-red-600" />
                             Database {health?.database.ok ? "terhubung" : "tidak tersedia"}
                         </span>
-                        <span className="inline-flex items-center gap-2 font-semibold">
-                            <MessageCircle className="h-4 w-4 text-red-600" />
-                            WAHA {!health?.waha.configured ? "belum dikonfigurasi" : health.waha.reachable ? "terhubung" : "tidak terjangkau"}
+                        {/* Alasannya ikut ditampilkan: "tidak terjangkau" saja tidak memberi
+                            tahu apakah yang salah endpoint, API key, atau sesinya. */}
+                        <span className="inline-flex flex-col gap-0.5">
+                            <span className="inline-flex items-center gap-2 font-semibold">
+                                <MessageCircle className="h-4 w-4 text-red-600" />
+                                WAHA {!health?.waha.configured
+                                    ? "belum dikonfigurasi"
+                                    : health.waha.reachable && !health.waha.error
+                                        ? `terhubung (sesi ${health.waha.sessionStatus || health.waha.session})`
+                                        : health.waha.reachable
+                                            ? "terhubung dengan catatan"
+                                            : "tidak terjangkau"}
+                            </span>
+                            {health?.waha.error && (
+                                <span className="text-xs font-normal text-muted-foreground">{health.waha.error}</span>
+                            )}
                         </span>
                     </div>
                     <Button variant="outline" onClick={cleanupExpiredAccess} disabled={cleaning}>
