@@ -23,6 +23,7 @@ import {
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
 import { getOutletEditLogs } from "@/lib/mitra-outlet-edit";
+import { bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
 import {
     hashSessionToken,
     isFuture,
@@ -184,6 +185,11 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
     // Dicocokkan pada pasangan kabupaten + kecamatan persis seperti yang tersimpan di
     // outlet. Selisih ejaan sekecil apa pun membuat baris tidak ketemu, dan itu memang
     // disengaja: lebih baik tidak menampilkan angka daripada menampilkan angka wilayah lain.
+    const whitelistPengakses = await findMatchingWhitelist(detailSession.phoneE164, {
+        id: outletRecord.id,
+        tap: outletRecord.tap,
+    });
+
     const [marketShare] = outletRecord.kabupaten && outletRecord.kecamatan
         ? await db
             .select()
@@ -216,6 +222,9 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         performance,
         marketShare: marketShare || null,
         editLogs: await getOutletEditLogs(outletRecord.id),
+        // Dipakai halaman untuk menyembunyikan kontrol yang memang akan ditolak server.
+        bolehEdit: bolehEditOutlet(whitelistPengakses?.keterangan),
+        peranPengakses: whitelistPengakses?.keterangan || null,
     };
 }
 

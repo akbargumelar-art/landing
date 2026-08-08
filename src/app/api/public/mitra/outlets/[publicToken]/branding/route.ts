@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
-import { getEditableOutlet, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
+import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
 import { OUTLET_BRANDINGS } from "@/lib/mitra-outlet-options";
 import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
 
@@ -15,11 +15,13 @@ export async function POST(
 ) {
     const { publicToken } = await params;
     const sessionToken = request.cookies.get(MITRA_DETAIL_SESSION_COOKIE)?.value;
-    const akses = await getEditableOutlet(publicToken, sessionToken);
+    const izin = await pastikanBolehEdit(publicToken, sessionToken);
 
-    if (!akses) {
-        return NextResponse.json({ error: "Verifikasi OTP diperlukan untuk mengubah branding" }, { status: 401 });
+    if (!izin.ok) {
+        return NextResponse.json({ error: izin.error }, { status: izin.status });
     }
+
+    const akses = izin.akses;
 
     const body = await request.json().catch(() => ({}));
     const branding = String(body.branding || "");

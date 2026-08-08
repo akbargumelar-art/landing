@@ -4,6 +4,8 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { mitraDetailSessions, mitraOutletEditLogs, mitraOutlets } from "@/db/schema";
 import { hashSessionToken, maskPhone } from "@/lib/mitra-utils";
+import { findMatchingWhitelist } from "@/lib/mitra-data";
+import { PESAN_TIDAK_BOLEH_EDIT, bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
 
 export type MitraEditAction = "PHOTO" | "LOCATION" | "BRANDING";
 
@@ -37,7 +39,29 @@ export async function getEditableOutlet(publicToken: string, sessionToken: strin
 
     if (!session) return null;
 
-    return { outlet, session };
+    // Peran pemegang nomor menentukan boleh-tidaknya menyunting. Diambil di sini, bukan di
+    // tiap endpoint, supaya tidak ada jalur ubah yang lupa memeriksanya.
+    const whitelist = await findMatchingWhitelist(session.phoneE164, { id: outlet.id, tap: outlet.tap });
+    const keterangan = whitelist?.keterangan || null;
+
+    return { outlet, session, keterangan, bolehEdit: bolehEditOutlet(keterangan) };
+}
+
+/** Pemeriksaan gabungan untuk endpoint yang mengubah data outlet. */
+type HasilIzin =
+    | { ok: false; error: string; status: 401 | 403 }
+    | { ok: true; akses: NonNullable<Awaited<ReturnType<typeof getEditableOutlet>>> };
+
+export async function pastikanBolehEdit(
+    publicToken: string,
+    sessionToken: string | undefined
+): Promise<HasilIzin> {
+    const akses = await getEditableOutlet(publicToken, sessionToken);
+
+    if (!akses) return { ok: false, error: "Verifikasi OTP diperlukan untuk mengubah data outlet", status: 401 };
+    if (!akses.bolehEdit) return { ok: false, error: PESAN_TIDAK_BOLEH_EDIT, status: 403 };
+
+    return { ok: true, akses };
 }
 
 export async function writeOutletEditLog(input: {

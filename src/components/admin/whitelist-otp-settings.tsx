@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+// Daftar bersama dengan pemeriksaan izin di server, jadi peran yang boleh menyunting
+// outlet dan saran isian di form ini tidak mungkin berbeda.
+import { SARAN_KETERANGAN } from "@/lib/mitra-whitelist-roles";
 
 interface WhitelistRow {
     id: string;
@@ -28,14 +31,7 @@ interface OptionRow {
 
 const emptyForm = { phone: "", name: "", keterangan: "", scope: "ALL", outletId: "", tap: "" };
 
-/** Saran isian keterangan; tetap boleh diketik bebas karena statusnya bisa berkembang. */
-const SARAN_KETERANGAN = [
-    "Outlet Owner",
-    "Salesforce",
-    "Manager",
-    "Supervisor",
-    "Organik Telkomsel",
-];
+
 
 export function WhitelistOtpSettings() {
     const [rows, setRows] = React.useState<WhitelistRow[]>([]);

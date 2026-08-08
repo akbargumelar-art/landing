@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, Camera, Crosshair, History, Loader2, MapPin, ShieldCheck, Tag } from "lucide-react";
+import { ArrowLeft, Camera, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
 
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ interface DetailData {
     }[];
     marketShare: (Record<MitraMarketShareKey, string> & { kabupaten: string; kecamatan: string }) | null;
     editLogs: EditLog[];
+    bolehEdit: boolean;
+    peranPengakses: string | null;
 }
 
 interface EditLog {
@@ -47,6 +49,12 @@ export default function MitraOutletDetailPage() {
     const [mengunggah, setMengunggah] = React.useState<MitraPhotoSlotKey | null>(null);
     const [menandaiLokasi, setMenandaiLokasi] = React.useState(false);
     const [menyimpanBranding, setMenyimpanBranding] = React.useState(false);
+    // Lokasi dan branding memakai mode edit eksplisit: keduanya mengubah data yang dipakai
+    // orang lain, jadi tidak boleh berubah hanya karena tombol tersenggol. Foto tidak
+    // perlu -- memilih berkas sudah merupakan tindakan sadar tersendiri.
+    const [editLokasi, setEditLokasi] = React.useState(false);
+    const [editBranding, setEditBranding] = React.useState(false);
+    const [brandingDraft, setBrandingDraft] = React.useState("");
     const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
 
     const muat = React.useCallback(() => {
@@ -83,6 +91,7 @@ export default function MitraOutletDetailPage() {
     };
 
     const simpanBranding = async (branding: string) => {
+        if (!branding) return;
         setMenyimpanBranding(true);
         setPesan(null);
 
@@ -97,6 +106,7 @@ export default function MitraOutletDetailPage() {
                 setPesan({ ok: false, teks: hasil.error || "Branding gagal disimpan." });
             } else {
                 setPesan({ ok: true, teks: `Branding outlet diperbarui menjadi ${branding}.` });
+                setEditBranding(false);
                 await muat();
             }
         } catch {
@@ -137,6 +147,7 @@ export default function MitraOutletDetailPage() {
                         setPesan({ ok: false, teks: hasil.error || "Lokasi gagal disimpan." });
                     } else {
                         setPesan({ ok: true, teks: `Lokasi outlet diperbarui (ketelitian ±${Math.round(posisi.coords.accuracy)} m).` });
+                        setEditLokasi(false);
                         await muat();
                     }
                 } catch {
@@ -185,13 +196,20 @@ export default function MitraOutletDetailPage() {
                     Profil Outlet
                 </Link>
 
+                {/* 1. Data outlet */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
-                    {/* Tidak ada lagi penanda masa berlaku sesi: batas waktu hanya melekat pada
-                        kode OTP, sedangkan halaman detail tetap terbuka setelah verifikasi. */}
-                    <div>
-                        <p className="text-sm font-bold uppercase tracking-widest text-red-600">Detail Terverifikasi</p>
-                        <h1 className="mt-1 text-2xl font-extrabold">{data.outlet.name}</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">{data.outlet.outletCode} - {data.outlet.ownerName}</p>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-bold uppercase tracking-widest text-red-600">Detail Terverifikasi</p>
+                            <h1 className="mt-1 text-2xl font-extrabold">{data.outlet.name}</h1>
+                            <p className="mt-1 text-sm text-muted-foreground">{data.outlet.outletCode} - {data.outlet.ownerName}</p>
+                        </div>
+                        {/* Peran ditampilkan supaya pengakses langsung paham mengapa tombol
+                            ubah ada atau tidak ada, tanpa harus menebak. */}
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${data.bolehEdit ? "bg-green-50 text-green-700" : "bg-gray-100 text-muted-foreground"}`}>
+                            {data.bolehEdit ? <Pencil className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                            {data.peranPengakses || "Tanpa keterangan"}
+                        </span>
                     </div>
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -202,6 +220,7 @@ export default function MitraOutletDetailPage() {
                         <Info label="Salesforce" value={String(data.outlet.salesforce || "-")} />
                         <Info label="Kabupaten" value={String(data.outlet.kabupaten || "-")} />
                         <Info label="Kecamatan" value={String(data.outlet.kecamatan || "-")} />
+                        <Info label="Branding" value={String(data.outlet.branding || "-")} />
                     </div>
 
                     {data.outlet.locationUrl && (
@@ -212,80 +231,13 @@ export default function MitraOutletDetailPage() {
                     )}
                 </div>
 
-                <OutletPhotoCard outlet={data.outlet} onUpload={unggahFoto} sedangUnggah={mengunggah} />
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                    <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <h2 className="font-bold">Lokasi Outlet</h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Diambil dari GPS perangkat, bukan diketik manual, supaya titiknya akurat. Dilakukan sesekali saja, saat memang dibutuhkan.</p>
-
-                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
-                            <p className="mt-1 font-mono text-sm text-gray-950">
-                                {data.outlet.latitude && data.outlet.longitude
-                                    ? `${Number(data.outlet.latitude).toFixed(6)}, ${Number(data.outlet.longitude).toFixed(6)}`
-                                    : "Belum ditandai"}
-                            </p>
-                            {data.outlet.locationUrl && (
-                                <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    Buka di Google Maps
-                                </a>
-                            )}
-                        </div>
-
-                        <Button onClick={tandaiLokasi} disabled={menandaiLokasi} className="mt-3 w-full">
-                            {menandaiLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
-                            {menandaiLokasi ? "Membaca lokasi..." : "Tandai Lokasi Saya Sekarang"}
-                        </Button>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            Tekan tombol ini <strong>saat berada di depan outlet</strong>, dan hanya bila titiknya belum ada
-                            atau sudah tidak sesuai. Koordinat dengan ketelitian di atas 200 m akan ditolak.
-                        </p>
-                    </div>
-
-                    <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-red-600" />
-                            <h2 className="font-bold">Branding Outlet</h2>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Materi promosi yang terpasang di outlet. Ubah bila brandingnya berganti.
-                        </p>
-
-                        <div className="mt-4 space-y-2">
-                            <label htmlFor="branding" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                Branding Terpasang
-                            </label>
-                            <select
-                                id="branding"
-                                value={String(data.outlet.branding || "")}
-                                onChange={(event) => simpanBranding(event.target.value)}
-                                disabled={menyimpanBranding}
-                                className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                            >
-                                {OUTLET_BRANDINGS.map((pilihan) => (
-                                    <option key={pilihan} value={pilihan}>{pilihan}</option>
-                                ))}
-                            </select>
-                            {menyimpanBranding && <p className="text-xs text-muted-foreground">Menyimpan...</p>}
-                        </div>
-
-                        <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
-                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu
-                            berjalan. <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap
-                            kunjungan</strong> -- cukup sekali saat outlet belum punya titik, atau saat outlet pindah
-                            dan titiknya keliru. Setiap perubahan tercatat pada riwayat di bawah.
-                        </p>
-                    </div>
-                </div>
-
                 {pesan && (
                     <p className={`rounded-lg p-3 text-sm ${pesan.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
                         {pesan.teks}
                     </p>
                 )}
 
+                {/* 2. Market share kecamatan */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <h2 className="font-bold">Market Share Kecamatan</h2>
@@ -327,6 +279,7 @@ export default function MitraOutletDetailPage() {
                     )}
                 </div>
 
+                {/* 3. Riwayat performance */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
                     <h2 className="font-bold">Riwayat Performance</h2>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -346,15 +299,207 @@ export default function MitraOutletDetailPage() {
                     </div>
                 </div>
 
-                {/* Tiap parameter punya tiga angka (M-1, M, MoM), jadi disajikan sebagai
-                    baris tabel. Bentuk kartu sebelumnya memecah satu parameter menjadi tiga
-                    kotak terpisah dan sulit dibaca begitu jumlah parameternya puluhan. */}
+                {/* 4. Tabel parameter: tiap parameter punya tiga angka (M-1, M, MoM). */}
+                {MITRA_DETAIL_FIELD_GROUPS.map((group) => {
+                    const values = data.details[group.key] || {};
+                    return (
+                        <div key={group.key} className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                            <div className="border-b bg-gray-50/70 px-5 py-4">
+                                <h2 className="font-bold">{group.title}</h2>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    M-1 bulan lalu, M bulan berjalan, MoM pertumbuhannya.
+                                </p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[560px] border-collapse text-sm">
+                                    <thead>
+                                        {/* Kepala tabel dibuat lengket supaya nama kolom tetap terbaca
+                                            saat menggulir tabel sepanjang 47 baris. */}
+                                        <tr className="sticky top-0 z-10 bg-white text-xs font-semibold uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_rgb(229,231,235)]">
+                                            <th className="px-5 py-3 text-left">Parameter</th>
+                                            <th className="px-4 py-3 text-right">M-1</th>
+                                            <th className="px-4 py-3 text-right">M</th>
+                                            <th className="px-5 py-3 text-right">MoM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {group.rows.map((row) => (
+                                            <tr key={row.key} className={`border-t transition-colors hover:bg-red-50/30 ${row.level === 1 ? "bg-gray-50/50" : ""}`}>
+                                                {/* Rincian diberi indentasi dan garis penghubung supaya jelas
+                                                    bahwa angkanya bagian dari baris induk di atasnya, bukan
+                                                    parameter berdiri sendiri yang ikut dijumlahkan lagi. */}
+                                                <td className={`py-2.5 pr-4 ${row.level === 1 ? "pl-10" : "pl-5"}`}>
+                                                    {row.level === 1 && (
+                                                        <span className="mr-2 text-muted-foreground" aria-hidden>&#8735;</span>
+                                                    )}
+                                                    <span className={row.level === 1 ? "text-gray-700" : "font-medium text-gray-950"}>{row.label}</span>
+                                                    <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        {row.unit === "qty" ? "qty" : "rev"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{formatValue(values[row.m1Key])}</td>
+                                                <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
+                                                <td className="px-5 py-2.5 text-right">
+                                                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${momClass(values[row.momKey])}`}>
+                                                        {formatMoM(values[row.momKey])}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {/* 5. Foto outlet -- boleh langsung ganti tanpa mode edit. */}
+                <OutletPhotoCard
+                    outlet={data.outlet}
+                    onUpload={data.bolehEdit ? unggahFoto : undefined}
+                    sedangUnggah={mengunggah}
+                />
+
+                {!data.bolehEdit && (
+                    <p className="flex items-start gap-2 rounded-lg border bg-gray-50 p-4 text-sm text-muted-foreground">
+                        <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                            Nomor Anda terdaftar tetapi statusnya hanya bisa melihat. Perubahan foto, lokasi, dan
+                            branding hanya untuk salesforce, merchandiser, supervisor, manager, atau organik Telkomsel.
+                        </span>
+                    </p>
+                )}
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* 6. Lokasi outlet */}
+                    <div className="rounded-lg border bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <h2 className="font-bold">Lokasi Outlet</h2>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Diambil dari GPS perangkat, bukan diketik. Dilakukan sesekali saja, saat memang dibutuhkan.
+                                </p>
+                            </div>
+                            {data.bolehEdit && !editLokasi && (
+                                <Button type="button" variant="outline" size="sm" onClick={() => setEditLokasi(true)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
+                            <p className="mt-1 font-mono text-sm text-gray-950">
+                                {data.outlet.latitude && data.outlet.longitude
+                                    ? `${Number(data.outlet.latitude).toFixed(6)}, ${Number(data.outlet.longitude).toFixed(6)}`
+                                    : "Belum ditandai"}
+                            </p>
+                            {data.outlet.locationUrl && (
+                                <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    Buka di Google Maps
+                                </a>
+                            )}
+                        </div>
+
+                        {editLokasi && (
+                            <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3">
+                                <p className="text-xs text-muted-foreground">
+                                    Tekan tombol di bawah <strong>saat berada di depan outlet</strong>. Koordinat dengan
+                                    ketelitian di atas 200 m akan ditolak.
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button onClick={tandaiLokasi} disabled={menandaiLokasi}>
+                                        {menandaiLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                                        {menandaiLokasi ? "Membaca lokasi..." : "Simpan Lokasi Saya"}
+                                    </Button>
+                                    <Button type="button" variant="ghost" onClick={() => setEditLokasi(false)} disabled={menandaiLokasi}>
+                                        <X className="h-4 w-4" />
+                                        Batal
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 7. Branding outlet */}
+                    <div className="rounded-lg border bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-red-600" />
+                                <h2 className="font-bold">Branding Outlet</h2>
+                            </div>
+                            {data.bolehEdit && !editBranding && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => { setBrandingDraft(String(data.outlet.branding || "")); setEditBranding(true); }}
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                </Button>
+                            )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Materi promosi yang terpasang di outlet. Ubah bila brandingnya berganti.
+                        </p>
+
+                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Branding Terpasang</p>
+                            <p className="mt-1 font-semibold text-gray-950">{String(data.outlet.branding || "-")}</p>
+                        </div>
+
+                        {editBranding && (
+                            <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3">
+                                <label htmlFor="branding" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Pilih Branding Baru
+                                </label>
+                                <select
+                                    id="branding"
+                                    value={brandingDraft}
+                                    onChange={(event) => setBrandingDraft(event.target.value)}
+                                    disabled={menyimpanBranding}
+                                    className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                >
+                                    {OUTLET_BRANDINGS.map((pilihan) => (
+                                        <option key={pilihan} value={pilihan}>{pilihan}</option>
+                                    ))}
+                                </select>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        onClick={() => simpanBranding(brandingDraft)}
+                                        disabled={menyimpanBranding || !brandingDraft || brandingDraft === data.outlet.branding}
+                                    >
+                                        {menyimpanBranding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
+                                        Simpan Branding
+                                    </Button>
+                                    <Button type="button" variant="ghost" onClick={() => setEditBranding(false)} disabled={menyimpanBranding}>
+                                        <X className="h-4 w-4" />
+                                        Batal
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
+                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu
+                            berjalan. <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap
+                            kunjungan</strong> -- cukup sekali saat outlet belum punya titik, atau saat outlet pindah
+                            dan titiknya keliru.
+                        </p>
+                    </div>
+                </div>
+
+                {/* 8. Riwayat perubahan */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
                     <div className="flex items-center gap-2">
                         <History className="h-4 w-4 text-red-600" />
                         <h2 className="font-bold">Riwayat Perubahan</h2>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Perubahan foto dan lokasi, baik oleh mitra maupun admin.</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Perubahan foto, lokasi, dan branding, baik oleh mitra maupun admin.</p>
 
                     {data.editLogs?.length ? (
                         <ul className="mt-4 space-y-2">
@@ -385,42 +530,6 @@ export default function MitraOutletDetailPage() {
                         <p className="mt-4 text-sm text-muted-foreground">Belum ada perubahan yang tercatat.</p>
                     )}
                 </div>
-
-                {MITRA_DETAIL_FIELD_GROUPS.map((group) => {
-                    const values = data.details[group.key] || {};
-                    return (
-                        <div key={group.key} className="rounded-lg border bg-white p-5 shadow-sm">
-                            <h2 className="font-bold">{group.title}</h2>
-                            <div className="mt-4 overflow-x-auto">
-                                <table className="w-full min-w-[520px] border-collapse text-sm">
-                                    <thead>
-                                        <tr className="border-b text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                            <th className="px-3 py-2 text-left">Parameter</th>
-                                            <th className="px-3 py-2 text-right">M-1</th>
-                                            <th className="px-3 py-2 text-right">M</th>
-                                            <th className="px-3 py-2 text-right">MoM</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {group.rows.map((row) => (
-                                            <tr key={row.key} className="border-b last:border-0 odd:bg-gray-50/60">
-                                                <td className="px-3 py-2">
-                                                    <span className="font-medium text-gray-950">{row.label}</span>
-                                                    <span className="ml-2 text-xs text-muted-foreground">{row.unit === "qty" ? "qty" : "rev."}</span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{formatValue(values[row.m1Key])}</td>
-                                                <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
-                                                <td className={`px-3 py-2 text-right font-semibold tabular-nums ${momClass(values[row.momKey])}`}>
-                                                    {formatMoM(values[row.momKey])}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    );
-                })}
             </section>
         </main>
     );
