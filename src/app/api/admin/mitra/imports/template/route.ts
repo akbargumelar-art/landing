@@ -55,14 +55,13 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
     ],
     outlet: [
         {
-            outletCode: "OUT-100",
-            rsNumber: "RS-100",
+            outletCode: "2201055482",
+            rsNumber: "62812333783",
             name: "Outlet Maju Jaya",
             ownerName: "Ahmad Fauzi",
             ownerPhone: "08123450000",
             tap: "TAP Cirebon Kota",
             salesforce: "Budi Salesforce",
-            territoryName: "Cirebon Kota",
             kabupaten: "Kota Cirebon",
             kecamatan: "Kesambi",
             latitude: -6.732,

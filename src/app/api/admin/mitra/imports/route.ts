@@ -217,28 +217,27 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
         }
 
         if (type === "outlet") {
-            const outletCode = String(row.outletCode || row.kodeOutlet || "");
-            const name = String(row.name || row.nama || "");
+            const outletCode = String(row.outletCode || row.kodeOutlet || "").trim();
+            const name = String(row.name || row.nama || "").trim();
             const phone = normalizePhoneE164(String(row.ownerPhone || row.nomorHp || ""));
-            const territoryName = String(row.territoryName || row.wilayah || "").toLowerCase();
-            const territory = territoryName ? territoryByName.get(territoryName) : null;
+            const kabupaten = String(row.kabupaten || "").trim();
 
-            if (!outletCode) errors.push({ row: rowNum, message: "Kode Outlet wajib diisi" });
+            if (!/^\d{10}$/.test(outletCode)) errors.push({ row: rowNum, message: "Kode Outlet wajib diisi 10 digit angka" });
             else if (outletByCode.has(outletCode)) errors.push({ row: rowNum, message: "Kode Outlet sudah ada" });
             else if (!name) errors.push({ row: rowNum, message: "Nama Outlet wajib diisi" });
             else if (!phone) errors.push({ row: rowNum, message: "Nomor HP wajib diisi" });
-            else if (!territory) errors.push({ row: rowNum, message: "Wilayah tidak ditemukan" });
+            else if (!kabupaten) errors.push({ row: rowNum, message: "Kabupaten wajib diisi" });
             else validRows.push({
                 ...row,
                 outletCode,
                 name,
                 ownerPhone: phone,
-                territoryId: territory.id,
+                territoryId: null,
                 rsNumber: String(row.rsNumber || ""),
                 ownerName: String(row.ownerName || ""),
                 tap: String(row.tap || ""),
                 salesforce: String(row.salesforce || ""),
-                kabupaten: String(row.kabupaten || ""),
+                kabupaten,
                 kecamatan: String(row.kecamatan || ""),
                 latitude: row.latitude ? parseFloat(String(row.latitude)) : null,
                 longitude: row.longitude ? parseFloat(String(row.longitude)) : null,
@@ -331,7 +330,7 @@ async function commitOutletRows(executor: ImportExecutor, rows: Record<string, u
             publicToken: uuid().replace(/-/g, "").slice(0, 16),
             name: String(row.name),
             ownerPhone: String(row.ownerPhone),
-            territoryId: String(row.territoryId),
+            territoryId: row.territoryId ? String(row.territoryId) : null,
             rsNumber: String(row.rsNumber || ""),
             ownerName: String(row.ownerName || ""),
             tap: String(row.tap || ""),
