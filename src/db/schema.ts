@@ -492,6 +492,27 @@ export const mitraUserTerritories = mysqlTable("mitra_user_territories", {
     index("mitra_user_territories_territory_idx").on(table.territoryId),
 ]);
 
+/**
+ * Master salesforce: satu baris per petugas, dipakai bersama oleh semua outlet yang
+ * dikunjunginya. Sebelumnya nama dan fotonya disimpan berulang di tiap baris outlet,
+ * sehingga ganti nama atau ganti foto berarti menyunting puluhan outlet satu per satu.
+ *
+ * Nama dijadikan unique karena itulah kunci pencocokan dari file import (kolom
+ * `salesforce` di CSV hanya berisi nama, tanpa id).
+ */
+export const mitraSalesforces = mysqlTable("mitra_salesforces", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull().unique(),
+    photoUrl: varchar("photo_url", { length: 500 }),
+    phone: varchar("phone", { length: 50 }),
+    tap: varchar("tap", { length: 255 }).notNull().default(""),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("mitra_salesforces_active_idx").on(table.isActive),
+]);
+
 export const mitraOutlets = mysqlTable("mitra_outlets", {
     id: varchar("id", { length: 36 }).primaryKey(),
     outletCode: varchar("outlet_code", { length: 100 }).notNull().unique(),
@@ -501,10 +522,9 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     ownerName: varchar("owner_name", { length: 255 }).notNull(),
     ownerPhone: varchar("owner_phone", { length: 50 }).notNull(),
     tap: varchar("tap", { length: 255 }).notNull().default(""),
-    salesforce: varchar("salesforce", { length: 255 }).notNull().default(""),
-    // Foto salesforce tampil di profil publik outlet supaya mitra mengenali siapa yang
-    // menagih kunjungan PJP. Nullable: sebagian besar outlet lama belum punya fotonya.
-    salesforcePhotoUrl: varchar("salesforce_photo_url", { length: 500 }),
+    // Nama dan foto salesforce hidup di mitra_salesforces, bukan di sini. Import CSV
+    // yang hanya membawa nama diselesaikan lewat resolveSalesforceId() di lib/mitra-salesforce.
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "set null" }),
     kabupaten: varchar("kabupaten", { length: 255 }).notNull().default(""),
     kecamatan: varchar("kecamatan", { length: 255 }).notNull().default(""),
     longitude: double("longitude"),
@@ -527,6 +547,7 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     index("mitra_outlets_owner_phone_idx").on(table.ownerPhone),
     index("mitra_outlets_territory_idx").on(table.territoryId),
     index("mitra_outlets_status_idx").on(table.status),
+    index("mitra_outlets_salesforce_idx").on(table.salesforceId),
 ]);
 
 export const mitraOutletDetails = mysqlTable("mitra_outlet_details", {

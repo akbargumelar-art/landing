@@ -14,8 +14,6 @@ export const MITRA_MARKET_SHARE_OPERATORS = [
 
 export type MitraMarketShareKey = (typeof MITRA_MARKET_SHARE_OPERATORS)[number]["key"];
 
-export type MitraMarketShareValues = Record<MitraMarketShareKey, string>;
-
 /** Persentase dibatasi 0-100 dan disimpan sebagai decimal(5,2). */
 export function normalizeSharePercent(input: unknown): string {
     const raw = typeof input === "number" ? input : Number(String(input ?? "").replace(",", "."));

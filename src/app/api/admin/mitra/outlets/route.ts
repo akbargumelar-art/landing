@@ -3,10 +3,11 @@ import { and, asc, count, desc, eq, inArray, like, or, type SQL } from "drizzle-
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
-import { mitraOutletDetails, mitraOutlets, mitraTerritories } from "@/db/schema";
+import { mitraOutletDetails, mitraOutlets, mitraSalesforces, mitraTerritories } from "@/db/schema";
 import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
+import { resolveSalesforceId } from "@/lib/mitra-salesforce";
 import {
     normalizeOutletBranding,
     normalizeOutletCategory,
@@ -62,8 +63,9 @@ export async function GET(request: Request) {
             ownerName: mitraOutlets.ownerName,
             ownerPhone: mitraOutlets.ownerPhone,
             tap: mitraOutlets.tap,
-            salesforce: mitraOutlets.salesforce,
-            salesforcePhotoUrl: mitraOutlets.salesforcePhotoUrl,
+            salesforceId: mitraOutlets.salesforceId,
+            salesforce: mitraSalesforces.name,
+            salesforcePhotoUrl: mitraSalesforces.photoUrl,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
             longitude: mitraOutlets.longitude,
@@ -81,16 +83,24 @@ export async function GET(request: Request) {
         })
         .from(mitraOutlets)
         .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
+        .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
         .where(where)
         .orderBy(desc(mitraOutlets.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize);
 
     const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.name));
+    // Dipakai dropdown salesforce di editor outlet; hanya yang aktif yang bisa dipilih,
+    // tetapi outlet yang terlanjur menaut ke yang nonaktif tetap ditampilkan apa adanya.
+    const salesforces = await db
+        .select({ id: mitraSalesforces.id, name: mitraSalesforces.name, isActive: mitraSalesforces.isActive })
+        .from(mitraSalesforces)
+        .orderBy(asc(mitraSalesforces.name));
 
     return NextResponse.json({
         outlets,
         territories,
+        salesforces,
         total: totalRow?.value || 0,
         page,
         pageSize,
@@ -121,8 +131,7 @@ export async function POST(request: Request) {
         ownerName: String(body.ownerName || ""),
         ownerPhone: normalizePhoneE164(String(body.ownerPhone || "")),
         tap: String(body.tap || ""),
-        salesforce: String(body.salesforce || ""),
-        salesforcePhotoUrl: body.salesforcePhotoUrl || null,
+        salesforceId: body.salesforceId || await resolveSalesforceId(body.salesforce),
         kabupaten: String(body.kabupaten || ""),
         kecamatan: String(body.kecamatan || ""),
         longitude,

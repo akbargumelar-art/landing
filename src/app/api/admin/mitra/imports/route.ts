@@ -18,6 +18,7 @@ import {
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
+import { normalizeSalesforceName, resolveSalesforceIds } from "@/lib/mitra-salesforce";
 import {
     buildOutletMapsUrl,
     normalizeOutletBranding,
@@ -321,6 +322,9 @@ async function commitProgramScoreRows(executor: ImportExecutor, batchId: string,
 
 async function commitOutletRows(executor: ImportExecutor, rows: Record<string, unknown>[]) {
     if (rows.length === 0) return;
+    // Nama salesforce di file hanya teks, jadi diterjemahkan lebih dulu menjadi id master
+    // (dibuatkan bila belum ada) supaya satu nama tidak tersimpan berulang di tiap outlet.
+    const salesforceIds = await resolveSalesforceIds(rows.map((row) => row.salesforce));
     const values = rows.map((row) => {
         const latitude = typeof row.latitude === "number" ? row.latitude : null;
         const longitude = typeof row.longitude === "number" ? row.longitude : null;
@@ -334,7 +338,7 @@ async function commitOutletRows(executor: ImportExecutor, rows: Record<string, u
             rsNumber: String(row.rsNumber || ""),
             ownerName: String(row.ownerName || ""),
             tap: String(row.tap || ""),
-            salesforce: String(row.salesforce || ""),
+            salesforceId: salesforceIds.get(normalizeSalesforceName(row.salesforce).toLowerCase()) || null,
             kabupaten: String(row.kabupaten || ""),
             kecamatan: String(row.kecamatan || ""),
             latitude,

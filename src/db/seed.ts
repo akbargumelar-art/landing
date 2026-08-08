@@ -15,6 +15,7 @@ import {
     winners,
     mitraUserProfiles,
     mitraTerritories,
+    mitraSalesforces,
     mitraOutlets,
     mitraOutletDetails,
     mitraWhitelistNumbers,
@@ -538,6 +539,13 @@ async function seed() {
 
             const outletAId = uuid();
             const outletBId = uuid();
+            const sfCirebonId = uuid();
+            const sfKuninganId = uuid();
+
+            await db.insert(mitraSalesforces).values([
+                { id: sfCirebonId, name: "SF Cirebon 1", tap: "TAP Cirebon", isActive: true, createdAt: new Date() },
+                { id: sfKuninganId, name: "SF Kuningan 1", tap: "TAP Kuningan", isActive: true, createdAt: new Date() },
+            ]);
             await db.insert(mitraOutlets).values([
                 {
                     id: outletAId,
@@ -548,7 +556,7 @@ async function seed() {
                     ownerName: "Dewi Rahayu",
                     ownerPhone: "+6281234567890",
                     tap: "TAP Cirebon",
-                    salesforce: "SF Cirebon 1",
+                    salesforceId: sfCirebonId,
                     kabupaten: "Kota Cirebon",
                     kecamatan: "Kesambi",
                     longitude: 108.549,
@@ -571,7 +579,7 @@ async function seed() {
                     ownerName: "Agus Salim",
                     ownerPhone: "+6282234567890",
                     tap: "TAP Kuningan",
-                    salesforce: "SF Kuningan 1",
+                    salesforceId: sfKuninganId,
                     kabupaten: "Kab. Kuningan",
                     kecamatan: "Kuningan",
                     longitude: 108.482,

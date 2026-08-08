@@ -6,6 +6,7 @@ import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
 import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
+import { resolveSalesforceId } from "@/lib/mitra-salesforce";
 import {
     normalizeOutletBranding,
     normalizeOutletCategory,
@@ -53,6 +54,14 @@ export async function PUT(
 
     if (!existing) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
 
+    // Form admin mengirim salesforceId dari dropdown, sedangkan jalur lain (mis. skrip)
+    // masih boleh mengirim namanya saja -- keduanya berakhir di master yang sama.
+    const salesforceId = body.salesforceId !== undefined
+        ? (body.salesforceId || null)
+        : body.salesforce !== undefined
+            ? await resolveSalesforceId(body.salesforce)
+            : existing.salesforceId;
+
     const longitude = body.longitude === "" ? null : body.longitude === undefined ? existing.longitude : Number(body.longitude);
     const latitude = body.latitude === "" ? null : body.latitude === undefined ? existing.latitude : Number(body.latitude);
 
@@ -64,8 +73,7 @@ export async function PUT(
         ownerName: body.ownerName ?? existing.ownerName,
         ownerPhone: body.ownerPhone ? normalizePhoneE164(String(body.ownerPhone)) : existing.ownerPhone,
         tap: body.tap ?? existing.tap,
-        salesforce: body.salesforce ?? existing.salesforce,
-        salesforcePhotoUrl: body.salesforcePhotoUrl === "" ? null : body.salesforcePhotoUrl ?? existing.salesforcePhotoUrl,
+        salesforceId,
         kabupaten: body.kabupaten ?? existing.kabupaten,
         kecamatan: body.kecamatan ?? existing.kecamatan,
         longitude,

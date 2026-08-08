@@ -28,7 +28,3 @@ export function buildStreetViewEmbedUrl(latitude: number, longitude: number): st
 
     return `https://www.google.com/maps/embed/v1/streetview?${params}`;
 }
-
-export function buildGoogleMapsPlaceUrl(latitude: number, longitude: number): string {
-    return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-}

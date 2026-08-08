@@ -3,7 +3,8 @@
 import { ExternalLink, X } from "lucide-react";
 
 import type { OutletMarker } from "@/components/mitra/outlet-map";
-import { buildGoogleMapsPlaceUrl, buildStreetViewEmbedUrl } from "@/lib/street-view";
+import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
+import { buildStreetViewEmbedUrl } from "@/lib/street-view";
 
 export function StreetViewPanel({ outlet, onClose }: { outlet: OutletMarker; onClose: () => void }) {
     return (
@@ -45,7 +46,7 @@ export function StreetViewPanel({ outlet, onClose }: { outlet: OutletMarker; onC
                     Panorama dari titik jalan terdekat. Sebagian lokasi belum terjangkau mobil Street View.
                 </p>
                 <a
-                    href={buildGoogleMapsPlaceUrl(outlet.latitude, outlet.longitude)}
+                    href={buildOutletMapsUrl(outlet.latitude, outlet.longitude)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"

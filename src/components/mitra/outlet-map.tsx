@@ -5,6 +5,8 @@ import Link from "next/link";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 
+import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
+
 import "leaflet/dist/leaflet.css";
 
 export interface OutletMarker {
@@ -170,7 +172,7 @@ export default function OutletMap({
                                 Lihat profil outlet
                             </Link>
                             <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${outlet.latitude},${outlet.longitude}`}
+                                href={buildOutletMapsUrl(outlet.latitude, outlet.longitude)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs font-semibold text-red-600 hover:underline"

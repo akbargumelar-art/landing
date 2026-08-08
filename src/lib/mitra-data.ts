@@ -18,6 +18,7 @@ import {
     mitraProgramScores,
     mitraPrograms,
     mitraProgramWinners,
+    mitraSalesforces,
     mitraWhitelistNumbers,
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
@@ -42,8 +43,11 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             ownerName: mitraOutlets.ownerName,
             ownerPhone: mitraOutlets.ownerPhone,
             tap: mitraOutlets.tap,
-            salesforce: mitraOutlets.salesforce,
-            salesforcePhotoUrl: mitraOutlets.salesforcePhotoUrl,
+            // Nama dan foto salesforce datang dari master lewat join, tetapi tetap
+            // dikembalikan dengan nama field yang sama seperti sebelumnya supaya
+            // halaman publik tidak perlu tahu asalnya berubah.
+            salesforce: mitraSalesforces.name,
+            salesforcePhotoUrl: mitraSalesforces.photoUrl,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
             longitude: mitraOutlets.longitude,
@@ -60,6 +64,7 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             territoryId: mitraOutlets.territoryId,
         })
         .from(mitraOutlets)
+        .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
         .where(eq(mitraOutlets.publicToken, publicToken))
         .limit(1);
 

@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import React from "react";
-import { Download, ExternalLink, ImageIcon, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,9 +40,16 @@ interface Territory {
     name: string;
 }
 
+interface SalesforceOption {
+    id: string;
+    name: string;
+    isActive: boolean;
+}
+
 export default function AdminMitraOutletPage() {
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
     const [territories, setTerritories] = React.useState<Territory[]>([]);
+    const [salesforces, setSalesforces] = React.useState<SalesforceOption[]>([]);
     const [q, setQ] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
@@ -52,7 +58,6 @@ export default function AdminMitraOutletPage() {
     const [editSaving, setEditSaving] = React.useState(false);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const [deleting, setDeleting] = React.useState(false);
-    const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
     const [form, setForm] = React.useState({
         outletCode: "",
         name: "",
@@ -65,6 +70,7 @@ export default function AdminMitraOutletPage() {
         pjpDay: String(DEFAULT_PJP_DAY),
         pjpType: String(DEFAULT_PJP_TYPE),
         branding: String(DEFAULT_OUTLET_BRANDING),
+        salesforceId: "",
     });
 
     const load = React.useCallback(() => {
@@ -75,6 +81,7 @@ export default function AdminMitraOutletPage() {
             .then((data) => {
                 setOutlets(Array.isArray(data.outlets) ? data.outlets : []);
                 setTerritories(Array.isArray(data.territories) ? data.territories : []);
+                setSalesforces(Array.isArray(data.salesforces) ? data.salesforces : []);
             })
             .finally(() => setLoading(false));
     }, [q]);
@@ -126,6 +133,7 @@ export default function AdminMitraOutletPage() {
                 outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "", territoryId: "",
                 category: String(DEFAULT_OUTLET_CATEGORY), pjpDay: String(DEFAULT_PJP_DAY),
                 pjpType: String(DEFAULT_PJP_TYPE), branding: String(DEFAULT_OUTLET_BRANDING),
+                salesforceId: "",
             });
             load();
         } else {
@@ -149,24 +157,6 @@ export default function AdminMitraOutletPage() {
 
     const updateEditField = (key: string, value: string) => {
         setEditOutlet((previous) => previous ? { ...previous, [key]: value } : previous);
-    };
-
-    const uploadSalesforcePhoto = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        setUploadingPhoto(true);
-        const fd = new FormData();
-        fd.append("file", file);
-        try {
-            const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.url) updateEditField("salesforcePhotoUrl", data.url);
-            else alert(data.error || "Gagal upload foto salesforce");
-        } finally {
-            setUploadingPhoto(false);
-            // Input direset supaya file yang sama bisa dipilih ulang setelah gagal upload.
-            event.target.value = "";
-        }
     };
 
     // Pratinjau tautan lokasi mengikuti koordinat yang sedang diketik, sama seperti
@@ -249,6 +239,15 @@ export default function AdminMitraOutletPage() {
                                 {OUTLET_BRANDINGS.map((option) => <option key={option} value={option}>{option}</option>)}
                             </select>
                         </div>
+                        <div className="space-y-2">
+                            <Label>Salesforce</Label>
+                            <select value={form.salesforceId} onChange={(event) => setForm((prev) => ({ ...prev, salesforceId: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                <option value="">Tanpa salesforce</option>
+                                {salesforces.filter((item) => item.isActive).map((item) => (
+                                    <option key={item.id} value={item.id}>{item.name}</option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="flex items-end">
                             <Button disabled={saving} className="w-full">
                                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -275,38 +274,33 @@ export default function AdminMitraOutletPage() {
                         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
                             {[
                                 ["outletCode", "ID Digipos"], ["rsNumber", "Nomor RS"], ["name", "Nama Outlet"], ["ownerName", "Nama Owner"],
-                                ["ownerPhone", "Nomor Owner"], ["tap", "TAP (nama cabang)"], ["salesforce", "Salesforce"], ["kabupaten", "Kabupaten"],
+                                ["ownerPhone", "Nomor Owner"], ["tap", "TAP (nama cabang)"], ["kabupaten", "Kabupaten"],
                                 ["kecamatan", "Kecamatan"], ["longitude", "Longitude"], ["latitude", "Latitude"], ["photoUrl", "URL Foto"],
                             ].map(([key, label]) => (
                                 <Field key={key} label={label} value={String(editOutlet[key] ?? "")} onChange={(value) => updateEditField(key, value)} />
                             ))}
-                            {/* Foto salesforce tampil di profil publik outlet, jadi diberi
-                                pratinjau dan tombol upload -- bukan hanya kolom URL. */}
+                            {/* Salesforce kini master tersendiri: nama dan fotonya diurus di
+                                menu Salesforce, outlet tinggal menautkannya. Foto tidak lagi
+                                diunggah per outlet supaya tidak ada dua sumber kebenaran. */}
                             <div className="space-y-2">
-                                <Label>Foto Salesforce</Label>
-                                <div className="flex items-center gap-3">
-                                    {editOutlet.salesforcePhotoUrl ? (
-                                        <Image
-                                            src={String(editOutlet.salesforcePhotoUrl)}
-                                            alt="Foto salesforce"
-                                            width={40}
-                                            height={40}
-                                            className="h-10 w-10 shrink-0 rounded-full border object-cover"
-                                            unoptimized
-                                        />
-                                    ) : (
-                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-gray-50 text-muted-foreground">
-                                            <ImageIcon className="h-4 w-4" />
-                                        </span>
-                                    )}
-                                    <Input type="file" accept="image/*" onChange={uploadSalesforcePhoto} disabled={uploadingPhoto} />
-                                </div>
-                                {uploadingPhoto && <p className="text-xs text-muted-foreground">Mengunggah foto...</p>}
-                                {editOutlet.salesforcePhotoUrl ? (
-                                    <button type="button" onClick={() => updateEditField("salesforcePhotoUrl", "")} className="text-xs font-semibold text-red-600">
-                                        Hapus foto
-                                    </button>
-                                ) : null}
+                                <Label>Salesforce</Label>
+                                <select
+                                    value={String(editOutlet.salesforceId || "")}
+                                    onChange={(event) => updateEditField("salesforceId", event.target.value)}
+                                    className="h-10 w-full rounded-md border px-3 text-sm"
+                                >
+                                    <option value="">Tanpa salesforce</option>
+                                    {salesforces
+                                        .filter((item) => item.isActive || item.id === editOutlet.salesforceId)
+                                        .map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                                {item.name}{item.isActive ? "" : " (nonaktif)"}
+                                            </option>
+                                        ))}
+                                </select>
+                                <Link href="/admin/mitra/salesforce" className="text-xs font-semibold text-red-600 hover:underline">
+                                    Kelola nama & foto salesforce
+                                </Link>
                             </div>
                             <div className="space-y-2">
                                 <Label>Territory</Label>
