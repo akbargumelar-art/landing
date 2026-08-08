@@ -37,6 +37,27 @@ const ikonOutlet = L.divIcon({
     popupAnchor: [0, -12],
 });
 
+/** Ikon lebih besar & berdenyut untuk outlet yang sedang difokuskan. */
+const ikonOutletFokus = L.divIcon({
+    className: "",
+    html: `
+        <span style="
+            display:block;width:30px;height:30px;border-radius:9999px;
+            background:#dc2626;border:4px solid #fef08a;
+            box-shadow:0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4);
+            animation:pulsa-marker 1.2s ease-in-out infinite;
+        "></span>
+        <style>
+            @keyframes pulsa-marker {
+                0%, 100% { box-shadow: 0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4); }
+                50%      { box-shadow: 0 0 0 12px rgba(220,38,38,.12), 0 2px 8px rgba(0,0,0,.4); }
+            }
+        </style>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -16],
+});
+
 /** Menyesuaikan tampilan peta agar seluruh penanda muat setiap kali daftarnya berubah. */
 function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
     const map = useMap();
@@ -56,7 +77,46 @@ function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
     return null;
 }
 
-export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
+/** Terbang halus ke outlet yang difokuskan dan buka popup-nya secara otomatis. */
+function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null; markers: OutletMarker[] }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!focusedToken) return;
+
+        const target = markers.find((m) => m.publicToken === focusedToken);
+        if (!target) return;
+
+        map.flyTo([target.latitude, target.longitude], 17, { duration: 1.2 });
+
+        // Buka popup penanda yang cocok setelah animasi selesai.
+        const timer = window.setTimeout(() => {
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    const pos = layer.getLatLng();
+                    if (
+                        Math.abs(pos.lat - target.latitude) < 0.00001 &&
+                        Math.abs(pos.lng - target.longitude) < 0.00001
+                    ) {
+                        layer.openPopup();
+                    }
+                }
+            });
+        }, 1300);
+
+        return () => window.clearTimeout(timer);
+    }, [focusedToken, map, markers]);
+
+    return null;
+}
+
+export default function OutletMap({
+    markers,
+    focusedToken = null,
+}: {
+    markers: OutletMarker[];
+    focusedToken?: string | null;
+}) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
     const tengahAwal: [number, number] = [-6.732, 108.549];
@@ -76,12 +136,13 @@ export default function OutletMap({ markers }: { markers: OutletMarker[] }) {
                 maxZoom={19}
             />
             <SesuaikanTampilan markers={markers} />
+            <TerbangKeFokus focusedToken={focusedToken} markers={markers} />
 
             {markers.map((outlet) => (
                 <Marker
                     key={outlet.publicToken}
                     position={[outlet.latitude, outlet.longitude]}
-                    icon={ikonOutlet}
+                    icon={focusedToken === outlet.publicToken ? ikonOutletFokus : ikonOutlet}
                 >
                     <Popup>
                         <span className="block text-sm font-bold text-gray-950">{outlet.name}</span>
