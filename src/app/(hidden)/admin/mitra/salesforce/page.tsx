@@ -29,6 +29,9 @@ export default function AdminMitraSalesforcePage() {
     const [saving, setSaving] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
     const [form, setForm] = React.useState(KOSONG);
+    // Form edit berada di atas tabel, jadi menekan Edit pada baris yang jauh di bawah
+    // tampak seperti tidak terjadi apa-apa. Halaman digulirkan ke formulirnya.
+    const formRef = React.useRef<HTMLDivElement>(null);
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -89,6 +92,7 @@ export default function AdminMitraSalesforcePage() {
     };
 
     const startEdit = (row: Salesforce) => {
+        formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         setForm({
             id: row.id,
             name: row.name,
@@ -109,7 +113,7 @@ export default function AdminMitraSalesforcePage() {
                 </p>
             </div>
 
-            <Card>
+            <Card ref={formRef}>
                 <CardContent className="p-5">
                     <form onSubmit={save} className="space-y-4">
                         <div className="grid gap-3 md:grid-cols-3">

@@ -66,6 +66,7 @@ export default function AdminMitraOutletPage() {
     const [editDetails, setEditDetails] = React.useState<Record<string, Record<string, string | number>>>({});
     const [editSaving, setEditSaving] = React.useState(false);
     const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
+    const editRef = React.useRef<HTMLDivElement>(null);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const [deleting, setDeleting] = React.useState(false);
     const [form, setForm] = React.useState({
@@ -97,6 +98,23 @@ export default function AdminMitraOutletPage() {
     }, [q]);
 
     React.useEffect(() => { load(); }, [load]);
+
+    /**
+     * Panel edit dirender di atas tabel dan baru ada setelah datanya dimuat, jadi
+     * penggulirannya harus lewat effect -- di dalam handler klik ref-nya masih null.
+     *
+     * Dibandingkan dengan id yang sebelumnya terbuka, bukan sekadar "editOutlet terisi":
+     * mengetik di form ikut mengganti objek editOutlet, dan tanpa perbandingan ini
+     * halaman akan melompat ke atas pada setiap ketikan.
+     */
+    const idTerbukaRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        const id = editOutlet ? String(editOutlet.id) : null;
+        if (id && id !== idTerbukaRef.current) {
+            editRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        idTerbukaRef.current = id;
+    }, [editOutlet]);
 
     const toggleSelected = (id: string) => {
         setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -270,7 +288,7 @@ export default function AdminMitraOutletPage() {
             </Card>
 
             {editOutlet && (
-                <Card>
+                <Card ref={editRef}>
                     <CardContent className="space-y-5 p-5">
                         <div className="flex items-center justify-between gap-3">
                             <div>

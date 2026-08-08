@@ -39,6 +39,13 @@ export default function AdminMitraMarketSharePage() {
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [form, setForm] = React.useState<MarketShareRow>(KOSONG);
+    // Sama seperti halaman Salesforce: formulirnya di atas, tombol Edit di tabel bawah.
+    const formRef = React.useRef<HTMLDivElement>(null);
+
+    const startEdit = (row: MarketShareRow) => {
+        formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setForm(row);
+    };
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -101,7 +108,7 @@ export default function AdminMitraMarketSharePage() {
                 </p>
             </div>
 
-            <Card>
+            <Card ref={formRef}>
                 <CardContent className="p-5">
                     <form onSubmit={save} className="space-y-4">
                         <div className="grid gap-3 md:grid-cols-2">
@@ -212,7 +219,7 @@ export default function AdminMitraMarketSharePage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
-                                                <button onClick={() => setForm(row)} className="rounded-md border p-2" title="Edit" aria-label="Edit market share">
+                                                <button onClick={() => startEdit(row)} className="rounded-md border p-2" title="Edit" aria-label="Edit market share">
                                                     <Pencil className="h-4 w-4" />
                                                 </button>
                                                 <button onClick={() => remove(row)} className="rounded-md border p-2" title="Hapus" aria-label="Hapus market share">
