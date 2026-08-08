@@ -15,6 +15,7 @@ import {
     TEMPLATE_BAWAAN,
     type QrElement,
     type QrFieldKey,
+    type QrImage,
 } from "@/lib/qr-template";
 
 /** Perbesaran pratinjau: 1 mm = 4 px, jadi kartunya tampil 360 x 220 px. */
@@ -26,10 +27,7 @@ interface TemplateRow {
     isDefault: boolean;
     backgroundColor: string;
     backgroundImageUrl: string | null;
-    logoUrl: string | null;
-    logoX: string;
-    logoY: string;
-    logoWidth: string;
+    imagesJson: QrImage[] | null;
     qrX: string;
     qrY: string;
     qrSize: string;
@@ -42,10 +40,7 @@ interface FormTemplate {
     isDefault: boolean;
     backgroundColor: string;
     backgroundImageUrl: string;
-    logoUrl: string;
-    logoX: number;
-    logoY: number;
-    logoWidth: number;
+    images: QrImage[];
     qrX: number;
     qrY: number;
     qrSize: number;
@@ -68,10 +63,7 @@ const FORM_BARU: FormTemplate = {
     isDefault: false,
     backgroundColor: TEMPLATE_BAWAAN.backgroundColor,
     backgroundImageUrl: "",
-    logoUrl: "",
-    logoX: TEMPLATE_BAWAAN.logoX,
-    logoY: TEMPLATE_BAWAAN.logoY,
-    logoWidth: TEMPLATE_BAWAAN.logoWidth,
+    images: [],
     qrX: TEMPLATE_BAWAAN.qrX,
     qrY: TEMPLATE_BAWAAN.qrY,
     qrSize: TEMPLATE_BAWAAN.qrSize,
@@ -92,7 +84,7 @@ export default function AdminQrTemplatePage() {
     const [form, setForm] = React.useState<FormTemplate>(FORM_BARU);
     const [terpilihId, setTerpilihId] = React.useState<string | null>(null);
     const [saving, setSaving] = React.useState(false);
-    const [unggah, setUnggah] = React.useState<"latar" | "logo" | null>(null);
+    const [unggah, setUnggah] = React.useState<string | null>(null);
     const kanvasRef = React.useRef<HTMLDivElement>(null);
     // Elemen yang sedang diseret beserta selisih titik pegang, supaya kartu tidak melompat.
     const seretRef = React.useRef<{ id: string; dx: number; dy: number } | null>(null);
@@ -113,10 +105,7 @@ export default function AdminQrTemplatePage() {
             isDefault: row.isDefault,
             backgroundColor: row.backgroundColor,
             backgroundImageUrl: row.backgroundImageUrl || "",
-            logoUrl: row.logoUrl || "",
-            logoX: Number(row.logoX),
-            logoY: Number(row.logoY),
-            logoWidth: Number(row.logoWidth),
+            images: Array.isArray(row.imagesJson) ? row.imagesJson : [],
             qrX: Number(row.qrX),
             qrY: Number(row.qrY),
             qrSize: Number(row.qrSize),
@@ -124,20 +113,40 @@ export default function AdminQrTemplatePage() {
         });
     };
 
-    const unggahGambar = async (jenis: "latar" | "logo", file: File) => {
-        setUnggah(jenis);
+    /**
+     * `tujuan` bernilai "latar" untuk gambar latar, atau id gambar tempelan. Satu fungsi
+     * untuk keduanya karena jalur unggahnya sama persis; yang berbeda hanya tempat
+     * URL hasilnya disimpan.
+     */
+    const unggahGambar = async (tujuan: string, file: File) => {
+        setUnggah(tujuan);
         const fd = new FormData();
         fd.append("file", file);
         try {
             const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.url) return alert(data.error || "Gambar gagal diunggah");
-            setForm((prev) => jenis === "latar"
+
+            setForm((prev) => tujuan === "latar"
                 ? { ...prev, backgroundImageUrl: data.url }
-                : { ...prev, logoUrl: data.url });
+                : { ...prev, images: prev.images.map((img) => img.id === tujuan ? { ...img, url: data.url } : img) });
         } finally {
             setUnggah(null);
         }
+    };
+
+    const tambahGambar = () => {
+        setForm((prev) => ({
+            ...prev,
+            images: [...prev.images, { id: `img-${Date.now()}`, url: "", x: 4, y: 4, width: 18 }],
+        }));
+    };
+
+    const ubahGambar = (id: string, patch: Partial<QrImage>) => {
+        setForm((prev) => ({
+            ...prev,
+            images: prev.images.map((img) => img.id === id ? { ...img, ...patch } : img),
+        }));
     };
 
     const simpan = async () => {
@@ -213,7 +222,7 @@ export default function AdminQrTemplatePage() {
         const batasY = Math.min(Math.max(y, 0), KARTU_TINGGI_MM);
 
         if (aktif.id === "__qr__") setForm((prev) => ({ ...prev, qrX: batasX, qrY: batasY }));
-        else if (aktif.id === "__logo__") setForm((prev) => ({ ...prev, logoX: batasX, logoY: batasY }));
+        else if (aktif.id.startsWith("img:")) ubahGambar(aktif.id.slice(4), { x: batasX, y: batasY });
         else ubahElemen(aktif.id, { x: batasX, y: batasY });
     };
 
@@ -284,18 +293,19 @@ export default function AdminQrTemplatePage() {
                                 QR
                             </div>
 
-                            {form.logoUrl && (
+                            {form.images.filter((image) => image.url).map((image) => (
                                 <div
-                                    onPointerDown={(event) => mulaiSeret(event, "__logo__", form.logoX, form.logoY)}
-                                    className="absolute cursor-move border border-blue-400"
-                                    style={{ left: form.logoX * SKALA, top: form.logoY * SKALA, width: form.logoWidth * SKALA }}
+                                    key={image.id}
+                                    onPointerDown={(event) => mulaiSeret(event, `img:${image.id}`, image.x, image.y)}
+                                    className="absolute cursor-move border border-dashed border-transparent hover:border-blue-400"
+                                    style={{ left: image.x * SKALA, top: image.y * SKALA, width: image.width * SKALA }}
                                 >
                                     {/* Sengaja <img>: sumbernya URL unggahan sembarang dan ini hanya
                                         pratinjau editor, bukan halaman yang dinilai performanya. */}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={form.logoUrl} alt="Logo" className="w-full" />
+                                    <img src={image.url} alt="Gambar template" className="w-full" />
                                 </div>
-                            )}
+                            ))}
 
                             {form.elements.map((element) => (
                                 <div
@@ -326,30 +336,57 @@ export default function AdminQrTemplatePage() {
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <BerkasGambar
-                                label="Gambar Latar (desain 90 x 55 mm)"
-                                url={form.backgroundImageUrl}
-                                sedang={unggah === "latar"}
-                                onPilih={(file) => unggahGambar("latar", file)}
-                                onHapus={() => setForm((prev) => ({ ...prev, backgroundImageUrl: "" }))}
-                            />
-                            <BerkasGambar
-                                label="Logo"
-                                url={form.logoUrl}
-                                sedang={unggah === "logo"}
-                                onPilih={(file) => unggahGambar("logo", file)}
-                                onHapus={() => setForm((prev) => ({ ...prev, logoUrl: "" }))}
-                            />
-                        </div>
+                        <BerkasGambar
+                            label="Gambar Latar (desain 90 x 55 mm)"
+                            url={form.backgroundImageUrl}
+                            sedang={unggah === "latar"}
+                            onPilih={(file) => unggahGambar("latar", file)}
+                            onHapus={() => setForm((prev) => ({ ...prev, backgroundImageUrl: "" }))}
+                        />
 
-                        {form.logoUrl && (
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                <Angka label="Logo X (mm)" nilai={form.logoX} onChange={(v) => setForm((p) => ({ ...p, logoX: v }))} />
-                                <Angka label="Logo Y (mm)" nilai={form.logoY} onChange={(v) => setForm((p) => ({ ...p, logoY: v }))} />
-                                <Angka label="Lebar Logo (mm)" nilai={form.logoWidth} onChange={(v) => setForm((p) => ({ ...p, logoWidth: v }))} />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="font-bold">Gambar Tempelan</h2>
+                                    <p className="text-xs text-muted-foreground">
+                                        Logo perusahaan, logo operator, stiker. Jumlahnya bebas; yang di bawah menimpa yang di atasnya bila bertumpuk.
+                                    </p>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={tambahGambar}>
+                                    <ImageIcon className="h-4 w-4" />
+                                    Tambah Gambar
+                                </Button>
                             </div>
-                        )}
+
+                            {form.images.length === 0 && (
+                                <p className="text-sm text-muted-foreground">Belum ada gambar tempelan.</p>
+                            )}
+
+                            {form.images.map((image, index) => (
+                                <div key={image.id} className="grid gap-3 rounded-lg border bg-gray-50 p-3 lg:grid-cols-[1fr_repeat(3,110px)_auto]">
+                                    <BerkasGambar
+                                        label={`Gambar ${index + 1}`}
+                                        url={image.url}
+                                        sedang={unggah === image.id}
+                                        onPilih={(file) => unggahGambar(image.id, file)}
+                                        onHapus={() => ubahGambar(image.id, { url: "" })}
+                                    />
+                                    <Angka kecil label="X (mm)" nilai={image.x} onChange={(v) => ubahGambar(image.id, { x: v })} />
+                                    <Angka kecil label="Y (mm)" nilai={image.y} onChange={(v) => ubahGambar(image.id, { y: v })} />
+                                    <Angka kecil label="Lebar (mm)" nilai={image.width} onChange={(v) => ubahGambar(image.id, { width: v })} />
+                                    <div className="flex items-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => setForm((prev) => ({ ...prev, images: prev.images.filter((img) => img.id !== image.id) }))}
+                                            className="mb-0.5 rounded-md border p-2"
+                                            aria-label="Hapus gambar"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
 
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">

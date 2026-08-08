@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { mitraQrTemplates } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/mitra-utils";
-import { sanitizeElements } from "@/lib/qr-template-store";
+import { sanitizeElements, sanitizeImages } from "@/lib/qr-template-store";
 import { TEMPLATE_BAWAAN } from "@/lib/qr-template";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +21,7 @@ function bacaNilai(body: Record<string, unknown>, existing?: typeof mitraQrTempl
         name: String(body.name || existing?.name || "Template Baru").slice(0, 255),
         backgroundColor: String(body.backgroundColor || existing?.backgroundColor || "#ffffff").slice(0, 20),
         backgroundImageUrl: body.backgroundImageUrl === "" ? null : (body.backgroundImageUrl as string) ?? existing?.backgroundImageUrl ?? null,
-        logoUrl: body.logoUrl === "" ? null : (body.logoUrl as string) ?? existing?.logoUrl ?? null,
-        logoX: angka("logoX", Number(existing?.logoX ?? TEMPLATE_BAWAAN.logoX)),
-        logoY: angka("logoY", Number(existing?.logoY ?? TEMPLATE_BAWAAN.logoY)),
-        logoWidth: angka("logoWidth", Number(existing?.logoWidth ?? TEMPLATE_BAWAAN.logoWidth)),
+        imagesJson: sanitizeImages(body.images ?? existing?.imagesJson),
         qrX: angka("qrX", Number(existing?.qrX ?? TEMPLATE_BAWAAN.qrX)),
         qrY: angka("qrY", Number(existing?.qrY ?? TEMPLATE_BAWAAN.qrY)),
         qrSize: angka("qrSize", Number(existing?.qrSize ?? TEMPLATE_BAWAAN.qrSize)),

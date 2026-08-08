@@ -616,10 +616,12 @@ export const mitraQrTemplates = mysqlTable("mitra_qr_templates", {
     isDefault: boolean("is_default").notNull().default(false),
     backgroundColor: varchar("background_color", { length: 20 }).notNull().default("#ffffff"),
     backgroundImageUrl: varchar("background_image_url", { length: 500 }),
-    logoUrl: varchar("logo_url", { length: 500 }),
-    logoX: decimal("logo_x", { precision: 6, scale: 2 }).notNull().default("4.00"),
-    logoY: decimal("logo_y", { precision: 6, scale: 2 }).notNull().default("4.00"),
-    logoWidth: decimal("logo_width", { precision: 6, scale: 2 }).notNull().default("18.00"),
+    /**
+     * Daftar gambar tempelan (logo perusahaan, logo operator, stiker, dan sebagainya).
+     * Berupa JSON, bukan sepasang kolom logo, karena jumlahnya memang bebas -- menambah
+     * kolom logo kedua hanya menunda pertanyaan yang sama saat butuh yang ketiga.
+     */
+    imagesJson: json("images_json").$type<unknown[]>(),
     qrX: decimal("qr_x", { precision: 6, scale: 2 }).notNull().default("5.00"),
     qrY: decimal("qr_y", { precision: 6, scale: 2 }).notNull().default("14.00"),
     qrSize: decimal("qr_size", { precision: 6, scale: 2 }).notNull().default("34.00"),
