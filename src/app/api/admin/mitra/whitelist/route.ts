@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
-import { mitraOutlets, mitraTerritories, mitraWhitelistNumbers } from "@/db/schema";
+import { mitraOutlets, mitraWhitelistNumbers } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
+
+type WhitelistScope = "ALL" | "OUTLET" | "TAP";
+
+function normalizeScope(input: unknown): WhitelistScope {
+    return input === "OUTLET" || input === "TAP" ? input : "ALL";
+}
+
+/** Scope OUTLET butuh outlet, scope TAP butuh nama TAP; ALL tidak butuh apa pun. */
+function validateScope(scope: WhitelistScope, outletId: unknown, tap: unknown) {
+    if (scope === "OUTLET" && !outletId) return "Scope outlet tertentu membutuhkan pilihan outlet";
+    if (scope === "TAP" && !String(tap || "").trim()) return "Scope TAP membutuhkan pilihan TAP";
+    return null;
+}
 
 export async function GET() {
     // Whitelist berada di halaman Pengaturan, dan seluruh grup "Sistem & Konten" kini
@@ -21,25 +34,38 @@ export async function GET() {
             id: mitraWhitelistNumbers.id,
             phoneE164: mitraWhitelistNumbers.phoneE164,
             name: mitraWhitelistNumbers.name,
+            keterangan: mitraWhitelistNumbers.keterangan,
             scope: mitraWhitelistNumbers.scope,
             outletId: mitraWhitelistNumbers.outletId,
             outletName: mitraOutlets.name,
-            territoryId: mitraWhitelistNumbers.territoryId,
-            territoryName: mitraTerritories.name,
+            tap: mitraWhitelistNumbers.tap,
             isActive: mitraWhitelistNumbers.isActive,
             expiresAt: mitraWhitelistNumbers.expiresAt,
             createdAt: mitraWhitelistNumbers.createdAt,
         })
         .from(mitraWhitelistNumbers)
         .leftJoin(mitraOutlets, eq(mitraWhitelistNumbers.outletId, mitraOutlets.id))
-        .leftJoin(mitraTerritories, eq(mitraWhitelistNumbers.territoryId, mitraTerritories.id))
         .orderBy(desc(mitraWhitelistNumbers.createdAt))
         .limit(500);
 
-    const outlets = await db.select({ id: mitraOutlets.id, name: mitraOutlets.name, outletCode: mitraOutlets.outletCode }).from(mitraOutlets).orderBy(asc(mitraOutlets.name));
-    const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.name));
+    const outlets = await db
+        .select({ id: mitraOutlets.id, name: mitraOutlets.name, outletCode: mitraOutlets.outletCode })
+        .from(mitraOutlets)
+        .orderBy(asc(mitraOutlets.name));
 
-    return NextResponse.json({ whitelist, outlets, territories });
+    // Daftar TAP diambil dari data outlet, bukan tabel master tersendiri, karena di situlah
+    // TAP sebenarnya hidup -- sehingga pilihannya selalu sama dengan yang dipakai outlet.
+    const tapRows = await db
+        .selectDistinct({ tap: mitraOutlets.tap })
+        .from(mitraOutlets)
+        .where(isNotNull(mitraOutlets.tap))
+        .orderBy(asc(mitraOutlets.tap));
+
+    return NextResponse.json({
+        whitelist,
+        outlets,
+        taps: tapRows.map((row) => row.tap).filter((tap): tap is string => Boolean(tap && tap.trim())),
+    });
 }
 
 export async function POST(request: Request) {
@@ -47,10 +73,9 @@ export async function POST(request: Request) {
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
-    const scope = body.scope || "ALL";
+    const scope = normalizeScope(body.scope);
 
-    // Bulk add: `phones` is a newline/comma separated list or an array of numbers.
-    // Every row shares the same scope, so scope validation below runs once for all of them.
+    // Bulk add: `phones` berisi banyak baris sekaligus, seluruhnya berbagi scope yang sama.
     if (body.phones !== undefined) {
         return handleBulkCreate(request, body, scope, auth.session?.userId);
     }
@@ -60,21 +85,19 @@ export async function POST(request: Request) {
     if (!phoneE164) {
         return NextResponse.json({ error: "Nomor WhatsApp wajib diisi" }, { status: 400 });
     }
-    if (scope === "OUTLET" && !body.outletId) {
-        return NextResponse.json({ error: "Scope OUTLET membutuhkan outlet" }, { status: 400 });
-    }
-    if (scope === "TERRITORY" && !body.territoryId) {
-        return NextResponse.json({ error: "Scope TERRITORY membutuhkan wilayah" }, { status: 400 });
-    }
+
+    const salahScope = validateScope(scope, body.outletId, body.tap);
+    if (salahScope) return NextResponse.json({ error: salahScope }, { status: 400 });
 
     const id = uuid();
     await db.insert(mitraWhitelistNumbers).values({
         id,
         phoneE164,
         name: body.name || null,
+        keterangan: body.keterangan || null,
         scope,
         outletId: scope === "OUTLET" ? body.outletId : null,
-        territoryId: scope === "TERRITORY" ? body.territoryId : null,
+        tap: scope === "TAP" ? String(body.tap).trim() : null,
         isActive: body.isActive ?? true,
         createdBy: auth.session?.userId,
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
@@ -94,38 +117,51 @@ export async function POST(request: Request) {
     return NextResponse.json(created, { status: 201 });
 }
 
+/**
+ * Baris bulk berformat `nomor,nama,keterangan` -- koma kini pemisah KOLOM, bukan pemisah
+ * nomor seperti sebelumnya, supaya satu tempelan bisa mengisi seluruh field. Karena itu
+ * satu nomor wajib satu baris.
+ */
+function parseBarisBulk(raw: string) {
+    const [nomor, nama, keterangan] = raw.split(",").map((bagian) => bagian.trim());
+    return { nomor: nomor || "", nama: nama || null, keterangan: keterangan || null };
+}
+
 async function handleBulkCreate(
     request: Request,
     body: Record<string, unknown>,
-    scope: string,
+    scope: WhitelistScope,
     userId?: string
 ) {
-    if (scope === "OUTLET" && !body.outletId) {
-        return NextResponse.json({ error: "Scope OUTLET membutuhkan outlet" }, { status: 400 });
-    }
-    if (scope === "TERRITORY" && !body.territoryId) {
-        return NextResponse.json({ error: "Scope TERRITORY membutuhkan wilayah" }, { status: 400 });
-    }
+    const salahScope = validateScope(scope, body.outletId, body.tap);
+    if (salahScope) return NextResponse.json({ error: salahScope }, { status: 400 });
 
-    const rawList = Array.isArray(body.phones)
+    const baris = Array.isArray(body.phones)
         ? (body.phones as unknown[]).map(String)
-        : String(body.phones || "").split(/[\n,;]+/);
+        : String(body.phones || "").split(/[\n;]+/);
 
     const invalid: string[] = [];
-    const normalized: string[] = [];
-    for (const raw of rawList) {
-        const trimmed = raw.trim();
-        if (!trimmed) continue;
-        const phone = normalizePhoneE164(trimmed);
-        if (phone) normalized.push(phone);
-        else invalid.push(trimmed);
+    const terkumpul = new Map<string, { nama: string | null; keterangan: string | null }>();
+
+    for (const raw of baris) {
+        if (!raw.trim()) continue;
+        const { nomor, nama, keterangan } = parseBarisBulk(raw);
+        const phone = normalizePhoneE164(nomor);
+
+        if (!phone) {
+            invalid.push(raw.trim());
+            continue;
+        }
+        // Baris duplikat dalam satu tempelan: yang pertama menang, supaya hasilnya
+        // tidak bergantung urutan pemrosesan.
+        if (!terkumpul.has(phone)) terkumpul.set(phone, { nama, keterangan });
     }
 
-    const unique = Array.from(new Set(normalized));
-    if (unique.length === 0) {
+    if (terkumpul.size === 0) {
         return NextResponse.json({ error: "Tidak ada nomor WhatsApp yang valid" }, { status: 400 });
     }
 
+    const unique = Array.from(terkumpul.keys());
     const existing = await db
         .select({ phoneE164: mitraWhitelistNumbers.phoneE164 })
         .from(mitraWhitelistNumbers)
@@ -135,18 +171,27 @@ async function handleBulkCreate(
 
     if (toInsert.length > 0) {
         const now = new Date();
-        await db.insert(mitraWhitelistNumbers).values(toInsert.map((phoneE164) => ({
-            id: uuid(),
-            phoneE164,
-            name: null,
-            scope: scope as "ALL" | "OUTLET" | "TERRITORY",
-            outletId: scope === "OUTLET" ? String(body.outletId) : null,
-            territoryId: scope === "TERRITORY" ? String(body.territoryId) : null,
-            isActive: true,
-            createdBy: userId,
-            expiresAt: body.expiresAt ? new Date(String(body.expiresAt)) : null,
-            createdAt: now,
-        })));
+        const namaBersama = body.name ? String(body.name) : null;
+        const keteranganBersama = body.keterangan ? String(body.keterangan) : null;
+
+        await db.insert(mitraWhitelistNumbers).values(toInsert.map((phoneE164) => {
+            const perBaris = terkumpul.get(phoneE164)!;
+            return {
+                id: uuid(),
+                phoneE164,
+                // Nilai per baris menang atas nilai bersama di form, supaya tempelan yang
+                // sudah lengkap tidak tertimpa isian formulir.
+                name: perBaris.nama || namaBersama,
+                keterangan: perBaris.keterangan || keteranganBersama,
+                scope,
+                outletId: scope === "OUTLET" ? String(body.outletId) : null,
+                tap: scope === "TAP" ? String(body.tap).trim() : null,
+                isActive: true,
+                createdBy: userId,
+                expiresAt: body.expiresAt ? new Date(String(body.expiresAt)) : null,
+                createdAt: now,
+            };
+        }));
 
         await writeAdminAuditLog({
             userId,
@@ -162,4 +207,38 @@ async function handleBulkCreate(
         skippedExisting: unique.length - toInsert.length,
         invalid,
     }, { status: 201 });
+}
+
+/** Hapus beberapa nomor sekaligus dari tabel. */
+export async function DELETE(request: Request) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const body = await request.json().catch(() => ({}));
+    const ids = Array.isArray(body.ids) ? (body.ids as unknown[]).map(String).filter(Boolean) : [];
+
+    if (ids.length === 0) {
+        return NextResponse.json({ error: "Pilih minimal satu nomor" }, { status: 400 });
+    }
+
+    const targets = await db
+        .select({ id: mitraWhitelistNumbers.id, phoneE164: mitraWhitelistNumbers.phoneE164 })
+        .from(mitraWhitelistNumbers)
+        .where(inArray(mitraWhitelistNumbers.id, ids));
+
+    if (targets.length === 0) {
+        return NextResponse.json({ error: "Nomor tidak ditemukan" }, { status: 404 });
+    }
+
+    await db.delete(mitraWhitelistNumbers).where(inArray(mitraWhitelistNumbers.id, targets.map((row) => row.id)));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE_BULK",
+        entity: "mitra_whitelist",
+        diff: { jumlah: targets.length, nomor: targets.map((row) => row.phoneE164) },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true, deleted: targets.length });
 }

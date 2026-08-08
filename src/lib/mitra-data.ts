@@ -200,7 +200,7 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
     };
 }
 
-export async function findMatchingWhitelist(phone: string, outlet: { id: string; territoryId: string | null }) {
+export async function findMatchingWhitelist(phone: string, outlet: { id: string; tap: string | null }) {
     const phoneE164 = normalizePhoneE164(phone);
     if (!phoneE164) return null;
 
@@ -218,7 +218,13 @@ export async function findMatchingWhitelist(phone: string, outlet: { id: string;
         if (candidate.expiresAt && !isFuture(candidate.expiresAt)) return false;
         if (candidate.scope === "ALL") return true;
         if (candidate.scope === "OUTLET") return candidate.outletId === outlet.id;
-        if (candidate.scope === "TERRITORY") return Boolean(outlet.territoryId && candidate.territoryId === outlet.territoryId);
+        // Dicocokkan tanpa membedakan huruf besar/kecil dan spasi tepi: nama TAP diketik
+        // manusia di dua tempat berbeda (data outlet dan form whitelist).
+        if (candidate.scope === "TAP") {
+            const tapOutlet = (outlet.tap || "").trim().toLowerCase();
+            const tapKandidat = (candidate.tap || "").trim().toLowerCase();
+            return Boolean(tapOutlet && tapKandidat && tapOutlet === tapKandidat);
+        }
         return false;
     }) || null;
 }

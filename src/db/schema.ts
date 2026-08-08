@@ -648,9 +648,16 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     id: varchar("id", { length: 36 }).primaryKey(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
     name: varchar("name", { length: 255 }),
-    scope: mysqlEnum("scope", ["ALL", "OUTLET", "TERRITORY"]).notNull().default("ALL"),
+    /** Status pemegang nomor: Outlet Owner, Salesforce, Manager, Organik Telkomsel, dan sejenisnya. */
+    keterangan: varchar("keterangan", { length: 255 }),
+    /**
+     * TERRITORY diganti TAP: territory adalah pengelompokan internal yang jarang diisi,
+     * sedangkan TAP sudah melekat di tiap outlet dan itu yang dipakai orang lapangan.
+     * Nilainya nama TAP apa adanya, dicocokkan ke mitra_outlets.tap.
+     */
+    scope: mysqlEnum("scope", ["ALL", "OUTLET", "TAP"]).notNull().default("ALL"),
     outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }),
     isActive: boolean("is_active").notNull().default(true),
     createdBy: varchar("created_by", { length: 36 }).references(() => user.id, { onDelete: "set null" }),
     // FK dinamai eksplisit: nama turunan otomatis Drizzle untuk kolom ini
@@ -664,7 +671,7 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
     index("mitra_whitelist_phone_idx").on(table.phoneE164),
     index("mitra_whitelist_scope_idx").on(table.scope),
     index("mitra_whitelist_outlet_idx").on(table.outletId),
-    index("mitra_whitelist_territory_idx").on(table.territoryId),
+    index("mitra_whitelist_tap_idx").on(table.tap),
     foreignKey({
         columns: [table.sourceBatchId],
         foreignColumns: [mitraImportBatches.id],

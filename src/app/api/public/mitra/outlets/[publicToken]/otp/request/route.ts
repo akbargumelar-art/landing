@@ -69,7 +69,7 @@ export async function POST(
 
     const whitelist = await findMatchingWhitelist(phoneE164, {
         id: outlet.id,
-        territoryId: outlet.territoryId,
+        tap: outlet.tap,
     });
 
     if (!whitelist) {

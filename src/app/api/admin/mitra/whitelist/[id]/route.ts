@@ -27,9 +27,10 @@ export async function PUT(
     await db.update(mitraWhitelistNumbers).set({
         phoneE164: body.phoneE164 || body.phone ? normalizePhoneE164(String(body.phoneE164 || body.phone)) : existing.phoneE164,
         name: body.name === "" ? null : body.name ?? existing.name,
+        keterangan: body.keterangan === "" ? null : body.keterangan ?? existing.keterangan,
         scope,
         outletId: scope === "OUTLET" ? body.outletId ?? existing.outletId : null,
-        territoryId: scope === "TERRITORY" ? body.territoryId ?? existing.territoryId : null,
+        tap: scope === "TAP" ? String(body.tap ?? existing.tap ?? "").trim() || null : null,
         isActive: body.isActive ?? existing.isActive,
         expiresAt: body.expiresAt === "" ? null : body.expiresAt ? new Date(body.expiresAt) : existing.expiresAt,
     }).where(eq(mitraWhitelistNumbers.id, id));
