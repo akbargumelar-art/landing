@@ -8,10 +8,12 @@ import { ArrowRight, Loader2, MapPin, Route, Search, Store } from "lucide-react"
 import dynamic from "next/dynamic";
 
 import { QrOutletScanner } from "@/components/mitra/qr-outlet-scanner";
+import { StreetViewPanel } from "@/components/mitra/street-view-panel";
 import type { OutletMarker } from "@/components/mitra/outlet-map";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { STREET_VIEW_ENABLED } from "@/lib/street-view";
 
 /**
  * Leaflet menyentuh `window` saat modulnya dimuat, jadi tidak bisa dirender di server.
@@ -68,15 +70,27 @@ export default function MitraOutletDirectoryPage() {
     const [map, setMap] = React.useState<MapResponse | null>(null);
     const [mapError, setMapError] = React.useState(false);
     const [focusedOutlet, setFocusedOutlet] = React.useState<string | null>(null);
+    const [streetViewToken, setStreetViewToken] = React.useState<string | null>(null);
     const mapSectionRef = React.useRef<HTMLDivElement>(null);
 
-    /** Klik outlet card → scroll ke peta dan fokuskan marker-nya. */
+    /**
+     * Dicari dari daftar penanda, bukan disimpan sebagai objek. Dengan begitu panel
+     * Street View ikut tertutup sendiri begitu filter berubah dan outletnya tidak lagi
+     * termasuk hasil -- tanpa perlu membersihkan state secara manual.
+     */
+    const streetViewOutlet = React.useMemo(
+        () => map?.markers.find((marker) => marker.publicToken === streetViewToken) || null,
+        [map, streetViewToken]
+    );
+
+    /** Klik outlet card → scroll ke peta, fokuskan marker-nya, dan buka Street View. */
     const handleFocusOutlet = React.useCallback((publicToken: string) => {
         // Cek apakah outlet ini ada di peta (punya koordinat)
         const hasMarker = map?.markers.some((m) => m.publicToken === publicToken);
         if (!hasMarker) return;
 
         setFocusedOutlet(publicToken);
+        if (STREET_VIEW_ENABLED) setStreetViewToken(publicToken);
         mapSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, [map]);
 
@@ -181,44 +195,60 @@ export default function MitraOutletDirectoryPage() {
                 </div>
             </section>
 
+            {/* Peta dan Street View berbagi baris begitu panorama dibuka; selama tertutup,
+                peta memakai lebar penuh seperti sebelumnya. */}
             <section ref={mapSectionRef} className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-                <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
-                        <div>
-                            <h2 className="text-sm font-bold text-gray-950">Peta Sebaran Outlet</h2>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                Mengikuti filter di atas. Klik penanda atau outlet di bawah untuk fokus di peta.
-                            </p>
-                        </div>
-                        {map && (
-                            <div className="flex items-center gap-3">
-                                {focusedOutlet && (
-                                    <button type="button" onClick={() => setFocusedOutlet(null)} className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors">
-                                        Reset Fokus
-                                    </button>
-                                )}
-                                <p className="text-xs text-muted-foreground">
-                                    <span className="font-bold text-gray-950">{map.markers.length}</span> outlet berkoordinat
-                                    {map.tanpaKoordinat > 0 && `, ${map.tanpaKoordinat} belum punya titik lokasi`}
+                <div className={`grid gap-4 ${streetViewOutlet ? "lg:grid-cols-2" : ""}`}>
+                    <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
+                            <div>
+                                <h2 className="text-sm font-bold text-gray-950">Peta Sebaran Outlet</h2>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Mengikuti filter di atas. Klik penanda atau outlet di bawah untuk fokus di peta
+                                    {STREET_VIEW_ENABLED ? " sekaligus membuka Street View." : "."}
                                 </p>
+                            </div>
+                            {map && (
+                                <div className="flex items-center gap-3">
+                                    {focusedOutlet && (
+                                        <button type="button" onClick={() => setFocusedOutlet(null)} className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors">
+                                            Reset Fokus
+                                        </button>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        <span className="font-bold text-gray-950">{map.markers.length}</span> outlet berkoordinat
+                                        {map.tanpaKoordinat > 0 && `, ${map.tanpaKoordinat} belum punya titik lokasi`}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {mapError ? (
+                            <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+                                Peta sedang tidak dapat dimuat. Daftar outlet di bawah tetap bisa digunakan.
+                            </div>
+                        ) : map && map.markers.length === 0 ? (
+                            <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+                                Belum ada outlet berkoordinat untuk filter ini.
+                            </div>
+                        ) : map ? (
+                            <OutletMap
+                                markers={map.markers}
+                                focusedToken={focusedOutlet}
+                                onStreetView={STREET_VIEW_ENABLED ? (token) => {
+                                    setFocusedOutlet(token);
+                                    setStreetViewToken(token);
+                                } : undefined}
+                            />
+                        ) : (
+                            <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground sm:h-[460px]">
+                                Memuat peta...
                             </div>
                         )}
                     </div>
 
-                    {mapError ? (
-                        <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-                            Peta sedang tidak dapat dimuat. Daftar outlet di bawah tetap bisa digunakan.
-                        </div>
-                    ) : map && map.markers.length === 0 ? (
-                        <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-                            Belum ada outlet berkoordinat untuk filter ini.
-                        </div>
-                    ) : map ? (
-                        <OutletMap markers={map.markers} focusedToken={focusedOutlet} />
-                    ) : (
-                        <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground sm:h-[460px]">
-                            Memuat peta...
-                        </div>
+                    {streetViewOutlet && (
+                        <StreetViewPanel outlet={streetViewOutlet} onClose={() => setStreetViewToken(null)} />
                     )}
                 </div>
             </section>
@@ -263,7 +293,6 @@ export default function MitraOutletDirectoryPage() {
                                 </div>
                                 <div className="flex items-center justify-between border-t px-4 py-3">
                                     <span className="text-xs text-muted-foreground">PJP {outlet.pjpDay} · {outlet.pjpType}</span>
-                                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
                                     <span onClick={(e) => e.stopPropagation()} role="presentation">
                                         <Link href={`/mitra/o/${outlet.publicToken}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-700">Lihat Profil <ArrowRight className="h-4 w-4" /></Link>
                                     </span>

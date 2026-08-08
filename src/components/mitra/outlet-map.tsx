@@ -113,9 +113,12 @@ function TerbangKeFokus({ focusedToken, markers }: { focusedToken: string | null
 export default function OutletMap({
     markers,
     focusedToken = null,
+    onStreetView,
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
+    /** Tidak diisi bila API key Street View belum dipasang; tombolnya ikut hilang. */
+    onStreetView?: (publicToken: string) => void;
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -151,6 +154,15 @@ export default function OutletMap({
                             {outlet.kecamatan}, {outlet.kabupaten}
                         </span>
                         <span className="mt-2 flex flex-col gap-1">
+                            {onStreetView && (
+                                <button
+                                    type="button"
+                                    onClick={() => onStreetView(outlet.publicToken)}
+                                    className="text-left text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                    Lihat Street View
+                                </button>
+                            )}
                             <Link
                                 href={`/mitra/o/${outlet.publicToken}`}
                                 className="text-xs font-semibold text-red-600 hover:underline"
