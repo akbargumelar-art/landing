@@ -311,45 +311,78 @@ export default function MitraOutletDetailPage() {
                                 </p>
                             </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full min-w-[560px] border-collapse text-sm">
-                                    <thead>
-                                        {/* Kepala tabel dibuat lengket supaya nama kolom tetap terbaca
-                                            saat menggulir tabel sepanjang 47 baris. */}
-                                        <tr className="sticky top-0 z-10 bg-white text-xs font-semibold uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_rgb(229,231,235)]">
-                                            <th className="px-5 py-3 text-left">Parameter</th>
-                                            <th className="px-4 py-3 text-right">M-1</th>
-                                            <th className="px-4 py-3 text-right">M</th>
-                                            <th className="px-5 py-3 text-right">MoM</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {group.rows.map((row) => (
-                                            <tr key={row.key} className={`border-t transition-colors hover:bg-red-50/30 ${row.level === 1 ? "bg-gray-50/50" : ""}`}>
-                                                {/* Rincian diberi indentasi dan garis penghubung supaya jelas
-                                                    bahwa angkanya bagian dari baris induk di atasnya, bukan
-                                                    parameter berdiri sendiri yang ikut dijumlahkan lagi. */}
-                                                <td className={`py-2.5 pr-4 ${row.level === 1 ? "pl-10" : "pl-5"}`}>
-                                                    {row.level === 1 && (
-                                                        <span className="mr-2 text-muted-foreground" aria-hidden>&#8735;</span>
-                                                    )}
-                                                    <span className={row.level === 1 ? "text-gray-700" : "font-medium text-gray-950"}>{row.label}</span>
-                                                    <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                        {row.unit === "qty" ? "qty" : "rev"}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{formatValue(values[row.m1Key])}</td>
-                                                <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
-                                                <td className="px-5 py-2.5 text-right">
-                                                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${momClass(values[row.momKey])}`}>
-                                                        {formatMoM(values[row.momKey])}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            {/* Dua bentuk, satu sumber data. Di ponsel tabel empat kolom selalu
+                                memaksa geser ke samping, jadi barisnya dirender ulang sebagai
+                                blok bertumpuk. Di layar lebar tabelnya table-fixed supaya kolom
+                                angka tidak terlempar ke tepi kanan menjauhi nama parameternya. */}
+                            <div className="divide-y md:hidden">
+                                {group.rows.map((row) => (
+                                    <div key={row.key} className={`px-4 py-3 ${row.level === 1 ? "bg-gray-50/60 pl-8" : ""}`}>
+                                        <p className="flex items-center gap-1.5 text-sm">
+                                            {row.level === 1 && <span className="text-muted-foreground" aria-hidden>&#8735;</span>}
+                                            <span className={row.level === 1 ? "text-gray-700" : "font-medium text-gray-950"}>{row.label}</span>
+                                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {row.unit === "qty" ? "qty" : "rev"}
+                                            </span>
+                                        </p>
+
+                                        <div className="mt-2 grid grid-cols-3 gap-2">
+                                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">M-1</p>
+                                                <p className="tabular-nums text-sm text-gray-700">{formatValue(values[row.m1Key])}</p>
+                                            </div>
+                                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">M</p>
+                                                <p className="font-semibold tabular-nums text-sm text-gray-950">{formatValue(values[row.mKey])}</p>
+                                            </div>
+                                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">MoM</p>
+                                                <p className={`text-sm font-bold tabular-nums ${momClass(values[row.momKey])}`}>
+                                                    {formatMoM(values[row.momKey])}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+
+                            <table className="hidden w-full table-fixed border-collapse text-sm md:table">
+                                <thead>
+                                    {/* Kepala tabel lengket supaya nama kolom tetap terbaca saat
+                                        menggulir tabel sepanjang 40 baris. */}
+                                    <tr className="sticky top-0 z-10 bg-white text-xs font-semibold uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_rgb(229,231,235)]">
+                                        <th className="w-[52%] px-5 py-3 text-left">Parameter</th>
+                                        <th className="w-[16%] border-l px-3 py-3 text-right">M-1</th>
+                                        <th className="w-[16%] border-l px-3 py-3 text-right">M</th>
+                                        <th className="w-[16%] border-l px-3 py-3 text-right">MoM</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {group.rows.map((row) => (
+                                        <tr key={row.key} className={`border-t transition-colors hover:bg-red-50/30 ${row.level === 1 ? "bg-gray-50/50" : ""}`}>
+                                            {/* Rincian diberi indentasi dan garis penghubung supaya jelas
+                                                bahwa angkanya bagian dari baris induk di atasnya, bukan
+                                                parameter berdiri sendiri yang ikut dijumlahkan lagi. */}
+                                            <td className={`truncate py-2 pr-3 ${row.level === 1 ? "pl-10" : "pl-5"}`}>
+                                                {row.level === 1 && (
+                                                    <span className="mr-1.5 text-muted-foreground" aria-hidden>&#8735;</span>
+                                                )}
+                                                <span className={row.level === 1 ? "text-gray-700" : "font-medium text-gray-950"}>{row.label}</span>
+                                                <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    {row.unit === "qty" ? "qty" : "rev"}
+                                                </span>
+                                            </td>
+                                            <td className="border-l px-3 py-2 text-right tabular-nums text-muted-foreground">{formatValue(values[row.m1Key])}</td>
+                                            <td className="border-l px-3 py-2 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
+                                            <td className="border-l px-3 py-2 text-right">
+                                                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${momClass(values[row.momKey])}`}>
+                                                    {formatMoM(values[row.momKey])}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     );
                 })}
