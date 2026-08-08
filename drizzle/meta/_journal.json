@@ -92,6 +92,20 @@
       "when": 1786172527766,
       "tag": "0012_salesforce_master",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1786189479361,
+      "tag": "0013_outlet_edit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1786190831064,
+      "tag": "0014_outlet_photo_slots",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAudi
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
+import { getOutletEditLogs, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
 import {
     normalizeOutletBranding,
     normalizeOutletCategory,
@@ -38,7 +39,8 @@ export async function GET(
     }
 
     const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
-    return NextResponse.json({ outlet, details });
+    const editLogs = await getOutletEditLogs(id, 30);
+    return NextResponse.json({ outlet, details, editLogs });
 }
 
 export async function PUT(
@@ -62,6 +64,7 @@ export async function PUT(
             ? await resolveSalesforceId(body.salesforce)
             : existing.salesforceId;
 
+    const photoBaru = body.photoUrl === "" ? null : body.photoUrl ?? existing.photoUrl;
     const longitude = body.longitude === "" ? null : body.longitude === undefined ? existing.longitude : Number(body.longitude);
     const latitude = body.latitude === "" ? null : body.latitude === undefined ? existing.latitude : Number(body.latitude);
 
@@ -87,8 +90,35 @@ export async function PUT(
         pjpType: normalizePjpType(body.pjpType ?? existing.pjpType),
         branding: normalizeOutletBranding(body.branding ?? existing.branding),
         status: body.status ?? existing.status,
-        photoUrl: body.photoUrl === "" ? null : body.photoUrl ?? existing.photoUrl,
+        photoUrl: photoBaru,
     }).where(eq(mitraOutlets.id, id));
+
+    // Ditulis ke log yang sama dengan perubahan dari sisi mitra supaya riwayat pada
+    // halaman detail utuh -- kalau hanya admin_audit_logs, perubahan admin tidak akan
+    // pernah terlihat oleh pemegang OTP.
+    const ipAdmin = getClientIp(request);
+    if (photoBaru !== existing.photoUrl) {
+        await writeOutletEditLog({
+            outletId: id,
+            actorType: "ADMIN",
+            actorUserId: auth.session?.userId,
+            action: "PHOTO",
+            before: { photoUrl: existing.photoUrl },
+            after: { photoUrl: photoBaru },
+            ip: ipAdmin,
+        });
+    }
+    if (latitude !== existing.latitude || longitude !== existing.longitude) {
+        await writeOutletEditLog({
+            outletId: id,
+            actorType: "ADMIN",
+            actorUserId: auth.session?.userId,
+            action: "LOCATION",
+            before: { latitude: existing.latitude, longitude: existing.longitude },
+            after: { latitude, longitude },
+            ip: ipAdmin,
+        });
+    }
 
     if (body.sellthruDigipos || body.sellthruNota || body.rechargeDigipos) {
         const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);

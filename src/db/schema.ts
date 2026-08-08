@@ -538,7 +538,23 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     pjpType: mysqlEnum("pjp_type", PJP_TYPES).notNull().default(DEFAULT_PJP_TYPE),
     branding: mysqlEnum("branding", OUTLET_BRANDINGS).notNull().default(DEFAULT_OUTLET_BRANDING),
     status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).notNull().default("ACTIVE"),
+    /**
+     * Empat slot foto outlet. photoUrl adalah foto tampak depan sekaligus foto utama
+     * yang dipakai kartu direktori, hero profil, dan popup peta -- karena itu namanya
+     * dipertahankan, supaya seluruh pembaca lama tetap bekerja tanpa join.
+     *
+     * Kolom *_updated_at bukan sekadar hiasan: kunjungan salesforce divalidasi lewat
+     * kebaruan foto, jadi tanggalnya adalah datanya. Diisi eksplisit saat foto diunggah,
+     * bukan lewat onUpdateNow, supaya perubahan kolom lain tidak ikut menyegarkannya.
+     */
     photoUrl: varchar("photo_url", { length: 500 }),
+    photoUpdatedAt: datetime("photo_updated_at"),
+    photoEtalaseUrl: varchar("photo_etalase_url", { length: 500 }),
+    photoEtalaseUpdatedAt: datetime("photo_etalase_updated_at"),
+    photoPopTelkomselUrl: varchar("photo_pop_telkomsel_url", { length: 500 }),
+    photoPopTelkomselUpdatedAt: datetime("photo_pop_telkomsel_updated_at"),
+    photoPopKompetitorUrl: varchar("photo_pop_kompetitor_url", { length: 500 }),
+    photoPopKompetitorUpdatedAt: datetime("photo_pop_kompetitor_updated_at"),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
@@ -686,6 +702,30 @@ export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
 }, (table) => [
     index("mitra_detail_sessions_outlet_idx").on(table.outletId),
     index("mitra_detail_sessions_expiry_idx").on(table.expiresAt),
+]);
+
+/**
+ * Jejak perubahan outlet yang bisa dilakukan dua pihak berbeda: mitra pemegang OTP
+ * (diidentifikasi nomor WhatsApp-nya dari mitra_detail_sessions) dan admin (user id).
+ * Karena itu keduanya nullable -- yang terisi menentukan siapa pelakunya.
+ *
+ * Terpisah dari admin_audit_logs supaya riwayatnya bisa ditampilkan di halaman detail
+ * publik tanpa ikut membuka jejak perubahan seluruh sistem.
+ */
+export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    actorType: mysqlEnum("actor_type", ["MITRA", "ADMIN"]).notNull(),
+    actorPhone: varchar("actor_phone", { length: 50 }),
+    actorUserId: varchar("actor_user_id", { length: 36 }),
+    action: mysqlEnum("action", ["PHOTO", "LOCATION"]).notNull(),
+    beforeJson: json("before_json").$type<Record<string, unknown>>(),
+    afterJson: json("after_json").$type<Record<string, unknown>>(),
+    ip: varchar("ip", { length: 120 }),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_outlet_edit_logs_outlet_idx").on(table.outletId),
+    index("mitra_outlet_edit_logs_created_idx").on(table.createdAt),
 ]);
 
 export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {

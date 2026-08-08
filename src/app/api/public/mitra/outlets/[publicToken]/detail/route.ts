@@ -24,5 +24,6 @@ export async function GET(
         details: data.details,
         performance: data.performance,
         marketShare: data.marketShare,
+        editLogs: data.editLogs,
     });
 }

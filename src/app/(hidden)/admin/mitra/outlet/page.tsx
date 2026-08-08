@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
+import { MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
 import {
     DEFAULT_OUTLET_BRANDING,
     DEFAULT_OUTLET_CATEGORY,
@@ -40,6 +41,14 @@ interface Territory {
     name: string;
 }
 
+interface EditLog {
+    id: string;
+    action: "PHOTO" | "LOCATION";
+    actorType: "MITRA" | "ADMIN";
+    actorLabel: string;
+    createdAt: string;
+}
+
 interface SalesforceOption {
     id: string;
     name: string;
@@ -56,6 +65,7 @@ export default function AdminMitraOutletPage() {
     const [editOutlet, setEditOutlet] = React.useState<Record<string, unknown> | null>(null);
     const [editDetails, setEditDetails] = React.useState<Record<string, Record<string, string | number>>>({});
     const [editSaving, setEditSaving] = React.useState(false);
+    const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const [deleting, setDeleting] = React.useState(false);
     const [form, setForm] = React.useState({
@@ -148,6 +158,7 @@ export default function AdminMitraOutletPage() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return alert(data.error || "Gagal memuat outlet");
         setEditOutlet(data.outlet);
+        setEditLogs(Array.isArray(data.editLogs) ? data.editLogs : []);
         setEditDetails({
             sellthruDigiposJson: data.details?.sellthruDigiposJson || {},
             sellthruNotaJson: data.details?.sellthruNotaJson || {},
@@ -368,6 +379,63 @@ export default function AdminMitraOutletPage() {
                                 </div>
                             </details>
                         ))}
+
+                        {/* Foto hanya bisa diunggah mitra lewat halaman detail (wajib OTP),
+                            jadi di sini statusnya ditampilkan untuk dipantau, bukan diedit.
+                            Kebaruannya adalah bukti kunjungan salesforce mingguan. */}
+                        <div className="rounded-lg border bg-gray-50 p-4">
+                            <h3 className="font-bold">Status Foto Outlet</h3>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                {MITRA_PHOTO_SLOTS.map((slot) => {
+                                    const url = editOutlet[slot.urlColumn];
+                                    const status = statusFoto(editOutlet[slot.atColumn] as string | null);
+                                    return (
+                                        <div key={slot.key} className="rounded-lg border bg-white p-3">
+                                            <p className="text-xs font-bold text-gray-950">{slot.label}</p>
+                                            <p className={`mt-1 text-xs font-semibold ${status.perluDiperbarui ? "text-amber-700" : "text-green-700"}`}>
+                                                {status.label}
+                                            </p>
+                                            {url ? (
+                                                <a href={String(url)} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-semibold text-red-600 hover:underline">
+                                                    Lihat foto
+                                                </a>
+                                            ) : (
+                                                <p className="mt-1 text-xs text-muted-foreground">Belum ada foto</p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Riwayat ini sumbernya sama dengan yang dilihat mitra di halaman
+                            detail, jadi admin dan mitra membaca jejak yang persis sama. */}
+                        <details className="rounded-lg border bg-gray-50 p-4">
+                            <summary className="cursor-pointer font-bold">
+                                Riwayat Perubahan Foto &amp; Lokasi ({editLogs.length})
+                            </summary>
+                            {editLogs.length > 0 ? (
+                                <ul className="mt-4 space-y-2">
+                                    {editLogs.map((log) => (
+                                        <li key={log.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-4 py-2 text-sm">
+                                            <span>
+                                                <span className="font-semibold">
+                                                    {log.action === "PHOTO" ? "Foto diperbarui" : "Lokasi diperbarui"}
+                                                </span>
+                                                <span className="ml-2 text-muted-foreground">
+                                                    oleh {log.actorLabel} ({log.actorType === "ADMIN" ? "admin" : "mitra"})
+                                                </span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(log.createdAt))}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-4 text-sm text-muted-foreground">Belum ada perubahan yang tercatat.</p>
+                            )}
+                        </details>
 
                         <Button onClick={saveEdit} disabled={editSaving}>
                             {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

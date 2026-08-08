@@ -22,6 +22,7 @@ import {
     mitraWhitelistNumbers,
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
+import { getOutletEditLogs } from "@/lib/mitra-outlet-edit";
 import {
     hashSessionToken,
     isFuture,
@@ -59,6 +60,13 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             branding: mitraOutlets.branding,
             status: mitraOutlets.status,
             photoUrl: mitraOutlets.photoUrl,
+            photoUpdatedAt: mitraOutlets.photoUpdatedAt,
+            photoEtalaseUrl: mitraOutlets.photoEtalaseUrl,
+            photoEtalaseUpdatedAt: mitraOutlets.photoEtalaseUpdatedAt,
+            photoPopTelkomselUrl: mitraOutlets.photoPopTelkomselUrl,
+            photoPopTelkomselUpdatedAt: mitraOutlets.photoPopTelkomselUpdatedAt,
+            photoPopKompetitorUrl: mitraOutlets.photoPopKompetitorUrl,
+            photoPopKompetitorUpdatedAt: mitraOutlets.photoPopKompetitorUpdatedAt,
             // Nama territory tidak lagi diambil: profil publik menampilkan TAP dan
             // salesforce, sedangkan territoryId saja sudah cukup untuk pencocokan whitelist.
             territoryId: mitraOutlets.territoryId,
@@ -88,7 +96,16 @@ export async function getPublicOutletByToken(publicToken: string) {
         pjpType: row.pjpType,
         branding: row.branding,
         status: row.status,
+        // Keempat slot foto ikut dibuka di profil publik: foto outlet bukan data
+        // sensitif, dan kebaruannya justru bukti kunjungan yang ingin dilihat.
         photoUrl: row.photoUrl,
+        photoUpdatedAt: row.photoUpdatedAt,
+        photoEtalaseUrl: row.photoEtalaseUrl,
+        photoEtalaseUpdatedAt: row.photoEtalaseUpdatedAt,
+        photoPopTelkomselUrl: row.photoPopTelkomselUrl,
+        photoPopTelkomselUpdatedAt: row.photoPopTelkomselUpdatedAt,
+        photoPopKompetitorUrl: row.photoPopKompetitorUrl,
+        photoPopKompetitorUpdatedAt: row.photoPopKompetitorUpdatedAt,
         // Territory diganti TAP + salesforce di profil publik: nama cabang dan petugas
         // yang mengunjungi outlet jauh lebih berarti bagi mitra daripada kode wilayah internal.
         tap: row.tap,
@@ -179,6 +196,7 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         },
         performance,
         marketShare: marketShare || null,
+        editLogs: await getOutletEditLogs(outletRecord.id),
     };
 }
 

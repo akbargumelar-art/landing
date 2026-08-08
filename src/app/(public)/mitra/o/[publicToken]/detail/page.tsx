@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, MapPin, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Camera, Crosshair, History, Loader2, MapPin, ShieldCheck } from "lucide-react";
 
+import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
+import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
 
@@ -25,6 +27,15 @@ interface DetailData {
         value: string;
     }[];
     marketShare: (Record<MitraMarketShareKey, string> & { kabupaten: string; kecamatan: string }) | null;
+    editLogs: EditLog[];
+}
+
+interface EditLog {
+    id: string;
+    action: "PHOTO" | "LOCATION";
+    actorType: "MITRA" | "ADMIN";
+    actorLabel: string;
+    createdAt: string;
 }
 
 export default function MitraOutletDetailPage() {
@@ -32,13 +43,94 @@ export default function MitraOutletDetailPage() {
     const publicToken = String(params.publicToken || "");
     const [data, setData] = React.useState<DetailData | null>(null);
     const [loading, setLoading] = React.useState(true);
+    const [mengunggah, setMengunggah] = React.useState<MitraPhotoSlotKey | null>(null);
+    const [menandaiLokasi, setMenandaiLokasi] = React.useState(false);
+    const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
+
+    const muat = React.useCallback(() => {
+        return fetch(`/api/public/mitra/outlets/${publicToken}/detail`)
+            .then((res) => res.ok ? res.json() : null)
+            .then(setData);
+    }, [publicToken]);
 
     React.useEffect(() => {
-        fetch(`/api/public/mitra/outlets/${publicToken}/detail`)
-            .then((res) => res.ok ? res.json() : null)
-            .then(setData)
-            .finally(() => setLoading(false));
-    }, [publicToken]);
+        muat().finally(() => setLoading(false));
+    }, [muat]);
+
+    const unggahFoto = async (slot: MitraPhotoSlotKey, file: File) => {
+        setMengunggah(slot);
+        setPesan(null);
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("slot", slot);
+
+        try {
+            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/photo`, { method: "POST", body: fd });
+            const hasil = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setPesan({ ok: false, teks: hasil.error || "Foto gagal diunggah." });
+            } else {
+                setPesan({ ok: true, teks: "Foto outlet berhasil diperbarui." });
+                await muat();
+            }
+        } catch {
+            setPesan({ ok: false, teks: "Koneksi bermasalah saat mengunggah foto." });
+        } finally {
+            setMengunggah(null);
+        }
+    };
+
+    /**
+     * Koordinat diambil dari GPS perangkat, bukan diketik. Mengetik lintang/bujur manual
+     * adalah sumber titik outlet yang meleset -- satu digit tertukar sudah memindahkan
+     * penanda belasan kilometer, dan tidak ada cara memverifikasinya dari layar admin.
+     */
+    const tandaiLokasi = () => {
+        if (!navigator.geolocation) {
+            setPesan({ ok: false, teks: "Perangkat atau browser ini tidak mendukung penanda lokasi." });
+            return;
+        }
+
+        setMenandaiLokasi(true);
+        setPesan(null);
+
+        navigator.geolocation.getCurrentPosition(
+            async (posisi) => {
+                try {
+                    const res = await fetch(`/api/public/mitra/outlets/${publicToken}/location`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            latitude: posisi.coords.latitude,
+                            longitude: posisi.coords.longitude,
+                            accuracy: posisi.coords.accuracy,
+                        }),
+                    });
+                    const hasil = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        setPesan({ ok: false, teks: hasil.error || "Lokasi gagal disimpan." });
+                    } else {
+                        setPesan({ ok: true, teks: `Lokasi outlet diperbarui (ketelitian ±${Math.round(posisi.coords.accuracy)} m).` });
+                        await muat();
+                    }
+                } catch {
+                    setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan lokasi." });
+                } finally {
+                    setMenandaiLokasi(false);
+                }
+            },
+            (error) => {
+                setMenandaiLokasi(false);
+                setPesan({
+                    ok: false,
+                    teks: error.code === error.PERMISSION_DENIED
+                        ? "Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini lalu coba lagi."
+                        : "Lokasi tidak terbaca. Pastikan GPS aktif dan Anda berada di depan outlet.",
+                });
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    };
 
     if (loading) {
         return <main className="min-h-screen bg-gray-50 pt-24 text-center text-sm text-muted-foreground">Memuat detail...</main>;
@@ -93,6 +185,55 @@ export default function MitraOutletDetailPage() {
                         </a>
                     )}
                 </div>
+
+                <OutletPhotoCard outlet={data.outlet} onUpload={unggahFoto} sedangUnggah={mengunggah} />
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="rounded-lg border bg-white p-5 shadow-sm">
+                        <h2 className="font-bold">Lokasi Outlet</h2>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Diambil dari GPS perangkat, bukan diketik manual, supaya titiknya akurat.</p>
+
+                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
+                            <p className="mt-1 font-mono text-sm text-gray-950">
+                                {data.outlet.latitude && data.outlet.longitude
+                                    ? `${Number(data.outlet.latitude).toFixed(6)}, ${Number(data.outlet.longitude).toFixed(6)}`
+                                    : "Belum ditandai"}
+                            </p>
+                            {data.outlet.locationUrl && (
+                                <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    Buka di Google Maps
+                                </a>
+                            )}
+                        </div>
+
+                        <Button onClick={tandaiLokasi} disabled={menandaiLokasi} className="mt-3 w-full">
+                            {menandaiLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                            {menandaiLokasi ? "Membaca lokasi..." : "Tandai Lokasi Saya Sekarang"}
+                        </Button>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            Tekan tombol ini <strong>saat berada di depan outlet</strong>. Koordinat dengan ketelitian di atas 200 m akan ditolak.
+                        </p>
+                    </div>
+
+                    <div className="rounded-lg border bg-white p-5 shadow-sm">
+                        <h2 className="font-bold">Validasi Kunjungan</h2>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu berjalan.
+                        </p>
+                        <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                            Perbarui foto langsung dari lokasi outlet memakai kamera perangkat, lalu tandai titik lokasi.
+                            Setiap perubahan tercatat pada riwayat di bawah beserta nomor yang melakukannya.
+                        </p>
+                    </div>
+                </div>
+
+                {pesan && (
+                    <p className={`rounded-lg p-3 text-sm ${pesan.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                        {pesan.teks}
+                    </p>
+                )}
 
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -157,6 +298,35 @@ export default function MitraOutletDetailPage() {
                 {/* Tiap parameter punya tiga angka (M-1, M, MoM), jadi disajikan sebagai
                     baris tabel. Bentuk kartu sebelumnya memecah satu parameter menjadi tiga
                     kotak terpisah dan sulit dibaca begitu jumlah parameternya puluhan. */}
+                <div className="rounded-lg border bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <History className="h-4 w-4 text-red-600" />
+                        <h2 className="font-bold">Riwayat Perubahan</h2>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Perubahan foto dan lokasi, baik oleh mitra maupun admin.</p>
+
+                    {data.editLogs?.length ? (
+                        <ul className="mt-4 space-y-2">
+                            {data.editLogs.map((log) => (
+                                <li key={log.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-gray-50 px-4 py-3 text-sm">
+                                    <span className="flex items-center gap-2">
+                                        {log.action === "PHOTO" ? <Camera className="h-4 w-4 text-muted-foreground" /> : <MapPin className="h-4 w-4 text-muted-foreground" />}
+                                        <span className="font-semibold text-gray-950">
+                                            {log.action === "PHOTO" ? "Foto outlet diperbarui" : "Lokasi outlet diperbarui"}
+                                        </span>
+                                        <span className="rounded-full bg-white px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-gray-200">
+                                            {log.actorLabel}
+                                        </span>
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{formatWaktu(log.createdAt)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">Belum ada perubahan yang tercatat.</p>
+                    )}
+                </div>
+
                 {MITRA_DETAIL_FIELD_GROUPS.map((group) => {
                     const values = data.details[group.key] || {};
                     return (
@@ -195,6 +365,12 @@ export default function MitraOutletDetailPage() {
             </section>
         </main>
     );
+}
+
+function formatWaktu(value: string) {
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    }).format(new Date(value));
 }
 
 function formatValue(value: number | undefined) {

@@ -6,13 +6,14 @@ import React from "react";
 import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldAlert, User } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
+import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface PublicOutlet {
+interface PublicOutlet extends Record<string, unknown> {
     publicToken: string;
     outletCode: string;
     name: string;
@@ -145,6 +146,8 @@ export default function MitraOutletProfilePage() {
                         <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
                         <SalesforceInfo name={outlet.salesforce} photoUrl={outlet.salesforcePhotoUrl} />
                     </div>
+                    {/* Kartu foto ikut tampil sebelum OTP: foto outlet bukan data terkunci,
+                        dan kebaruannya justru yang ingin dilihat pengunjung. */}
                     {/* "Lokasi akurat" dihapus dari kalimat ini: sejak peta sebaran di /mitra
                         menampilkan koordinat outlet secara publik, menjanjikannya sebagai data
                         terkunci tidak lagi benar. Yang masih benar-benar di balik OTP adalah
@@ -209,6 +212,10 @@ export default function MitraOutletProfilePage() {
                 </aside>
             </section>
 
+            <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6 lg:px-8">
+                <OutletPhotoCard outlet={outlet} />
+            </section>
+
             <Dialog open={Boolean(notice)} onOpenChange={(open) => { if (!open) setNotice(null); }}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
@@ -237,17 +244,17 @@ function SalesforceInfo({ name, photoUrl }: { name?: string; photoUrl?: string |
     return (
         <div className="rounded-lg border bg-gray-50 p-4 sm:col-span-2">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nama Salesforce</p>
-            <div className="mt-2 flex items-center gap-3">
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border bg-white">
+            <div className="mt-3 flex items-center gap-4">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm sm:h-24 sm:w-24">
                     {photoUrl ? (
-                        <Image src={photoUrl} alt={displayName} fill className="object-cover" unoptimized />
+                        <Image src={photoUrl} alt={displayName} fill sizes="96px" className="object-cover" unoptimized />
                     ) : (
-                        <span className="flex h-full w-full items-center justify-center text-sm font-bold text-muted-foreground">
-                            {initials || <User className="h-5 w-5" />}
+                        <span className="flex h-full w-full items-center justify-center text-xl font-bold text-muted-foreground">
+                            {initials || <User className="h-8 w-8" />}
                         </span>
                     )}
                 </div>
-                <p className="font-semibold text-gray-950">{displayName}</p>
+                <p className="text-lg font-semibold text-gray-950">{displayName}</p>
             </div>
         </div>
     );
