@@ -1,0 +1,11 @@
+# Skrip shell dijalankan di dalam kontainer Linux, sedangkan repo ini dikerjakan di
+# Windows dengan core.autocrlf=true. Tanpa aturan ini berkas .sh ter-checkout dengan
+# akhiran baris CRLF, dan kernel menolaknya dengan pesan yang menyesatkan
+# ("not found" untuk berkas yang jelas-jelas ada) karena \r ikut terbaca sebagai bagian
+# dari nama penerjemah pada baris #!.
+*.sh text eol=lf
+
+# CATATAN: berkas .sql SENGAJA tidak diatur di sini. drizzle-kit menyimpan hash isi tiap
+# migrasi di tabel __drizzle_migrations untuk menandai mana yang sudah dijalankan --
+# mengubah akhiran barisnya mengubah hash, dan migrasi yang sudah diterapkan bisa
+# dianggap baru lalu dijalankan ulang.
