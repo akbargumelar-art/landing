@@ -4,6 +4,7 @@ import Link from "next/link";
 import React from "react";
 import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
 
+import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -223,6 +224,8 @@ export default function AdminMitraOutletPage() {
 
     return (
         <div className="space-y-6">
+            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
+
             <div>
                 <h1 className="text-2xl font-bold">Outlet Mitra</h1>
                 <p className="mt-1 text-sm text-muted-foreground">Kelola data outlet dan token QR publik.</p>
@@ -288,7 +291,7 @@ export default function AdminMitraOutletPage() {
             </Card>
 
             {editOutlet && (
-                <Card ref={editRef}>
+                <Card ref={editRef} className="scroll-mt-20">
                     <CardContent className="space-y-5 p-5">
                         <div className="flex items-center justify-between gap-3">
                             <div>
