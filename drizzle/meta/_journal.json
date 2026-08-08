@@ -71,6 +71,13 @@
       "when": 1786001964584,
       "tag": "0009_redemption_log_nullable_voucher",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1786163929941,
+      "tag": "0010_outlet_salesforce_photo",
+      "breakpoints": true
     }
   ]
 }

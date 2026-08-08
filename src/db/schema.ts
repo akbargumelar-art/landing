@@ -502,6 +502,9 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     ownerPhone: varchar("owner_phone", { length: 50 }).notNull(),
     tap: varchar("tap", { length: 255 }).notNull().default(""),
     salesforce: varchar("salesforce", { length: 255 }).notNull().default(""),
+    // Foto salesforce tampil di profil publik outlet supaya mitra mengenali siapa yang
+    // menagih kunjungan PJP. Nullable: sebagian besar outlet lama belum punya fotonya.
+    salesforcePhotoUrl: varchar("salesforce_photo_url", { length: 500 }),
     kabupaten: varchar("kabupaten", { length: 255 }).notNull().default(""),
     kecamatan: varchar("kecamatan", { length: 255 }).notNull().default(""),
     longitude: double("longitude"),

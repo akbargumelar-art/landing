@@ -65,6 +65,7 @@ export async function PUT(
         ownerPhone: body.ownerPhone ? normalizePhoneE164(String(body.ownerPhone)) : existing.ownerPhone,
         tap: body.tap ?? existing.tap,
         salesforce: body.salesforce ?? existing.salesforce,
+        salesforcePhotoUrl: body.salesforcePhotoUrl === "" ? null : body.salesforcePhotoUrl ?? existing.salesforcePhotoUrl,
         kabupaten: body.kabupaten ?? existing.kabupaten,
         kecamatan: body.kecamatan ?? existing.kecamatan,
         longitude,

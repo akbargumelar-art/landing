@@ -17,7 +17,6 @@ import {
     mitraProgramScores,
     mitraPrograms,
     mitraProgramWinners,
-    mitraTerritories,
     mitraWhitelistNumbers,
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
@@ -43,6 +42,7 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             ownerPhone: mitraOutlets.ownerPhone,
             tap: mitraOutlets.tap,
             salesforce: mitraOutlets.salesforce,
+            salesforcePhotoUrl: mitraOutlets.salesforcePhotoUrl,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
             longitude: mitraOutlets.longitude,
@@ -54,11 +54,11 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             branding: mitraOutlets.branding,
             status: mitraOutlets.status,
             photoUrl: mitraOutlets.photoUrl,
-            territoryName: mitraTerritories.name,
+            // Nama territory tidak lagi diambil: profil publik menampilkan TAP dan
+            // salesforce, sedangkan territoryId saja sudah cukup untuk pencocokan whitelist.
             territoryId: mitraOutlets.territoryId,
         })
         .from(mitraOutlets)
-        .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
         .where(eq(mitraOutlets.publicToken, publicToken))
         .limit(1);
 
@@ -83,7 +83,11 @@ export async function getPublicOutletByToken(publicToken: string) {
         branding: row.branding,
         status: row.status,
         photoUrl: row.photoUrl,
-        territoryName: row.territoryName,
+        // Territory diganti TAP + salesforce di profil publik: nama cabang dan petugas
+        // yang mengunjungi outlet jauh lebih berarti bagi mitra daripada kode wilayah internal.
+        tap: row.tap,
+        salesforce: row.salesforce,
+        salesforcePhotoUrl: row.salesforcePhotoUrl,
         ownerPhoneMasked: maskPhone(row.ownerPhone),
     };
 }
@@ -140,8 +144,6 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             ...outlet,
             ownerName: outletRecord.ownerName,
             rsNumber: outletRecord.rsNumber,
-            tap: outletRecord.tap,
-            salesforce: outletRecord.salesforce,
             longitude: outletRecord.longitude,
             latitude: outletRecord.latitude,
             // Diturunkan dari koordinat supaya tautan selalu cocok dengan lat/long tersimpan.

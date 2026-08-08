@@ -4,11 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React from "react";
-import { CheckCircle2, LockKeyhole, MapPin, QrCode, Send } from "lucide-react";
+import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldAlert, User } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -24,7 +25,9 @@ interface PublicOutlet {
     branding: string;
     status: string;
     photoUrl?: string;
-    territoryName?: string;
+    tap?: string;
+    salesforce?: string;
+    salesforcePhotoUrl?: string | null;
     ownerPhoneMasked: string;
 }
 
@@ -35,10 +38,10 @@ export default function MitraOutletProfilePage() {
     const [outlet, setOutlet] = React.useState<PublicOutlet | null>(null);
     const [phone, setPhone] = React.useState("");
     const [code, setCode] = React.useState("");
-    const [message, setMessage] = React.useState("");
     const [error, setError] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [submitting, setSubmitting] = React.useState(false);
+    const [notice, setNotice] = React.useState<{ eligible: boolean; title: string; message: string } | null>(null);
 
     React.useEffect(() => {
         fetch(`/api/public/mitra/outlets/${publicToken}`)
@@ -47,18 +50,33 @@ export default function MitraOutletProfilePage() {
             .finally(() => setLoading(false));
     }, [publicToken]);
 
+    // Hasil permintaan OTP muncul sebagai popup, bukan teks kecil di bawah tombol:
+    // status "berhak" atau "tidak berhak" adalah info yang menentukan langkah pengunjung
+    // berikutnya, jadi harus sulit terlewat.
     const requestOtp = async () => {
         setSubmitting(true);
         setError("");
-        const res = await fetch(`/api/public/mitra/outlets/${publicToken}/otp/request`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone }),
-        });
-        const data = await res.json().catch(() => ({}));
-        setMessage(data.message || "Jika nomor terdaftar, OTP akan dikirim.");
-        if (!res.ok && res.status !== 429) setError(data.error || "Gagal meminta OTP");
-        setSubmitting(false);
+        try {
+            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/otp/request`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await res.json().catch(() => ({}));
+            setNotice({
+                eligible: res.ok && Boolean(data.eligible),
+                title: data.title || "Permintaan OTP Gagal",
+                message: data.message || "Permintaan OTP gagal diproses. Coba lagi beberapa saat.",
+            });
+        } catch {
+            setNotice({
+                eligible: false,
+                title: "Koneksi Bermasalah",
+                message: "Permintaan tidak sampai ke server. Periksa jaringan Anda lalu coba lagi.",
+            });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const verifyOtp = async () => {
@@ -99,6 +117,8 @@ export default function MitraOutletProfilePage() {
         );
     }
 
+    const canVerify = code.length === 6 && Boolean(phone);
+
     return (
         <main className="min-h-screen bg-gray-50 pt-20">
             <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 lg:px-8">
@@ -119,11 +139,12 @@ export default function MitraOutletProfilePage() {
                     </div>
                     <div className="grid gap-4 p-5 sm:grid-cols-2">
                         <Info label="Wilayah" value={`${outlet.kecamatan}, ${outlet.kabupaten}`} icon={<MapPin className="h-4 w-4" />} />
-                        <Info label="Territory" value={outlet.territoryName || "-"} />
+                        <Info label="TAP" value={outlet.tap || "-"} />
                         <Info label="Kategori" value={outlet.category} />
                         <Info label="Jadwal PJP" value={`${outlet.pjpDay} / ${outlet.pjpType}`} />
                         <Info label="Branding" value={outlet.branding || "-"} />
                         <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
+                        <SalesforceInfo name={outlet.salesforce} photoUrl={outlet.salesforcePhotoUrl} />
                     </div>
                     {/* "Lokasi akurat" dihapus dari kalimat ini: sejak peta sebaran di /mitra
                         menampilkan koordinat outlet secara publik, menjanjikannya sebagai data
@@ -158,13 +179,20 @@ export default function MitraOutletProfilePage() {
                         <div className="space-y-2">
                             <Label htmlFor="code">Kode OTP</Label>
                             <Input id="code" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6 digit" inputMode="numeric" />
+                            <p className="text-xs text-muted-foreground">Kode berlaku 5 menit sejak dikirim. Setelah terverifikasi, akses detail outlet tidak dibatasi waktu.</p>
                         </div>
-                        <Button onClick={verifyOtp} disabled={submitting || code.length !== 6 || !phone} variant="outline" className="w-full">
+                        {/* Warna tombol berubah begitu 6 digit terisi supaya jelas bahwa
+                            langkah verifikasi sudah bisa dijalankan. */}
+                        <Button
+                            onClick={verifyOtp}
+                            disabled={submitting || !canVerify}
+                            variant={canVerify ? "default" : "outline"}
+                            className={canVerify ? "w-full bg-green-600 text-white shadow-md hover:bg-green-700" : "w-full"}
+                        >
                             <CheckCircle2 className="h-4 w-4" />
                             Verifikasi
                         </Button>
 
-                        {message && <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">{message}</p>}
                         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
                         <Link href={`/api/public/mitra/outlets/${publicToken}/qr`} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">
@@ -174,7 +202,48 @@ export default function MitraOutletProfilePage() {
                     </div>
                 </aside>
             </section>
+
+            <Dialog open={Boolean(notice)} onOpenChange={(open) => { if (!open) setNotice(null); }}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <div className={`mb-2 flex h-11 w-11 items-center justify-center rounded-full ${notice?.eligible ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+                            {notice?.eligible ? <MessageCircle className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
+                        </div>
+                        <DialogTitle>{notice?.title}</DialogTitle>
+                        <DialogDescription>{notice?.message}</DialogDescription>
+                    </DialogHeader>
+                    <Button onClick={() => setNotice(null)} className="w-full">Mengerti</Button>
+                </DialogContent>
+            </Dialog>
         </main>
+    );
+}
+
+// Salesforce dapat kartunya sendiri (selebar dua kolom) karena hanya kolom ini yang
+// membawa foto; menaruhnya di grid Info biasa akan membuat satu sel jauh lebih tinggi
+// daripada tetangganya. Tanpa foto, inisial nama dipakai sebagai penggantinya.
+function SalesforceInfo({ name, photoUrl }: { name?: string; photoUrl?: string | null }) {
+    const displayName = name?.trim() || "-";
+    const initials = displayName === "-"
+        ? ""
+        : displayName.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+
+    return (
+        <div className="rounded-lg border bg-gray-50 p-4 sm:col-span-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nama Salesforce</p>
+            <div className="mt-2 flex items-center gap-3">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border bg-white">
+                    {photoUrl ? (
+                        <Image src={photoUrl} alt={displayName} fill className="object-cover" unoptimized />
+                    ) : (
+                        <span className="flex h-full w-full items-center justify-center text-sm font-bold text-muted-foreground">
+                            {initials || <User className="h-5 w-5" />}
+                        </span>
+                    )}
+                </div>
+                <p className="font-semibold text-gray-950">{displayName}</p>
+            </div>
+        </div>
     );
 }
 

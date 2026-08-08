@@ -3,11 +3,49 @@ export interface MitraDetailField {
     label: string;
 }
 
+/**
+ * Satu parameter beserta tiga kolomnya (M-1, M, MoM). Ini bentuk aslinya: tiap
+ * parameter memang selalu punya tiga angka, jadi halaman publik bisa menyajikannya
+ * sebagai satu baris tabel alih-alih tiga kartu terpisah.
+ */
+export interface MitraDetailRow {
+    key: string;
+    label: string;
+    unit: "qty" | "rev";
+    m1Key: string;
+    mKey: string;
+    momKey: string;
+}
+
 export interface MitraDetailFieldGroup {
     key: "sellthruDigipos" | "sellthruNota" | "rechargeDigipos";
     title: string;
     storageKey: "sellthruDigiposJson" | "sellthruNotaJson" | "rechargeDigiposJson";
+    rows: MitraDetailRow[];
+    /** Diturunkan dari rows supaya editor admin dan tabel publik tidak bisa berbeda. */
     fields: MitraDetailField[];
+}
+
+const UNIT_LABEL: Record<MitraDetailRow["unit"], string> = { qty: "qty", rev: "rev." };
+
+function buildRow(base: string, label: string, unit: MitraDetailRow["unit"]): MitraDetailRow {
+    return {
+        key: `${base}_${unit}`,
+        label,
+        unit,
+        m1Key: `${base}_m_1_${unit}`,
+        mKey: `${base}_m_${unit}`,
+        momKey: `mom_${base}_${unit}`,
+    };
+}
+
+function rowToFields(row: MitraDetailRow): MitraDetailField[] {
+    const unit = UNIT_LABEL[row.unit];
+    return [
+        { key: row.m1Key, label: `${row.label} M-1 (${unit})` },
+        { key: row.mKey, label: `${row.label} M (${unit})` },
+        { key: row.momKey, label: `MoM ${row.label} (${unit})` },
+    ];
 }
 
 const sellthruProducts = [
@@ -21,15 +59,12 @@ const sellthruProducts = [
     { key: "vokos_byu", label: "Vokos byU" },
 ];
 
-function buildSellthruFields(prefix: "st" | "st_nota", labelPrefix: string): MitraDetailField[] {
-    return sellthruProducts.flatMap((product) => [
-        { key: `${prefix}_${product.key}_m_1_qty`, label: `${labelPrefix} ${product.label} M-1 (qty)` },
-        { key: `${prefix}_${product.key}_m_qty`, label: `${labelPrefix} ${product.label} M (qty)` },
-        { key: `mom_${prefix}_${product.key}_qty`, label: `MoM ${labelPrefix} ${product.label} (qty)` },
-        { key: `${prefix}_${product.key}_m_1_rev`, label: `${labelPrefix} ${product.label} M-1 (rev.)` },
-        { key: `${prefix}_${product.key}_m_rev`, label: `${labelPrefix} ${product.label} M (rev.)` },
-        { key: `mom_${prefix}_${product.key}_rev`, label: `MoM ${labelPrefix} ${product.label} (rev.)` },
-    ]);
+function buildSellthruRows(prefix: "st" | "st_nota", labelPrefix: string): MitraDetailRow[] {
+    return sellthruProducts.flatMap((product) => {
+        const base = `${prefix}_${product.key}`;
+        const label = `${labelPrefix} ${product.label}`;
+        return [buildRow(base, label, "qty"), buildRow(base, label, "rev")];
+    });
 }
 
 const rechargeProducts = [
@@ -43,43 +78,37 @@ const rechargeProducts = [
     { key: "scan_so", label: "Scan SO", hasRev: true },
 ];
 
-const rechargeDigiposFields = rechargeProducts.flatMap((product) => {
-    const qtyFields = [
-        { key: `${product.key}_m_1_qty`, label: `${product.label} M-1 (qty)` },
-        { key: `${product.key}_m_qty`, label: `${product.label} M (qty)` },
-        { key: `mom_${product.key}_qty`, label: `MoM ${product.label} (qty)` },
-    ];
-
-    if (!product.hasRev) return qtyFields;
-
-    return [
-        ...qtyFields,
-        { key: `${product.key}_m_1_rev`, label: `${product.label} M-1 (rev.)` },
-        { key: `${product.key}_m_rev`, label: `${product.label} M (rev.)` },
-        { key: `mom_${product.key}_rev`, label: `MoM ${product.label} (rev.)` },
-    ];
+const rechargeDigiposRows = rechargeProducts.flatMap((product) => {
+    const qtyRow = buildRow(product.key, product.label, "qty");
+    if (!product.hasRev) return [qtyRow];
+    return [qtyRow, buildRow(product.key, product.label, "rev")];
 });
 
-export const MITRA_DETAIL_FIELD_GROUPS: MitraDetailFieldGroup[] = [
+const detailGroups: Omit<MitraDetailFieldGroup, "fields">[] = [
     {
         key: "sellthruDigipos",
         title: "Sellthru Digipos",
         storageKey: "sellthruDigiposJson",
-        fields: buildSellthruFields("st", "ST"),
+        rows: buildSellthruRows("st", "ST"),
     },
     {
         key: "sellthruNota",
         title: "Sellthru Nota",
         storageKey: "sellthruNotaJson",
-        fields: buildSellthruFields("st_nota", "ST Nota"),
+        rows: buildSellthruRows("st_nota", "ST Nota"),
     },
     {
         key: "rechargeDigipos",
         title: "Recharge Digipos",
         storageKey: "rechargeDigiposJson",
-        fields: rechargeDigiposFields,
+        rows: rechargeDigiposRows,
     },
 ];
+
+export const MITRA_DETAIL_FIELD_GROUPS: MitraDetailFieldGroup[] = detailGroups.map((group) => ({
+    ...group,
+    fields: group.rows.flatMap(rowToFields),
+}));
 
 export function sanitizeDetailGroup(input: unknown, allowedKeys: string[]): Record<string, number> {
     if (!input || typeof input !== "object" || Array.isArray(input)) return {};

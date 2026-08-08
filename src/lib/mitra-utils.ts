@@ -3,6 +3,15 @@ import { NextResponse } from "next/server";
 
 export const MITRA_DETAIL_SESSION_COOKIE = "mitra_detail_session";
 
+/**
+ * Batas waktu hanya berlaku pada kode OTP (5 menit untuk dimasukkan ke web).
+ * Setelah OTP terverifikasi, akses detail tidak lagi dibatasi waktu; kolom
+ * expires_at tetap ada karena NOT NULL dan dipakai job pembersih sesi, jadi
+ * diisi jauh ke depan agar praktis tidak pernah kedaluwarsa.
+ */
+export const MITRA_OTP_TTL_MINUTES = 5;
+export const MITRA_DETAIL_SESSION_TTL_MINUTES = 60 * 24 * 365 * 10;
+
 export function normalizePhoneE164(phone: string): string {
     const clean = phone.replace(/[^\d+]/g, "").trim();
     if (!clean) return "";

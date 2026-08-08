@@ -23,7 +23,6 @@ interface DetailData {
         periodYm: string;
         value: string;
     }[];
-    expiresAt: string;
 }
 
 export default function MitraOutletDetailPage() {
@@ -48,8 +47,8 @@ export default function MitraOutletDetailPage() {
             <main className="min-h-screen bg-gray-50 pt-24">
                 <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center shadow-sm">
                     <ShieldCheck className="mx-auto h-10 w-10 text-red-600" />
-                    <h1 className="mt-4 text-lg font-bold">Sesi Detail Berakhir</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">Silakan verifikasi OTP ulang untuk membuka detail outlet.</p>
+                    <h1 className="mt-4 text-lg font-bold">Verifikasi Diperlukan</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">Silakan verifikasi OTP WhatsApp untuk membuka detail outlet.</p>
                     <Link href={`/mitra/o/${publicToken}`} className="mt-5 block">
                         <Button>Kembali ke Profil Outlet</Button>
                     </Link>
@@ -67,15 +66,12 @@ export default function MitraOutletDetailPage() {
                 </Link>
 
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <p className="text-sm font-bold uppercase tracking-widest text-red-600">Detail Terverifikasi</p>
-                            <h1 className="mt-1 text-2xl font-extrabold">{data.outlet.name}</h1>
-                            <p className="mt-1 text-sm text-muted-foreground">{data.outlet.outletCode} - {data.outlet.ownerName}</p>
-                        </div>
-                        <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-                            Sesi berlaku sampai {new Date(data.expiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                        </div>
+                    {/* Tidak ada lagi penanda masa berlaku sesi: batas waktu hanya melekat pada
+                        kode OTP, sedangkan halaman detail tetap terbuka setelah verifikasi. */}
+                    <div>
+                        <p className="text-sm font-bold uppercase tracking-widest text-red-600">Detail Terverifikasi</p>
+                        <h1 className="mt-1 text-2xl font-extrabold">{data.outlet.name}</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">{data.outlet.outletCode} - {data.outlet.ownerName}</p>
                     </div>
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -112,20 +108,40 @@ export default function MitraOutletDetailPage() {
                     </div>
                 </div>
 
+                {/* Tiap parameter punya tiga angka (M-1, M, MoM), jadi disajikan sebagai
+                    baris tabel. Bentuk kartu sebelumnya memecah satu parameter menjadi tiga
+                    kotak terpisah dan sulit dibaca begitu jumlah parameternya puluhan. */}
                 {MITRA_DETAIL_FIELD_GROUPS.map((group) => {
                     const values = data.details[group.key] || {};
                     return (
                         <div key={group.key} className="rounded-lg border bg-white p-5 shadow-sm">
                             <h2 className="font-bold">{group.title}</h2>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {group.fields.map((field) => (
-                                    <div key={field.key} className="rounded-lg border bg-gray-50 p-3">
-                                        <p className="text-xs text-muted-foreground">{field.label}</p>
-                                        <p className="mt-1 text-base font-bold text-gray-950">
-                                            {(values[field.key] ?? 0).toLocaleString("id-ID")}
-                                        </p>
-                                    </div>
-                                ))}
+                            <div className="mt-4 overflow-x-auto">
+                                <table className="w-full min-w-[520px] border-collapse text-sm">
+                                    <thead>
+                                        <tr className="border-b text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                            <th className="px-3 py-2 text-left">Parameter</th>
+                                            <th className="px-3 py-2 text-right">M-1</th>
+                                            <th className="px-3 py-2 text-right">M</th>
+                                            <th className="px-3 py-2 text-right">MoM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {group.rows.map((row) => (
+                                            <tr key={row.key} className="border-b last:border-0 odd:bg-gray-50/60">
+                                                <td className="px-3 py-2">
+                                                    <span className="font-medium text-gray-950">{row.label}</span>
+                                                    <span className="ml-2 text-xs text-muted-foreground">{row.unit === "qty" ? "qty" : "rev."}</span>
+                                                </td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{formatValue(values[row.m1Key])}</td>
+                                                <td className="px-3 py-2 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
+                                                <td className={`px-3 py-2 text-right font-semibold tabular-nums ${momClass(values[row.momKey])}`}>
+                                                    {formatMoM(values[row.momKey])}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     );
@@ -133,6 +149,25 @@ export default function MitraOutletDetailPage() {
             </section>
         </main>
     );
+}
+
+function formatValue(value: number | undefined) {
+    return (value ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
+
+// MoM disimpan sebagai persentase pertumbuhan, jadi ditampilkan bertanda supaya
+// arah naik/turunnya terbaca tanpa harus membandingkan kolom M-1 dan M.
+function formatMoM(value: number | undefined) {
+    const number = value ?? 0;
+    const sign = number > 0 ? "+" : "";
+    return `${sign}${number.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
+}
+
+function momClass(value: number | undefined) {
+    const number = value ?? 0;
+    if (number > 0) return "text-green-600";
+    if (number < 0) return "text-red-600";
+    return "text-muted-foreground";
 }
 
 function Info({ label, value }: { label: string; value: string }) {
