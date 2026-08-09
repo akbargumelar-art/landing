@@ -223,7 +223,7 @@ export default function MitraOutletDirectoryPage() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 pt-20">
+        <main className="min-h-screen bg-gray-50">
             <section className="border-b bg-white">
                 <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-9 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
                     <div>
