@@ -344,7 +344,7 @@ export default function MitraOutletDirectoryPage() {
                 peta memakai lebar penuh seperti sebelumnya. */}
             <section ref={mapSectionRef} className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
                 <div className={`grid gap-4 ${titikStreetView ? "lg:grid-cols-2" : ""}`}>
-                    <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                    <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
                             <div>
                                 <h2 className="text-sm font-bold text-gray-950">Peta Sebaran Outlet</h2>
@@ -469,22 +469,25 @@ export default function MitraOutletDirectoryPage() {
                                 Belum ada outlet berkoordinat untuk filter ini.
                             </div>
                         ) : map ? (
-                            <OutletMap
-                                markers={map.markers}
-                                focusedToken={focusedOutlet}
-                                userPosition={posisiSaya}
-                                odp={tampilkanOdp ? odp : []}
-                                onAreaChange={areaBerubah}
-                                onStreetView={STREET_VIEW_ENABLED ? (token) => {
-                                    setStreetViewOdp(null);
-                                    setFocusedOutlet(token);
-                                    setStreetViewToken(token);
-                                } : undefined}
-                                onOdpStreetView={STREET_VIEW_ENABLED ? (titik) => {
-                                    setStreetViewToken(null);
-                                    setStreetViewOdp(titik);
-                                } : undefined}
-                            />
+                            <div className="min-h-[360px] flex-1">
+                                <OutletMap
+                                    heightClass="h-full"
+                                    markers={map.markers}
+                                    focusedToken={focusedOutlet}
+                                    userPosition={posisiSaya}
+                                    odp={tampilkanOdp ? odp : []}
+                                    onAreaChange={areaBerubah}
+                                    onStreetView={STREET_VIEW_ENABLED ? (token) => {
+                                        setStreetViewOdp(null);
+                                        setFocusedOutlet(token);
+                                        setStreetViewToken(token);
+                                    } : undefined}
+                                    onOdpStreetView={STREET_VIEW_ENABLED ? (titik) => {
+                                        setStreetViewToken(null);
+                                        setStreetViewOdp(titik);
+                                    } : undefined}
+                                />
+                            </div>
                         ) : (
                             <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground sm:h-[460px]">
                                 Memuat peta...

@@ -20,7 +20,7 @@ export interface TitikStreetView {
 
 export function StreetViewPanel({ titik, onClose }: { titik: TitikStreetView; onClose: () => void }) {
     return (
-        <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+        <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2 border-b px-5 py-4">
                 <div className="min-w-0">
                     <h2 className="text-sm font-bold text-gray-950">Street View</h2>
@@ -50,7 +50,7 @@ export function StreetViewPanel({ titik, onClose }: { titik: TitikStreetView; on
                 // Google mencocokkan pembatasan HTTP referrer pada API key dengan header
                 // referrer permintaan ini; tanpa referrer, key yang dibatasi domain ditolak.
                 referrerPolicy="no-referrer-when-downgrade"
-                className="h-[360px] w-full border-0 bg-gray-100 sm:h-[460px]"
+                className="w-full flex-1 border-0 bg-gray-100 min-h-[360px]"
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
