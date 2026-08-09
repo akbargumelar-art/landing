@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Eye, FileText, Loader2, MapPin, Pencil, Plus, Search, Trash2, Wifi } from "lucide-react";
+import { CheckCircle2, Eye, FileText, Loader2, MapPin, Pencil, Plus, Router, Search, Trash2, Wifi } from "lucide-react";
 import { IndihomeLocationsBanner } from "@/components/admin/indihome-locations-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { IndihomeOdpPanel } from "@/components/admin/indihome-odp-panel";
 import { INDIHOME_LEAD_STATUSES, type IndihomeLeadStatus } from "@/lib/indihome-admin";
 import { INDIHOME_LOCATIONS } from "@/lib/indihome-products";
 
@@ -69,7 +70,7 @@ const statusLabels: Record<IndihomeLeadStatus, string> = {
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 export default function AdminIndihomePage() {
-    const [tab, setTab] = useState<"products" | "leads" | "settings">("products");
+    const [tab, setTab] = useState<"products" | "leads" | "settings" | "odp">("products");
     const [locationOptions, setLocationOptions] = useState<string[]>([...INDIHOME_LOCATIONS]);
     const [products, setProducts] = useState<AdminProduct[]>([]);
     const [leads, setLeads] = useState<IndihomeLead[]>([]);
@@ -209,12 +210,15 @@ export default function AdminIndihomePage() {
             <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
                 <button type="button" onClick={() => setTab("products")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "products" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><Wifi className="h-4 w-4" /> Produk</button>
                 <button type="button" onClick={() => setTab("settings")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "settings" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><MapPin className="h-4 w-4" /> Lokasi &amp; Banner</button>
+                <button type="button" onClick={() => setTab("odp")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "odp" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><Router className="h-4 w-4" /> Titik ODP</button>
                 <button type="button" onClick={() => setTab("leads")} className={`flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold ${tab === "leads" ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}><FileText className="h-4 w-4" /> Form Langganan <span className={`rounded-full px-2 py-0.5 text-xs ${tab === "leads" ? "bg-white/20" : "bg-gray-100"}`}>{leads.length}</span></button>
             </div>
 
             {message && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{message}</div>}
 
-            {tab === "products" ? (
+            {tab === "odp" ? (
+                <IndihomeOdpPanel />
+            ) : tab === "products" ? (
                 <section className="space-y-5">
                     <div className="flex items-center justify-between">
                         <div><h3 className="font-bold text-gray-950">Katalog landing page</h3><p className="text-sm text-muted-foreground">Hanya paket aktif yang ditampilkan kepada pengunjung.</p></div>

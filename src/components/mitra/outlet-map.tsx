@@ -6,8 +6,22 @@ import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from "react-le
 import L from "leaflet";
 
 import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
+import { hitungOccupancy, infoKategori, type OdpCategory } from "@/lib/indihome-odp";
 
 import "leaflet/dist/leaflet.css";
+
+export interface OdpMarker {
+    id: string;
+    code: string | null;
+    kabupaten: string;
+    kecamatan: string;
+    latitude: number;
+    longitude: number;
+    portTotal: number;
+    portUsed: number;
+    portAvailable: number;
+    category: OdpCategory | null;
+}
 
 export interface OutletMarker {
     publicToken: string;
@@ -26,43 +40,65 @@ export interface OutletMarker {
  * di-bundle dan diberi hash oleh Next.js -- gejalanya penanda hilang tanpa error. divIcon
  * berbasis HTML menghindari masalah itu sepenuhnya dan sekaligus mengikuti warna merek.
  */
-const ikonOutlet = L.divIcon({
-    className: "",
-    html: `
-        <span style="
-            display:block;width:22px;height:22px;border-radius:9999px;
-            background:#dc2626;border:3px solid #fff;
-            box-shadow:0 2px 6px rgba(0,0,0,.35);
-        "></span>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-    popupAnchor: [0, -12],
-});
+function pinOutlet(fokus: boolean) {
+    const ukuran = fokus ? 40 : 32;
+    // Bentuk toko: kanopi bergelombang di atas, badan bangunan, pintu di tengah. Dipilih
+    // agar penanda outlet berbeda bentuk -- bukan hanya beda warna -- dari penanda ODP,
+    // sehingga tetap terbaca oleh yang kesulitan membedakan warna.
+    return L.divIcon({
+        className: "",
+        html: `
+            <span style="display:block;width:${ukuran}px;height:${ukuran}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));${fokus ? "animation:pulsa-marker 1.2s ease-in-out infinite;" : ""}">
+                <svg viewBox="0 0 24 24" width="${ukuran}" height="${ukuran}">
+                    <path d="M12 2c4.4 0 8 3.4 8 7.6 0 5.2-6.3 11.1-7.4 12.1a.9.9 0 0 1-1.2 0C10.3 20.7 4 14.8 4 9.6 4 5.4 7.6 2 12 2z"
+                          fill="#dc2626" stroke="#fff" stroke-width="1.4"/>
+                    <path d="M8 7.4h8v1.3a1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0z" fill="#fff"/>
+                    <path d="M8.7 9.6h6.6v4.6h-2.4v-2.7h-1.8v2.7H8.7z" fill="#fff"/>
+                </svg>
+            </span>
+            ${fokus ? `<style>
+                @keyframes pulsa-marker {
+                    0%, 100% { transform: scale(1); }
+                    50%      { transform: scale(1.12); }
+                }
+            </style>` : ""}`,
+        iconSize: [ukuran, ukuran],
+        // Ujung bawah pin yang menunjuk lokasi, bukan tengahnya.
+        iconAnchor: [ukuran / 2, ukuran],
+        popupAnchor: [0, -ukuran + 6],
+    });
+}
 
-/** Ikon lebih besar & berdenyut untuk outlet yang sedang difokuskan. */
-const ikonOutletFokus = L.divIcon({
-    className: "",
-    html: `
-        <span style="
-            display:block;width:30px;height:30px;border-radius:9999px;
-            background:#dc2626;border:4px solid #fef08a;
-            box-shadow:0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4);
-            animation:pulsa-marker 1.2s ease-in-out infinite;
-        "></span>
-        <style>
-            @keyframes pulsa-marker {
-                0%, 100% { box-shadow: 0 0 0 6px rgba(220,38,38,.3), 0 2px 8px rgba(0,0,0,.4); }
-                50%      { box-shadow: 0 0 0 12px rgba(220,38,38,.12), 0 2px 8px rgba(0,0,0,.4); }
-            }
-        </style>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -16],
-});
+const ikonOutlet = pinOutlet(false);
+const ikonOutletFokus = pinOutlet(true);
+
+/**
+ * Penanda ODP: kotak terminal dengan tiga port dan kabel menjuntai -- bentuk yang lazim
+ * dikenali sebagai perangkat fix broadband di lapangan. Warnanya mengikuti kategori.
+ */
+function ikonOdp(warna: string) {
+    return L.divIcon({
+        className: "",
+        html: `
+            <span style="display:block;width:26px;height:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));">
+                <svg viewBox="0 0 24 24" width="26" height="26">
+                    <rect x="4" y="5" width="16" height="12" rx="2.5" fill="${warna}" stroke="#fff" stroke-width="1.6"/>
+                    <circle cx="8.5" cy="11" r="1.25" fill="#fff"/>
+                    <circle cx="12" cy="11" r="1.25" fill="#fff"/>
+                    <circle cx="15.5" cy="11" r="1.25" fill="#fff"/>
+                    <path d="M12 17v3" stroke="${warna}" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M12 17v3" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
+                </svg>
+            </span>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -12],
+    });
+}
 
 /**
  * Titik posisi pengguna dibuat biru dan berdenyut supaya tidak tertukar dengan penanda
- * outlet yang merah -- keduanya sering berdekatan justru ketika fitur ini dipakai.
+ * outlet maupun ODP -- ketiganya sering berdekatan justru ketika fitur ini dipakai.
  */
 const ikonPengguna = L.divIcon({
     className: "",
@@ -207,12 +243,14 @@ export default function OutletMap({
     focusedToken = null,
     onStreetView,
     userPosition = null,
+    odp = [],
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
     /** Tidak diisi bila API key Street View belum dipasang; tombolnya ikut hilang. */
     onStreetView?: (publicToken: string) => void;
     userPosition?: PosisiPengguna | null;
+    odp?: OdpMarker[];
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -256,6 +294,43 @@ export default function OutletMap({
                     </Marker>
                 </>
             )}
+
+            {/* ODP digambar sebelum outlet supaya penanda outlet berada di lapisan atas
+                ketika keduanya bertumpuk -- outlet yang lebih sering diklik. */}
+            {odp.map((titik) => {
+                const kategori = infoKategori(titik.category, titik.portUsed, titik.portTotal);
+                const occupancy = hitungOccupancy(titik.portUsed, titik.portTotal);
+
+                return (
+                    <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(kategori.color)}>
+                        <Popup>
+                            <span className="block text-sm font-bold text-gray-950">
+                                ODP {titik.code || titik.kecamatan}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-gray-600">
+                                {titik.kecamatan}, {titik.kabupaten}
+                            </span>
+                            <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: kategori.color }}>
+                                {kategori.label}
+                            </span>
+                            <span className="mt-2 block text-xs text-gray-700">
+                                Port: <strong>{titik.portTotal}</strong> total, {titik.portUsed} terpakai, {titik.portAvailable} tersedia
+                            </span>
+                            <span className="mt-0.5 block text-xs text-gray-700">
+                                Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
+                            </span>
+                            <a
+                                href={buildOutletMapsUrl(titik.latitude, titik.longitude)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 block text-xs font-semibold text-red-600 hover:underline"
+                            >
+                                Buka lokasi ODP di Google Maps
+                            </a>
+                        </Popup>
+                    </Marker>
+                );
+            })}
 
             {markers.map((outlet) => (
                 <Marker

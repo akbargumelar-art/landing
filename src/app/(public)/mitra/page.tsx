@@ -3,13 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
-import { ArrowRight, Crosshair, Loader2, MapPin, Navigation, Route, Search, Store } from "lucide-react";
+import { ArrowRight, Crosshair, Loader2, MapPin, Navigation, Route, Router, Search, Store } from "lucide-react";
 
 import dynamic from "next/dynamic";
 
 import { QrOutletScanner } from "@/components/mitra/qr-outlet-scanner";
 import { StreetViewPanel } from "@/components/mitra/street-view-panel";
-import type { OutletMarker, PosisiPengguna } from "@/components/mitra/outlet-map";
+import type { OdpMarker, OutletMarker, PosisiPengguna } from "@/components/mitra/outlet-map";
+import { ODP_CATEGORIES } from "@/lib/indihome-odp";
 import { formatJarak, jarakMeter } from "@/lib/geo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,9 @@ export default function MitraOutletDirectoryPage() {
     const [posisiSaya, setPosisiSaya] = React.useState<PosisiPengguna | null>(null);
     const [mencariLokasi, setMencariLokasi] = React.useState(false);
     const [galatLokasi, setGalatLokasi] = React.useState("");
+    const [odp, setOdp] = React.useState<OdpMarker[]>([]);
+    const [tampilkanOdp, setTampilkanOdp] = React.useState(false);
+    const [memuatOdp, setMemuatOdp] = React.useState(false);
     const mapSectionRef = React.useRef<HTMLDivElement>(null);
 
     /**
@@ -142,6 +146,33 @@ export default function MitraOutletDirectoryPage() {
             .sort((a, b) => a.jarak - b.jarak)
             .slice(0, 5);
     }, [posisiSaya, map]);
+
+    /**
+     * ODP diambil hanya saat lapisannya dinyalakan, bukan bersamaan dengan penanda outlet.
+     * Jumlahnya bisa ribuan sedangkan sebagian besar pengunjung datang mencari outlet,
+     * jadi memuatnya di awal hanya memperlambat halaman untuk semua orang.
+     */
+    const alihkanOdp = React.useCallback(async () => {
+        if (tampilkanOdp) {
+            setTampilkanOdp(false);
+            return;
+        }
+
+        setTampilkanOdp(true);
+        if (odp.length > 0) return;
+
+        setMemuatOdp(true);
+        try {
+            const params = kabupaten ? `?kabupaten=${encodeURIComponent(kabupaten)}` : "";
+            const res = await fetch(`/api/public/indihome/odp${params}`);
+            const data = res.ok ? await res.json() : null;
+            setOdp(Array.isArray(data?.odp) ? data.odp : []);
+        } catch {
+            setOdp([]);
+        } finally {
+            setMemuatOdp(false);
+        }
+    }, [tampilkanOdp, odp.length, kabupaten]);
 
     /** Klik outlet card → scroll ke peta, fokuskan marker-nya, dan buka Street View. */
     const handleFocusOutlet = React.useCallback((publicToken: string) => {
@@ -279,6 +310,16 @@ export default function MitraOutletDirectoryPage() {
                                     {mencariLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
                                     {mencariLokasi ? "Mencari..." : "Lokasi Saya"}
                                 </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={tampilkanOdp ? "default" : "outline"}
+                                    onClick={alihkanOdp}
+                                    disabled={memuatOdp}
+                                >
+                                    {memuatOdp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Router className="h-4 w-4" />}
+                                    {memuatOdp ? "Memuat ODP..." : tampilkanOdp ? "Sembunyikan ODP" : "Tampilkan ODP"}
+                                </Button>
                                 {posisiSaya && (
                                     <button
                                         type="button"
@@ -304,6 +345,23 @@ export default function MitraOutletDirectoryPage() {
                                 </div>
                             )}
                         </div>
+
+                        {tampilkanOdp && (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b bg-gray-50 px-5 py-3">
+                                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Kategori ODP
+                                </span>
+                                {ODP_CATEGORIES.map((kategori) => (
+                                    <span key={kategori.key} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <span className="h-3 w-3 rounded-sm" style={{ background: kategori.color }} />
+                                        <strong className="text-gray-950">{kategori.label}</strong> {kategori.keterangan}
+                                    </span>
+                                ))}
+                                <span className="text-xs text-muted-foreground">
+                                    {odp.length.toLocaleString("id-ID")} titik ditampilkan
+                                </span>
+                            </div>
+                        )}
 
                         {galatLokasi && (
                             <p className="border-b bg-red-50 px-5 py-3 text-sm text-red-700">{galatLokasi}</p>
@@ -359,6 +417,7 @@ export default function MitraOutletDirectoryPage() {
                                 markers={map.markers}
                                 focusedToken={focusedOutlet}
                                 userPosition={posisiSaya}
+                                odp={tampilkanOdp ? odp : []}
                                 onStreetView={STREET_VIEW_ENABLED ? (token) => {
                                     setFocusedOutlet(token);
                                     setStreetViewToken(token);
