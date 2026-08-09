@@ -22,6 +22,9 @@ import { STREET_VIEW_ENABLED } from "@/lib/street-view";
  * Dimuat dinamis tanpa SSR sekaligus supaya bundel peta (leaflet + react-leaflet) tidak
  * ikut membebani pengunjung halaman lain.
  */
+/** Di bawah zoom ini penanda ODP saling menumpuk dan tidak terbaca, jadi tidak dimuat. */
+const ZOOM_MINIMAL_ODP = 13;
+
 const OutletMap = dynamic(() => import("@/components/mitra/outlet-map"), {
     ssr: false,
     loading: () => (
@@ -79,6 +82,8 @@ export default function MitraOutletDirectoryPage() {
     const [odp, setOdp] = React.useState<OdpMarker[]>([]);
     const [tampilkanOdp, setTampilkanOdp] = React.useState(false);
     const [memuatOdp, setMemuatOdp] = React.useState(false);
+    const [odpTerpotong, setOdpTerpotong] = React.useState(false);
+    const [zoomPeta, setZoomPeta] = React.useState(11);
     const mapSectionRef = React.useRef<HTMLDivElement>(null);
 
     /**
@@ -148,31 +153,45 @@ export default function MitraOutletDirectoryPage() {
     }, [posisiSaya, map]);
 
     /**
-     * ODP diambil hanya saat lapisannya dinyalakan, bukan bersamaan dengan penanda outlet.
-     * Jumlahnya bisa ribuan sedangkan sebagian besar pengunjung datang mencari outlet,
-     * jadi memuatnya di awal hanya memperlambat halaman untuk semua orang.
+     * Titik ODP berjumlah puluhan ribu, dan Leaflet menggambar tiap penanda sebagai elemen
+     * DOM tersendiri -- memuat semuanya membekukan browser. Karena itu yang diambil hanya
+     * yang berada di dalam area peta yang sedang terlihat, dan hanya setelah peta cukup
+     * diperbesar. Pada tampilan seluruh Jawa Barat, ribuan titik yang saling menumpuk
+     * juga tidak memberi informasi apa pun.
      */
-    const alihkanOdp = React.useCallback(async () => {
-        if (tampilkanOdp) {
-            setTampilkanOdp(false);
+    const alihkanOdp = React.useCallback(() => {
+        setTampilkanOdp((sebelumnya) => !sebelumnya);
+    }, []);
+
+    const muatOdp = React.useCallback(async (bbox: string, zoom: number) => {
+        if (!tampilkanOdp) return;
+
+        if (zoom < ZOOM_MINIMAL_ODP) {
+            setOdp([]);
+            setOdpTerpotong(false);
             return;
         }
 
-        setTampilkanOdp(true);
-        if (odp.length > 0) return;
-
         setMemuatOdp(true);
         try {
-            const params = kabupaten ? `?kabupaten=${encodeURIComponent(kabupaten)}` : "";
-            const res = await fetch(`/api/public/indihome/odp${params}`);
+            const params = new URLSearchParams({ bbox });
+            if (kabupaten) params.set("kabupaten", kabupaten);
+
+            const res = await fetch(`/api/public/indihome/odp?${params}`);
             const data = res.ok ? await res.json() : null;
             setOdp(Array.isArray(data?.odp) ? data.odp : []);
+            setOdpTerpotong(Boolean(data?.dibatasi));
         } catch {
             setOdp([]);
         } finally {
             setMemuatOdp(false);
         }
-    }, [tampilkanOdp, odp.length, kabupaten]);
+    }, [tampilkanOdp, kabupaten]);
+
+    const areaBerubah = React.useCallback((bbox: string, zoom: number) => {
+        setZoomPeta(zoom);
+        muatOdp(bbox, zoom);
+    }, [muatOdp]);
 
     /** Klik outlet card → scroll ke peta, fokuskan marker-nya, dan buka Street View. */
     const handleFocusOutlet = React.useCallback((publicToken: string) => {
@@ -358,7 +377,9 @@ export default function MitraOutletDirectoryPage() {
                                     </span>
                                 ))}
                                 <span className="text-xs text-muted-foreground">
-                                    {odp.length.toLocaleString("id-ID")} titik ditampilkan
+                                    {zoomPeta < ZOOM_MINIMAL_ODP
+                                        ? "Perbesar peta untuk menampilkan titik ODP"
+                                        : `${odp.length.toLocaleString("id-ID")} titik pada area ini${odpTerpotong ? " (sebagian, perbesar lagi untuk melihat sisanya)" : ""}`}
                                 </span>
                             </div>
                         )}
@@ -418,6 +439,7 @@ export default function MitraOutletDirectoryPage() {
                                 focusedToken={focusedOutlet}
                                 userPosition={posisiSaya}
                                 odp={tampilkanOdp ? odp : []}
+                                onAreaChange={areaBerubah}
                                 onStreetView={STREET_VIEW_ENABLED ? (token) => {
                                     setFocusedOutlet(token);
                                     setStreetViewToken(token);

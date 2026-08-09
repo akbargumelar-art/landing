@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asc, count, eq, inArray, like, or, type SQL } from "drizzle-orm";
+import { asc, count, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import * as XLSX from "xlsx";
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     // sinkron dengan yang diterima POST di bawah.
     if (url.searchParams.get("template") === "1") {
         const contoh = [{
-            code: "ODP-CRB-001",
+            name: "ODP-CRB-001",
             kabupaten: "Kota Cirebon",
             kecamatan: "Kesambi",
             latitude: -6.732,
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     }
 
     const where: SQL | undefined = q
-        ? or(like(indihomeOdp.code, `%${q}%`), like(indihomeOdp.kabupaten, `%${q}%`), like(indihomeOdp.kecamatan, `%${q}%`))
+        ? or(like(indihomeOdp.name, `%${q}%`), like(indihomeOdp.kabupaten, `%${q}%`), like(indihomeOdp.kecamatan, `%${q}%`))
         : undefined;
 
     const [rows, [total]] = await Promise.all([
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const id = uuid();
     await db.insert(indihomeOdp).values({
         id,
-        code: body.code ? String(body.code).trim() : null,
+        name: body.name ? String(body.name).trim() : null,
         kabupaten: String(body.kabupaten).trim(),
         kecamatan: String(body.kecamatan).trim(),
         latitude,
@@ -164,7 +164,7 @@ async function handleUnggah(request: Request, userId?: string) {
 
         valid.push({
             id: uuid(),
-            code: String(ambil(row, ["code", "kode", "nama odp"]) || "").trim() || null,
+            name: String(ambil(row, ["name", "nama", "nama odp", "code", "kode"]) || "").trim() || null,
             kabupaten,
             kecamatan,
             latitude,
@@ -182,8 +182,21 @@ async function handleUnggah(request: Request, userId?: string) {
     }
 
     // Disisipkan bertahap: satu INSERT berisi ribuan baris melewati batas paket MySQL.
+    // onDuplicateKeyUpdate memakai unique index pada `name`, sehingga mengunggah ulang
+    // berkas yang sama memperbarui titiknya alih-alih menggandakan seluruh isi tabel.
     for (let i = 0; i < valid.length; i += 200) {
-        await db.insert(indihomeOdp).values(valid.slice(i, i + 200));
+        await db.insert(indihomeOdp).values(valid.slice(i, i + 200)).onDuplicateKeyUpdate({
+            set: {
+                kabupaten: sql`values(kabupaten)`,
+                kecamatan: sql`values(kecamatan)`,
+                latitude: sql`values(latitude)`,
+                longitude: sql`values(longitude)`,
+                portTotal: sql`values(port_total)`,
+                portUsed: sql`values(port_used)`,
+                portAvailable: sql`values(port_available)`,
+                category: sql`values(category)`,
+            },
+        });
     }
 
     await writeAdminAuditLog({

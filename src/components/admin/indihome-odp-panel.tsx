@@ -12,7 +12,7 @@ import { ODP_CATEGORIES, hitungOccupancy, infoKategori, type OdpCategory } from 
 
 interface OdpRow {
     id: string;
-    code: string | null;
+    name: string | null;
     kabupaten: string;
     kecamatan: string;
     latitude: number;
@@ -24,7 +24,7 @@ interface OdpRow {
 }
 
 const KOSONG = {
-    code: "", kabupaten: "", kecamatan: "", latitude: "", longitude: "",
+    name: "", kabupaten: "", kecamatan: "", latitude: "", longitude: "",
     portTotal: "", portUsed: "", portAvailable: "", category: "",
 };
 
@@ -97,7 +97,7 @@ export function IndihomeOdpPanel() {
     };
 
     const hapus = async (row: OdpRow) => {
-        if (!window.confirm(`Hapus ODP ${row.code || row.kecamatan}?`)) return;
+        if (!window.confirm(`Hapus ODP ${row.name || row.kecamatan}?`)) return;
         const res = await fetch(`/api/admin/indihome/odp?id=${row.id}`, { method: "DELETE" });
         if (!res.ok) return alert("ODP gagal dihapus");
         load();
@@ -126,8 +126,9 @@ export function IndihomeOdpPanel() {
                     <div>
                         <h2 className="font-bold">Unggah Banyak Sekaligus</h2>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            XLSX atau CSV berkolom kabupaten, kecamatan, latitude, longitude, portTotal, portUsed,
-                            portAvailable, dan category.
+                            XLSX atau CSV berkolom name, kabupaten, kecamatan, latitude, longitude, portTotal, portUsed,
+                            portAvailable, dan category. Nama ODP bersifat unik: mengunggah ulang nama yang sama
+                            memperbarui titiknya, bukan menggandakannya.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -169,7 +170,7 @@ export function IndihomeOdpPanel() {
             <Card>
                 <CardContent className="p-5">
                     <form onSubmit={simpan} className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-                        <Isian label="Kode ODP" nilai={form.code} onChange={(v) => setForm((p) => ({ ...p, code: v }))} />
+                        <Isian label="Nama ODP" nilai={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} />
                         <Isian label="Kabupaten" nilai={form.kabupaten} onChange={(v) => setForm((p) => ({ ...p, kabupaten: v }))} />
                         <Isian label="Kecamatan" nilai={form.kecamatan} onChange={(v) => setForm((p) => ({ ...p, kecamatan: v }))} />
                         <Isian label="Latitude" nilai={form.latitude} onChange={(v) => setForm((p) => ({ ...p, latitude: v }))} />
@@ -201,7 +202,7 @@ export function IndihomeOdpPanel() {
             <Card>
                 <CardContent className="p-5">
                     <div className="mb-4 flex gap-2">
-                        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Cari kode, kabupaten, atau kecamatan" />
+                        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Cari nama, kabupaten, atau kecamatan" />
                         <Button onClick={load} size="icon" aria-label="Cari">
                             <Search className="h-4 w-4" />
                         </Button>
@@ -233,7 +234,7 @@ export function IndihomeOdpPanel() {
                                     return (
                                         <TableRow key={row.id}>
                                             <TableCell>
-                                                <p className="font-semibold">{row.code || "-"}</p>
+                                                <p className="font-semibold">{row.name || "-"}</p>
                                                 <p className="font-mono text-xs text-muted-foreground">
                                                     {row.latitude.toFixed(5)}, {row.longitude.toFixed(5)}
                                                 </p>
