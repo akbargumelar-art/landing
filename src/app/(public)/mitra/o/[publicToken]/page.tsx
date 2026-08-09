@@ -6,6 +6,7 @@ import React from "react";
 import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldAlert, User } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
+import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Badge } from "@/components/ui/badge";
@@ -143,12 +144,12 @@ export default function MitraOutletProfilePage() {
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5">
-                        <Info label="Wilayah" value={`${outlet.kecamatan}, ${outlet.kabupaten}`} icon={<MapPin className="h-4 w-4" />} />
-                        <Info label="TAP" value={outlet.tap || "-"} />
-                        <Info label="Kategori" value={outlet.category} />
-                        <Info label="Jadwal PJP" value={`${outlet.pjpDay} / ${outlet.pjpType}`} />
-                        <Info label="Branding" value={outlet.branding || "-"} />
-                        <Info label="Nomor Owner" value={outlet.ownerPhoneMasked} />
+                        <InfoCard label="Wilayah" value={`${outlet.kecamatan}, ${outlet.kabupaten}`} icon={<MapPin className="h-4 w-4" />} />
+                        <InfoCard label="TAP" value={outlet.tap || "-"} />
+                        <InfoCard label="Kategori" value={outlet.category} />
+                        <InfoCard label="Jadwal PJP" value={`${outlet.pjpDay} / ${outlet.pjpType}`} />
+                        <InfoCard label="Branding" value={outlet.branding || "-"} />
+                        <InfoCard label="Nomor Owner" value={outlet.ownerPhoneMasked} />
                         <SalesforceInfo
                             name={outlet.salesforce}
                             photoUrl={outlet.salesforcePhotoUrl}
@@ -306,15 +307,3 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
     );
 }
 
-function Info({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-    return (
-        <div className="rounded-lg border bg-gray-50 p-3 sm:p-4">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:gap-2 sm:text-xs">
-                {icon}{label}
-            </p>
-            {/* break-words: nilai seperti "Jalaksana, Kuningan" bisa melebihi setengah lebar
-                layar ponsel, dan tanpa ini teksnya menonjol keluar kartu. */}
-            <p className="mt-1 break-words text-sm font-semibold text-gray-950 sm:text-base">{value}</p>
-        </div>
-    );
-}

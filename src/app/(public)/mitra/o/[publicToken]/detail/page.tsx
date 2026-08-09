@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import React from "react";
 import { ArrowLeft, Camera, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
 
+import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
@@ -214,15 +215,15 @@ export default function MitraOutletDetailPage() {
                         </span>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <Info label="Nama Owner" value={String(data.outlet.ownerName || "-")} />
-                        <Info label="Nomor Owner" value={data.details.ownerPhone || "-"} />
-                        <Info label="Nomor RS" value={String(data.outlet.rsNumber || "-")} />
-                        <Info label="TAP" value={String(data.outlet.tap || "-")} />
-                        <Info label="Salesforce" value={String(data.outlet.salesforce || "-")} />
-                        <Info label="Kabupaten" value={String(data.outlet.kabupaten || "-")} />
-                        <Info label="Kecamatan" value={String(data.outlet.kecamatan || "-")} />
-                        <Info label="Branding" value={String(data.outlet.branding || "-")} />
+                    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <InfoCard label="Nama Owner" value={String(data.outlet.ownerName || "-")} />
+                        <InfoCard label="Nomor Owner" value={data.details.ownerPhone || "-"} />
+                        <InfoCard label="Nomor RS" value={String(data.outlet.rsNumber || "-")} />
+                        <InfoCard label="TAP" value={String(data.outlet.tap || "-")} />
+                        <InfoCard label="Salesforce" value={String(data.outlet.salesforce || "-")} />
+                        <InfoCard label="Kabupaten" value={String(data.outlet.kabupaten || "-")} />
+                        <InfoCard label="Kecamatan" value={String(data.outlet.kecamatan || "-")} />
+                        <InfoCard label="Branding" value={String(data.outlet.branding || "-")} />
                     </div>
 
                     {data.outlet.locationUrl && (
@@ -628,11 +629,3 @@ function momClass(value: number | undefined) {
     return "text-muted-foreground";
 }
 
-function Info({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="rounded-lg border bg-gray-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="mt-1 font-semibold">{value}</p>
-        </div>
-    );
-}

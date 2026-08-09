@@ -274,6 +274,7 @@ export default function OutletMap({
     odp = [],
     onAreaChange,
     onOdpStreetView,
+    heightClass = "h-[360px] sm:h-[460px]",
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
@@ -283,6 +284,12 @@ export default function OutletMap({
     odp?: OdpMarker[];
     onAreaChange?: (bbox: string, zoom: number) => void;
     onOdpStreetView?: (titik: OdpMarker) => void;
+    /**
+     * Tinggi peta. Dibuat bisa diatur pemanggil supaya peta sanggup mengisi sisa ruang
+     * kartunya -- ketika bersanding dengan panel Street View, tinggi tetap membuat kedua
+     * kartu berakhir di titik berbeda karena header kartu peta lebih tinggi.
+     */
+    heightClass?: string;
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -293,7 +300,7 @@ export default function OutletMap({
             center={tengahAwal}
             zoom={11}
             scrollWheelZoom={false}
-            className="h-[360px] w-full sm:h-[460px]"
+            className={`w-full ${heightClass}`}
             style={{ background: "#e5e7eb" }}
         >
             <TileLayer
