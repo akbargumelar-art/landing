@@ -37,7 +37,10 @@ export default function PortalAdminPage() {
             if (result.error) {
                 setError(result.error.message || "Login gagal");
             } else {
-                router.push("/admin/beranda");
+                // Tujuan mengikuti peran: /admin/beranda hanya untuk Admin Super, sedangkan
+                // peran lain akan melihat galat di sana karena API-nya membalas 403.
+                const me = await fetch("/api/admin/me").then((res) => res.ok ? res.json() : null).catch(() => null);
+                router.push(me?.session?.role === "SUPER_ADMIN" ? "/admin/beranda" : "/admin/mitra");
             }
         } catch {
             setError("Terjadi kesalahan jaringan");
