@@ -229,6 +229,35 @@ export const indihomeProducts = mysqlTable("indihome_products", {
     index("indihome_products_sort_idx").on(table.sortOrder),
 ]);
 
+/**
+ * Titik ODP (Optical Distribution Point) IndiHome untuk peta sebaran.
+ *
+ * portAvailable disimpan, bukan dihitung dari total - used: pada FTTH sebagian port bisa
+ * rusak atau dicadangkan, sehingga "tersedia" tidak selalu sama dengan sisa. Occupancy
+ * yang dihitung aplikasi tetap memakai used/total, karena itu definisi yang dipakai
+ * pewarnaan kategori.
+ */
+export const indihomeOdp = mysqlTable("indihome_odp", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    /** Kode ODP di lapangan; opsional karena sebagian sumber data hanya membawa wilayah. */
+    code: varchar("code", { length: 120 }),
+    kabupaten: varchar("kabupaten", { length: 255 }).notNull(),
+    kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
+    latitude: double("latitude").notNull(),
+    longitude: double("longitude").notNull(),
+    portTotal: int("port_total").notNull().default(0),
+    portUsed: int("port_used").notNull().default(0),
+    portAvailable: int("port_available").notNull().default(0),
+    /** Kosong berarti diturunkan otomatis dari occupancy saat ditampilkan. */
+    category: mysqlEnum("category", ["GREEN", "YELLOW", "ORANGE", "BLACK"]),
+    createdAt: datetime("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    index("indihome_odp_kabupaten_idx").on(table.kabupaten),
+    index("indihome_odp_kecamatan_idx").on(table.kecamatan),
+    index("indihome_odp_category_idx").on(table.category),
+]);
+
 export const indihomeLeads = mysqlTable("indihome_leads", {
     id: varchar("id", { length: 36 }).primaryKey(),
     fullName: varchar("full_name", { length: 255 }).notNull(),
