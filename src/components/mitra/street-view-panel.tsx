@@ -2,18 +2,30 @@
 
 import { ExternalLink, X } from "lucide-react";
 
-import type { OutletMarker } from "@/components/mitra/outlet-map";
 import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
 import { buildStreetViewEmbedUrl } from "@/lib/street-view";
 
-export function StreetViewPanel({ outlet, onClose }: { outlet: OutletMarker; onClose: () => void }) {
+/**
+ * Titik apa pun yang punya koordinat: outlet maupun ODP. Panel ini sengaja tidak lagi
+ * terikat bentuk data outlet -- yang dibutuhkannya hanya judul, keterangan, dan koordinat.
+ */
+export interface TitikStreetView {
+    /** Dipakai sebagai key iframe; berganti berarti panorama dimuat ulang. */
+    id: string;
+    judul: string;
+    keterangan: string;
+    latitude: number;
+    longitude: number;
+}
+
+export function StreetViewPanel({ titik, onClose }: { titik: TitikStreetView; onClose: () => void }) {
     return (
         <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2 border-b px-5 py-4">
                 <div className="min-w-0">
                     <h2 className="text-sm font-bold text-gray-950">Street View</h2>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {outlet.name} · {outlet.outletCode}
+                        {titik.judul} · {titik.keterangan}
                     </p>
                 </div>
                 <button
@@ -30,9 +42,9 @@ export function StreetViewPanel({ outlet, onClose }: { outlet: OutletMarker; onC
                 yang diganti, sebagian browser mencatatnya sebagai entri riwayat baru dan
                 tombol "kembali" jadi menelusuri panorama satu per satu. */}
             <iframe
-                key={outlet.publicToken}
-                title={`Street View ${outlet.name}`}
-                src={buildStreetViewEmbedUrl(outlet.latitude, outlet.longitude)}
+                key={titik.id}
+                title={`Street View ${titik.judul}`}
+                src={buildStreetViewEmbedUrl(titik.latitude, titik.longitude)}
                 loading="lazy"
                 allowFullScreen
                 // Google mencocokkan pembatasan HTTP referrer pada API key dengan header
@@ -46,7 +58,7 @@ export function StreetViewPanel({ outlet, onClose }: { outlet: OutletMarker; onC
                     Panorama dari titik jalan terdekat. Sebagian lokasi belum terjangkau mobil Street View.
                 </p>
                 <a
-                    href={buildOutletMapsUrl(outlet.latitude, outlet.longitude)}
+                    href={buildOutletMapsUrl(titik.latitude, titik.longitude)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
