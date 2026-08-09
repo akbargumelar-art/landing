@@ -239,8 +239,12 @@ export const indihomeProducts = mysqlTable("indihome_products", {
  */
 export const indihomeOdp = mysqlTable("indihome_odp", {
     id: varchar("id", { length: 36 }).primaryKey(),
-    /** Kode ODP di lapangan; opsional karena sebagian sumber data hanya membawa wilayah. */
-    code: varchar("code", { length: 120 }),
+    /**
+     * Nama ODP di lapangan, dijadikan penanda unik supaya unggahan ulang memperbarui
+     * titik yang sama alih-alih menggandakannya. Tetap nullable karena sebagian sumber
+     * data hanya membawa wilayah, dan MySQL mengizinkan banyak baris NULL pada unique.
+     */
+    name: varchar("name", { length: 160 }).unique(),
     kabupaten: varchar("kabupaten", { length: 255 }).notNull(),
     kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
     latitude: double("latitude").notNull(),

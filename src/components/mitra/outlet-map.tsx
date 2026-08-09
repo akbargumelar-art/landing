@@ -12,7 +12,7 @@ import "leaflet/dist/leaflet.css";
 
 export interface OdpMarker {
     id: string;
-    code: string | null;
+    name: string | null;
     kabupaten: string;
     kecamatan: string;
     latitude: number;
@@ -119,6 +119,34 @@ const ikonPengguna = L.divIcon({
     iconAnchor: [9, 9],
     popupAnchor: [0, -10],
 });
+
+/**
+ * Melaporkan area peta yang sedang terlihat, dipakai halaman untuk mengambil ODP hanya
+ * di sekitar situ. Dibatasi jeda 400 ms karena `moveend` menyala pada setiap akhir geser
+ * dan zoom -- tanpa jeda, menggeser peta beruntun memicu belasan permintaan.
+ */
+function LaporkanArea({ onChange }: { onChange?: (bbox: string, zoom: number) => void }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!onChange) return;
+
+        let timer = 0;
+        const laporkan = () => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => onChange(map.getBounds().toBBoxString(), map.getZoom()), 400);
+        };
+
+        laporkan();
+        map.on("moveend", laporkan);
+        return () => {
+            window.clearTimeout(timer);
+            map.off("moveend", laporkan);
+        };
+    }, [map, onChange]);
+
+    return null;
+}
 
 /** Menyesuaikan tampilan peta agar seluruh penanda muat setiap kali daftarnya berubah. */
 function SesuaikanTampilan({ markers }: { markers: OutletMarker[] }) {
@@ -244,6 +272,7 @@ export default function OutletMap({
     onStreetView,
     userPosition = null,
     odp = [],
+    onAreaChange,
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
@@ -251,6 +280,7 @@ export default function OutletMap({
     onStreetView?: (publicToken: string) => void;
     userPosition?: PosisiPengguna | null;
     odp?: OdpMarker[];
+    onAreaChange?: (bbox: string, zoom: number) => void;
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -272,6 +302,7 @@ export default function OutletMap({
             />
             <SesuaikanTampilan markers={markers} />
             <TerbangKePengguna posisi={userPosition} />
+            <LaporkanArea onChange={onAreaChange} />
             <IkutiUkuranKotak focusedToken={focusedToken} markers={markers} />
             <TerbangKeFokus focusedToken={focusedToken} markers={markers} />
 
@@ -305,7 +336,7 @@ export default function OutletMap({
                     <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(kategori.color)}>
                         <Popup>
                             <span className="block text-sm font-bold text-gray-950">
-                                ODP {titik.code || titik.kecamatan}
+                                ODP {titik.name || titik.kecamatan}
                             </span>
                             <span className="mt-0.5 block text-xs text-gray-600">
                                 {titik.kecamatan}, {titik.kabupaten}

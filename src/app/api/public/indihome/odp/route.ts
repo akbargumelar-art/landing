@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq, type SQL } from "drizzle-orm";
+import { and, asc, between, count, eq, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
 import { indihomeOdp } from "@/db/schema";
@@ -7,37 +7,62 @@ import { indihomeOdp } from "@/db/schema";
 export const dynamic = "force-dynamic";
 
 /**
- * Batas titik yang dikirim sekali jalan. ODP jumlahnya bisa ribuan dan seluruhnya
- * digambar sebagai penanda di peta; tanpa batas, satu permintaan bisa membekukan browser.
+ * Titik ODP jumlahnya puluhan ribu, sedangkan Leaflet menggambar setiap penanda sebagai
+ * elemen DOM tersendiri. Menggambar semuanya sekaligus membekukan browser, jadi yang
+ * dikirim hanya yang berada di dalam area peta yang sedang terlihat.
  */
-const BATAS_TITIK = 2000;
+const BATAS_TITIK = 1500;
+
+function angka(nilai: string | null): number | null {
+    const hasil = Number(nilai);
+    return Number.isFinite(hasil) ? hasil : null;
+}
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
     const kabupaten = (url.searchParams.get("kabupaten") || "").trim();
-    const kecamatan = (url.searchParams.get("kecamatan") || "").trim();
 
     const filters: SQL[] = [];
     if (kabupaten) filters.push(eq(indihomeOdp.kabupaten, kabupaten));
-    if (kecamatan) filters.push(eq(indihomeOdp.kecamatan, kecamatan));
 
-    const rows = await db
-        .select({
-            id: indihomeOdp.id,
-            code: indihomeOdp.code,
-            kabupaten: indihomeOdp.kabupaten,
-            kecamatan: indihomeOdp.kecamatan,
-            latitude: indihomeOdp.latitude,
-            longitude: indihomeOdp.longitude,
-            portTotal: indihomeOdp.portTotal,
-            portUsed: indihomeOdp.portUsed,
-            portAvailable: indihomeOdp.portAvailable,
-            category: indihomeOdp.category,
-        })
-        .from(indihomeOdp)
-        .where(filters.length > 0 ? and(...filters) : undefined)
-        .orderBy(asc(indihomeOdp.kabupaten), asc(indihomeOdp.kecamatan))
-        .limit(BATAS_TITIK);
+    // bbox = barat,selatan,timur,utara sesuai urutan getBounds().toBBoxString() Leaflet.
+    const bbox = (url.searchParams.get("bbox") || "").split(",").map((bagian) => angka(bagian.trim()));
+    if (bbox.length === 4 && bbox.every((nilai) => nilai !== null)) {
+        const [barat, selatan, timur, utara] = bbox as number[];
+        filters.push(between(indihomeOdp.latitude, Math.min(selatan, utara), Math.max(selatan, utara)));
+        filters.push(between(indihomeOdp.longitude, Math.min(barat, timur), Math.max(barat, timur)));
+    }
 
-    return NextResponse.json({ odp: rows, dibatasi: rows.length >= BATAS_TITIK });
+    const where = filters.length > 0 ? and(...filters) : undefined;
+
+    const [rows, [totalRow]] = await Promise.all([
+        db
+            .select({
+                id: indihomeOdp.id,
+                name: indihomeOdp.name,
+                kabupaten: indihomeOdp.kabupaten,
+                kecamatan: indihomeOdp.kecamatan,
+                latitude: indihomeOdp.latitude,
+                longitude: indihomeOdp.longitude,
+                portTotal: indihomeOdp.portTotal,
+                portUsed: indihomeOdp.portUsed,
+                portAvailable: indihomeOdp.portAvailable,
+                category: indihomeOdp.category,
+            })
+            .from(indihomeOdp)
+            .where(where)
+            .orderBy(asc(indihomeOdp.kabupaten), asc(indihomeOdp.kecamatan))
+            .limit(BATAS_TITIK),
+        db.select({ value: count() }).from(indihomeOdp).where(where),
+    ]);
+
+    const cocok = totalRow?.value || 0;
+
+    return NextResponse.json({
+        odp: rows,
+        // Dipakai halaman untuk memberi tahu bahwa sebagian titik belum tergambar,
+        // alih-alih diam-diam menyembunyikannya.
+        cocok,
+        dibatasi: cocok > rows.length,
+    });
 }
