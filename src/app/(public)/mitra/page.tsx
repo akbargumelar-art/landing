@@ -76,6 +76,7 @@ export default function MitraOutletDirectoryPage() {
     const [mapError, setMapError] = React.useState(false);
     const [focusedOutlet, setFocusedOutlet] = React.useState<string | null>(null);
     const [streetViewToken, setStreetViewToken] = React.useState<string | null>(null);
+    const [streetViewOdp, setStreetViewOdp] = React.useState<OdpMarker | null>(null);
     const [posisiSaya, setPosisiSaya] = React.useState<PosisiPengguna | null>(null);
     const [mencariLokasi, setMencariLokasi] = React.useState(false);
     const [galatLokasi, setGalatLokasi] = React.useState("");
@@ -95,6 +96,36 @@ export default function MitraOutletDirectoryPage() {
         () => map?.markers.find((marker) => marker.publicToken === streetViewToken) || null,
         [map, streetViewToken]
     );
+
+    /**
+     * Satu panel dipakai bersama outlet dan ODP. Outlet tetap ditelusuri dari daftar
+     * penanda supaya panelnya tertutup sendiri ketika filter berubah; ODP disimpan sebagai
+     * objek karena daftarnya berganti setiap peta digeser -- menelusuri ulang di sana akan
+     * menutup panel hanya karena pengguna menggeser peta sedikit.
+     */
+    const titikStreetView = React.useMemo(() => {
+        if (streetViewOdp) {
+            return {
+                id: streetViewOdp.id,
+                judul: `ODP ${streetViewOdp.name || streetViewOdp.kecamatan}`,
+                keterangan: `${streetViewOdp.kecamatan}, ${streetViewOdp.kabupaten}`,
+                latitude: streetViewOdp.latitude,
+                longitude: streetViewOdp.longitude,
+            };
+        }
+
+        if (streetViewOutlet) {
+            return {
+                id: streetViewOutlet.publicToken,
+                judul: streetViewOutlet.name,
+                keterangan: streetViewOutlet.outletCode,
+                latitude: streetViewOutlet.latitude,
+                longitude: streetViewOutlet.longitude,
+            };
+        }
+
+        return null;
+    }, [streetViewOdp, streetViewOutlet]);
 
     /**
      * Membaca lokasi perangkat lalu memfokuskan peta ke sana. Memakai pembacaan sekali,
@@ -200,7 +231,11 @@ export default function MitraOutletDirectoryPage() {
         if (!hasMarker) return;
 
         setFocusedOutlet(publicToken);
-        if (STREET_VIEW_ENABLED) setStreetViewToken(publicToken);
+        // Membuka salah satu menutup yang lain supaya tidak ada dua sumber panel aktif.
+        if (STREET_VIEW_ENABLED) {
+            setStreetViewOdp(null);
+            setStreetViewToken(publicToken);
+        }
         mapSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, [map]);
 
@@ -308,7 +343,7 @@ export default function MitraOutletDirectoryPage() {
             {/* Peta dan Street View berbagi baris begitu panorama dibuka; selama tertutup,
                 peta memakai lebar penuh seperti sebelumnya. */}
             <section ref={mapSectionRef} className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-                <div className={`grid gap-4 ${streetViewOutlet ? "lg:grid-cols-2" : ""}`}>
+                <div className={`grid gap-4 ${titikStreetView ? "lg:grid-cols-2" : ""}`}>
                     <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
                             <div>
@@ -441,8 +476,13 @@ export default function MitraOutletDirectoryPage() {
                                 odp={tampilkanOdp ? odp : []}
                                 onAreaChange={areaBerubah}
                                 onStreetView={STREET_VIEW_ENABLED ? (token) => {
+                                    setStreetViewOdp(null);
                                     setFocusedOutlet(token);
                                     setStreetViewToken(token);
+                                } : undefined}
+                                onOdpStreetView={STREET_VIEW_ENABLED ? (titik) => {
+                                    setStreetViewToken(null);
+                                    setStreetViewOdp(titik);
                                 } : undefined}
                             />
                         ) : (
@@ -452,8 +492,11 @@ export default function MitraOutletDirectoryPage() {
                         )}
                     </div>
 
-                    {streetViewOutlet && (
-                        <StreetViewPanel outlet={streetViewOutlet} onClose={() => setStreetViewToken(null)} />
+                    {titikStreetView && (
+                        <StreetViewPanel
+                            titik={titikStreetView}
+                            onClose={() => { setStreetViewToken(null); setStreetViewOdp(null); }}
+                        />
                     )}
                 </div>
             </section>

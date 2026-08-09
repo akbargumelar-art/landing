@@ -273,6 +273,7 @@ export default function OutletMap({
     userPosition = null,
     odp = [],
     onAreaChange,
+    onOdpStreetView,
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
@@ -281,6 +282,7 @@ export default function OutletMap({
     userPosition?: PosisiPengguna | null;
     odp?: OdpMarker[];
     onAreaChange?: (bbox: string, zoom: number) => void;
+    onOdpStreetView?: (titik: OdpMarker) => void;
 }) {
     // Cirebon sebagai tampilan awal sebelum penanda dimuat, supaya peta tidak
     // sempat memperlihatkan tengah samudra.
@@ -350,14 +352,25 @@ export default function OutletMap({
                             <span className="mt-0.5 block text-xs text-gray-700">
                                 Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
                             </span>
-                            <a
-                                href={buildOutletMapsUrl(titik.latitude, titik.longitude)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-2 block text-xs font-semibold text-red-600 hover:underline"
-                            >
-                                Buka lokasi ODP di Google Maps
-                            </a>
+                            <span className="mt-2 flex flex-col gap-1">
+                                {onOdpStreetView && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOdpStreetView(titik)}
+                                        className="text-left text-xs font-semibold text-red-600 hover:underline"
+                                    >
+                                        Lihat Street View
+                                    </button>
+                                )}
+                                <a
+                                    href={buildOutletMapsUrl(titik.latitude, titik.longitude)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                    Buka lokasi ODP di Google Maps
+                                </a>
+                            </span>
                         </Popup>
                     </Marker>
                 );
