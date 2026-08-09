@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,10 +10,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Plus, Pencil, Trash2, Loader2, Save, GripVertical, ArrowUp, ArrowDown, Eye, EyeOff,
-    Upload, LayoutGrid, Building2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Building2, Eye, EyeOff, GripVertical, LayoutGrid, Loader2, Pencil, Plus, Save, ShieldAlert, Trash2, Upload } from "lucide-react";
 import Image from "next/image";
 
 interface HeroSlide {
@@ -74,6 +72,7 @@ export default function BerandaPage() {
     const [quickCards, setQuickCards] = useState<QuickCard[]>(defaultQuickCards);
     const [offices, setOffices] = useState<OfficeData[]>(defaultOffices);
     const [loading, setLoading] = useState(true);
+    const [terlarang, setTerlarang] = useState(false);
     const [saving, setSaving] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editSlide, setEditSlide] = useState<Partial<HeroSlide>>(defaultSlide);
@@ -96,8 +95,16 @@ export default function BerandaPage() {
             fetch("/api/admin/hero-slides").then((r) => r.json()),
             fetch("/api/admin/settings").then((r) => r.json()),
         ]).then(([slidesData, settingsData]) => {
+            // API membalas objek {error} ketika peran tidak berhak, dan slides.map() pada
+            // objek itulah yang memunculkan "client-side exception" alih-alih pesan jelas.
+            if (!Array.isArray(slidesData)) {
+                setTerlarang(true);
+                setLoading(false);
+                return;
+            }
+
             setSlides(slidesData);
-            setAboutContent(settingsData.about_content || "");
+            setAboutContent(settingsData?.about_content || "");
             if (settingsData.quick_access_cards) {
                 try { setQuickCards(JSON.parse(settingsData.quick_access_cards)); } catch { /* use default */ }
             }
@@ -206,6 +213,21 @@ export default function BerandaPage() {
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+
+    if (terlarang) {
+        return (
+            <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center shadow-sm">
+                <ShieldAlert className="mx-auto h-10 w-10 text-red-600" />
+                <h1 className="mt-4 text-lg font-bold">Halaman Khusus Admin Super</h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    Akun Anda tidak berhak mengelola konten beranda. Silakan pakai menu lain di sidebar.
+                </p>
+                <Link href="/admin/mitra" className="mt-5 inline-block">
+                    <Button>Buka Database Mitra Outlet</Button>
+                </Link>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-5xl space-y-6">

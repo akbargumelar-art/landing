@@ -9,10 +9,15 @@ export function middleware(request: NextRequest) {
         request.cookies.get("better-auth.session_token")?.value ||
         request.cookies.get("__Secure-better-auth.session_token")?.value;
 
-    // Redirect logged-in users away from login page
+    // Redirect logged-in users away from login page.
+    //
+    // Tujuannya /admin/mitra, bukan /admin/beranda: middleware berjalan di edge tanpa akses
+    // database sehingga tidak bisa mengetahui peran pengguna, sedangkan /admin/beranda
+    // khusus Admin Super. Mengarahkan semua orang ke sana membuat peran lain mendarat di
+    // halaman yang API-nya membalas 403.
     if (pathname === "/portal-admin") {
         if (sessionCookie) {
-            return NextResponse.redirect(new URL("/admin/beranda", request.url));
+            return NextResponse.redirect(new URL("/admin/mitra", request.url));
         }
         return NextResponse.next();
     }
