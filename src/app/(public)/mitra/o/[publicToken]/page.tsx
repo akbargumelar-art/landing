@@ -99,7 +99,7 @@ export default function MitraOutletProfilePage() {
     // outlet yang tokennya salah atau sudah dihapus menjadi jalan buntu total.
     if (loading) {
         return (
-            <main className="min-h-screen bg-gray-50 pt-20">
+            <main className="min-h-screen bg-gray-50">
                 <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
                     <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
                     <p className="mt-8 text-center text-sm text-muted-foreground">Memuat profil outlet...</p>
@@ -110,7 +110,7 @@ export default function MitraOutletProfilePage() {
 
     if (!outlet) {
         return (
-            <main className="min-h-screen bg-gray-50 pt-20">
+            <main className="min-h-screen bg-gray-50">
                 <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
                     <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
                     <p className="mt-8 text-center text-sm text-muted-foreground">Outlet tidak ditemukan.</p>
@@ -122,7 +122,7 @@ export default function MitraOutletProfilePage() {
     const canVerify = code.length === 6 && Boolean(phone);
 
     return (
-        <main className="min-h-screen bg-gray-50 pt-20">
+        <main className="min-h-screen bg-gray-50">
             <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 lg:px-8">
                 <BackLink href="/mitra" label="Kembali ke Direktori Outlet" />
             </section>
@@ -139,7 +139,7 @@ export default function MitraOutletProfilePage() {
                             <p className="mt-1 text-sm text-white/85">{outlet.outletCode}</p>
                         </div>
                     </div>
-                    <div className="grid gap-4 p-5 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5">
                         <Info label="Wilayah" value={`${outlet.kecamatan}, ${outlet.kabupaten}`} icon={<MapPin className="h-4 w-4" />} />
                         <Info label="TAP" value={outlet.tap || "-"} />
                         <Info label="Kategori" value={outlet.category} />
@@ -254,7 +254,7 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
         : displayName.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
 
     return (
-        <div className="rounded-lg border bg-gray-50 p-4 sm:col-span-2">
+        <div className="col-span-2 rounded-lg border bg-gray-50 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nama Salesforce</p>
             <div className="mt-3 flex items-center gap-4">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm sm:h-24 sm:w-24">
@@ -289,9 +289,13 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
 
 function Info({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
     return (
-        <div className="rounded-lg border bg-gray-50 p-4">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{icon}{label}</p>
-            <p className="mt-1 font-semibold text-gray-950">{value}</p>
+        <div className="rounded-lg border bg-gray-50 p-3 sm:p-4">
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:gap-2 sm:text-xs">
+                {icon}{label}
+            </p>
+            {/* break-words: nilai seperti "Jalaksana, Kuningan" bisa melebihi setengah lebar
+                layar ponsel, dan tanpa ini teksnya menonjol keluar kartu. */}
+            <p className="mt-1 break-words text-sm font-semibold text-gray-950 sm:text-base">{value}</p>
         </div>
     );
 }

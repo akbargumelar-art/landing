@@ -14,6 +14,8 @@ export interface MitraDetailRow {
     unit: "qty" | "rev";
     /** 0 = parameter induk, 1 = rincian di bawahnya (mis. per masa aktif voucher). */
     level: 0 | 1;
+    /** Bulan sebelumnya secara penuh, sebagai pembanding pencapaian akhir bulan. */
+    fm1Key: string;
     m1Key: string;
     mKey: string;
     momKey: string;
@@ -36,6 +38,7 @@ function buildRow(base: string, label: string, unit: MitraDetailRow["unit"], lev
         label,
         unit,
         level,
+        fm1Key: `${base}_fm_1_${unit}`,
         m1Key: `${base}_m_1_${unit}`,
         mKey: `${base}_m_${unit}`,
         momKey: `mom_${base}_${unit}`,
@@ -45,6 +48,9 @@ function buildRow(base: string, label: string, unit: MitraDetailRow["unit"], lev
 function rowToFields(row: MitraDetailRow): MitraDetailField[] {
     const unit = UNIT_LABEL[row.unit];
     return [
+        // FM-1 ditaruh pertama mengikuti urutan bacanya di tabel; key parameter lain tidak
+        // berubah sama sekali, jadi data yang sudah tersimpan tetap terbaca.
+        { key: row.fm1Key, label: `${row.label} FM-1 (${unit})` },
         { key: row.m1Key, label: `${row.label} M-1 (${unit})` },
         { key: row.mKey, label: `${row.label} M (${unit})` },
         { key: row.momKey, label: `MoM ${row.label} (${unit})` },

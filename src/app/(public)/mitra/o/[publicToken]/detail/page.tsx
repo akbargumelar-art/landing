@@ -19,6 +19,7 @@ interface DetailData {
         sellthruDigipos: Record<string, number>;
         sellthruNota: Record<string, number>;
         rechargeDigipos: Record<string, number>;
+        updatedAt: string | null;
     };
     performance: {
         metricKey: string;
@@ -170,12 +171,12 @@ export default function MitraOutletDetailPage() {
     };
 
     if (loading) {
-        return <main className="min-h-screen bg-gray-50 pt-24 text-center text-sm text-muted-foreground">Memuat detail...</main>;
+        return <main className="min-h-screen bg-gray-50 py-16 text-center text-sm text-muted-foreground">Memuat detail...</main>;
     }
 
     if (!data) {
         return (
-            <main className="min-h-screen bg-gray-50 pt-24">
+            <main className="min-h-screen bg-gray-50 py-16">
                 <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center shadow-sm">
                     <ShieldCheck className="mx-auto h-10 w-10 text-red-600" />
                     <h1 className="mt-4 text-lg font-bold">Verifikasi Diperlukan</h1>
@@ -189,7 +190,7 @@ export default function MitraOutletDetailPage() {
     }
 
     return (
-        <main className="min-h-screen bg-gray-50 pt-20">
+        <main className="min-h-screen bg-gray-50">
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                 <Link href={`/mitra/o/${publicToken}`} className="inline-flex items-center gap-2 text-sm font-semibold text-red-600">
                     <ArrowLeft className="h-4 w-4" />
@@ -304,10 +305,20 @@ export default function MitraOutletDetailPage() {
                     const values = data.details[group.key] || {};
                     return (
                         <div key={group.key} className="overflow-hidden rounded-lg border bg-white shadow-sm">
-                            <div className="border-b bg-gray-50/70 px-5 py-4">
-                                <h2 className="font-bold">{group.title}</h2>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    M-1 bulan lalu, M bulan berjalan, MoM pertumbuhannya.
+                            <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50/70 px-5 py-4">
+                                <div>
+                                    <h2 className="font-bold">{group.title}</h2>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        FM-1 bulan sebelumnya penuh, M-1 periode sama bulan lalu, M bulan berjalan, MoM pertumbuhannya.
+                                    </p>
+                                </div>
+                                {/* Tanggal ini menjawab pertanyaan pertama pembaca angka: masih baru
+                                    atau sudah basi. Sumbernya kolom updated_at yang tersentuh setiap
+                                    unggahan berkas maupun suntingan manual. */}
+                                <p className="text-xs text-muted-foreground">
+                                    {data.details.updatedAt
+                                        ? `Diperbarui ${formatWaktu(data.details.updatedAt)}`
+                                        : "Belum pernah diperbarui"}
                                 </p>
                             </div>
 
@@ -326,7 +337,14 @@ export default function MitraOutletDetailPage() {
                                             </span>
                                         </p>
 
-                                        <div className="mt-2 grid grid-cols-3 gap-2">
+                                        {/* Dua kolom, bukan empat berjajar: empat angka dalam satu
+                                            baris di layar sempit membuat tiap kotak terlalu sempit
+                                            untuk angka ribuan. */}
+                                        <div className="mt-2 grid grid-cols-2 gap-2">
+                                            <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">FM-1</p>
+                                                <p className="tabular-nums text-sm text-gray-700">{formatValue(values[row.fm1Key])}</p>
+                                            </div>
                                             <div className="rounded-md bg-gray-50 px-2 py-1.5">
                                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">M-1</p>
                                                 <p className="tabular-nums text-sm text-gray-700">{formatValue(values[row.m1Key])}</p>
@@ -351,10 +369,11 @@ export default function MitraOutletDetailPage() {
                                     {/* Kepala tabel lengket supaya nama kolom tetap terbaca saat
                                         menggulir tabel sepanjang 40 baris. */}
                                     <tr className="sticky top-0 z-10 bg-white text-xs font-semibold uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_rgb(229,231,235)]">
-                                        <th className="w-[52%] px-5 py-3 text-left">Parameter</th>
-                                        <th className="w-[16%] border-l px-3 py-3 text-right">M-1</th>
-                                        <th className="w-[16%] border-l px-3 py-3 text-right">M</th>
-                                        <th className="w-[16%] border-l px-3 py-3 text-right">MoM</th>
+                                        <th className="w-[40%] px-5 py-3 text-left">Parameter</th>
+                                        <th className="w-[15%] border-l px-3 py-3 text-right">FM-1</th>
+                                        <th className="w-[15%] border-l px-3 py-3 text-right">M-1</th>
+                                        <th className="w-[15%] border-l px-3 py-3 text-right">M</th>
+                                        <th className="w-[15%] border-l px-3 py-3 text-right">MoM</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -372,6 +391,7 @@ export default function MitraOutletDetailPage() {
                                                     {row.unit === "qty" ? "qty" : "rev"}
                                                 </span>
                                             </td>
+                                            <td className="border-l px-3 py-2 text-right tabular-nums text-muted-foreground">{formatValue(values[row.fm1Key])}</td>
                                             <td className="border-l px-3 py-2 text-right tabular-nums text-muted-foreground">{formatValue(values[row.m1Key])}</td>
                                             <td className="border-l px-3 py-2 text-right font-semibold tabular-nums text-gray-950">{formatValue(values[row.mKey])}</td>
                                             <td className="border-l px-3 py-2 text-right">

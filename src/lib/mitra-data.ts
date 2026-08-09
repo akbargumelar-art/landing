@@ -163,6 +163,9 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             sellthruDigiposJson: mitraOutletDetails.sellthruDigiposJson,
             sellthruNotaJson: mitraOutletDetails.sellthruNotaJson,
             rechargeDigiposJson: mitraOutletDetails.rechargeDigiposJson,
+            // Diisi otomatis oleh onUpdateNow, jadi mencerminkan perubahan terakhir dari
+            // jalur mana pun -- unggahan berkas maupun suntingan manual admin.
+            updatedAt: mitraOutletDetails.updatedAt,
         })
         .from(mitraOutlets)
         .leftJoin(mitraOutletDetails, eq(mitraOutlets.id, mitraOutletDetails.outletId))
@@ -218,6 +221,7 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             sellthruDigipos: detailRow?.sellthruDigiposJson || {},
             sellthruNota: detailRow?.sellthruNotaJson || {},
             rechargeDigipos: detailRow?.rechargeDigiposJson || {},
+            updatedAt: detailRow?.updatedAt || null,
         },
         performance,
         marketShare: marketShare || null,

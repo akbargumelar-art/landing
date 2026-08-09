@@ -148,7 +148,7 @@ export default function MitraProgramDetailPage() {
     const jumlahKolom = 5 + programParams.length;
 
     return (
-        <main className="min-h-screen bg-gray-50 pt-20">
+        <main className="min-h-screen bg-gray-50">
             <section className="bg-gradient-to-br from-red-700 via-red-600 to-orange-500">
                 <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
                     <Link href="/program" className="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white">
