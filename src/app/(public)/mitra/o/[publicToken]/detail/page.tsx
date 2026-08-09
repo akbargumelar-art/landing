@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import React from "react";
 import { ArrowLeft, Camera, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
 
+import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
 import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
@@ -413,6 +414,20 @@ export default function MitraOutletDetailPage() {
                     onUpload={data.bolehEdit ? unggahFoto : undefined}
                     sedangUnggah={mengunggah}
                 />
+
+                {data.outlet.latitude != null && data.outlet.longitude != null && (
+                    <OdpSekitar
+                        outlet={{
+                            publicToken: publicToken,
+                            outletCode: String(data.outlet.outletCode || ""),
+                            name: String(data.outlet.name || ""),
+                            kabupaten: String(data.outlet.kabupaten || ""),
+                            kecamatan: String(data.outlet.kecamatan || ""),
+                            latitude: Number(data.outlet.latitude),
+                            longitude: Number(data.outlet.longitude),
+                        }}
+                    />
+                )}
 
                 {!data.bolehEdit && (
                     <p className="flex items-start gap-2 rounded-lg border bg-gray-50 p-4 text-sm text-muted-foreground">

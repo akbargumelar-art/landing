@@ -114,6 +114,10 @@ export async function getPublicOutletByToken(publicToken: string) {
         // Keempat slot foto ikut dibuka di profil publik: foto outlet bukan data
         // sensitif, dan kebaruannya justru bukti kunjungan yang ingin dilihat.
         photoUrl: row.photoUrl,
+        // Koordinat memang sudah publik lewat peta sebaran di /mitra; dikirim di sini
+        // supaya profil outlet bisa menggambar peta ODP sekitarnya.
+        latitude: row.latitude,
+        longitude: row.longitude,
         photoUpdatedAt: row.photoUpdatedAt,
         photoEtalaseUrl: row.photoEtalaseUrl,
         photoEtalaseUpdatedAt: row.photoEtalaseUpdatedAt,

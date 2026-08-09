@@ -6,6 +6,7 @@ import React from "react";
 import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldAlert, User } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
+import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ interface PublicOutlet extends Record<string, unknown> {
     tap?: string;
     salesforce?: string;
     salesforcePhotoUrl?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
     salesforcePhoneMasked?: string | null;
     salesforceWaUrl?: string | null;
     ownerPhoneMasked: string;
@@ -219,8 +222,24 @@ export default function MitraOutletProfilePage() {
                 </aside>
             </section>
 
-            <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6 lg:px-8">
+            <section className="mx-auto max-w-6xl space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
                 <OutletPhotoCard outlet={outlet} />
+
+                {/* Hanya digambar bila outletnya punya koordinat; tanpa titik acuan,
+                    pencarian ODP sekitar tidak punya pusat. */}
+                {outlet.latitude != null && outlet.longitude != null && (
+                    <OdpSekitar
+                        outlet={{
+                            publicToken: outlet.publicToken,
+                            outletCode: outlet.outletCode,
+                            name: outlet.name,
+                            kabupaten: outlet.kabupaten,
+                            kecamatan: outlet.kecamatan,
+                            latitude: outlet.latitude,
+                            longitude: outlet.longitude,
+                        }}
+                    />
+                )}
             </section>
 
             <Dialog open={Boolean(notice)} onOpenChange={(open) => { if (!open) setNotice(null); }}>
