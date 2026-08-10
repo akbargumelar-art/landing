@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces } from "@/db/schema";
 import { getUserTaps, isTapScopedRole, requireRole } from "@/lib/admin-auth";
 import { BATAS_SEGAR_HARI, MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
-import { OUTLET_CATEGORIES } from "@/lib/mitra-outlet-options";
+import { OUTLET_CATEGORIES, PJP_DAYS } from "@/lib/mitra-outlet-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +29,7 @@ async function ambilOutletDalamScope(taps: string[] | null) {
             tap: mitraOutlets.tap,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
+            pjpDay: mitraOutlets.pjpDay,
             salesforceId: mitraOutlets.salesforceId,
             salesforce: mitraSalesforces.name,
             photoUrl: mitraOutlets.photoUrl,
@@ -48,18 +49,6 @@ async function ambilOutletDalamScope(taps: string[] | null) {
 
 function teks(nilai: unknown): string {
     return String(nilai ?? "").trim();
-}
-
-/**
- * Outlet yang keempat slot fotonya kosong sama sekali dianggap belum pernah didatangi
- * untuk pendataan foto -- bukan outlet yang "kelewat" jadwal kunjungan. Ikut dihitung
- * sebagai "belum ada" akan membanjiri kartu ringkasan dan tabel dengan outlet yang memang
- * belum pernah difoto sekalipun, membuat angka kekurangan riil (outlet yang sudah mulai
- * didata tapi satu slotnya masih kosong) tenggelam. Outlet yang sudah punya minimal satu
- * foto tetap dihitung penuh, termasuk untuk slot lain yang masih kosong.
- */
-function pernahDifoto(outlet: OutletRow): boolean {
-    return MITRA_PHOTO_SLOTS.some((slot) => teks(outlet[slot.urlColumn]));
 }
 
 function buatBarisFoto(outlet: OutletRow) {
@@ -120,6 +109,8 @@ export async function GET(request: Request) {
     const outletCategory = teks(params.get("outletCategory"));
     const tap = teks(params.get("tap"));
     const salesforceId = teks(params.get("salesforceId"));
+    const pjpDayInput = teks(params.get("pjpDay"));
+    const pjpDay = (PJP_DAYS as readonly string[]).includes(pjpDayInput) ? pjpDayInput : "";
     const sort = teks(params.get("sort")).toLowerCase();
     const page = Math.max(Number(params.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(params.get("pageSize") || "50"), 1), 100);
@@ -137,10 +128,10 @@ export async function GET(request: Request) {
         .sort((a, b) => a.name.localeCompare(b.name, "id"));
 
     const outletTersaring = scopedOutlets.filter((outlet) => {
-        if (!pernahDifoto(outlet)) return false;
         if (outletCategory && outlet.category !== outletCategory) return false;
         if (tap && outlet.tap !== tap) return false;
         if (salesforceId && outlet.salesforceId !== salesforceId) return false;
+        if (pjpDay && outlet.pjpDay !== pjpDay) return false;
         if (!q) return true;
 
         return [outlet.outletCode, outlet.name, outlet.tap, outlet.kabupaten, outlet.kecamatan, outlet.salesforce]
@@ -150,12 +141,15 @@ export async function GET(request: Request) {
     const semuaBaris = outletTersaring.flatMap(buatBarisFoto);
     const summary = Object.fromEntries(MITRA_PHOTO_SLOTS.map((slot) => {
         const rows = semuaBaris.filter((row) => row.photoSlot === slot.key);
+        const withPhoto = rows.filter((row) => row.statusKey !== "MISSING").length;
         return [slot.key, {
             label: slot.label,
             total: rows.length,
             missing: rows.filter((row) => row.statusKey === "MISSING").length,
             stale: rows.filter((row) => row.statusKey === "STALE").length,
             fresh: rows.filter((row) => row.statusKey === "FRESH").length,
+            withPhoto,
+            percentage: rows.length ? Math.round((withPhoto / rows.length) * 100) : 0,
         }];
     }));
 

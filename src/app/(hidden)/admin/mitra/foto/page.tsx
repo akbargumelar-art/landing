@@ -9,8 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MITRA_PHOTO_SLOTS } from "@/lib/mitra-outlet-photos";
+import { PJP_DAYS } from "@/lib/mitra-outlet-options";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface PhotoRow {
     id: string;
@@ -37,6 +40,8 @@ interface SlotSummary {
     missing: number;
     stale: number;
     fresh: number;
+    withPhoto: number;
+    percentage: number;
 }
 
 interface ReportResponse {
@@ -79,6 +84,14 @@ function statusClass(status: PhotoRow["statusKey"]): string {
     return "bg-green-100 text-green-700";
 }
 
+// Persentase mengikuti data yang sama dengan tabel di bawahnya (filter kategori/TAP/
+// salesforce/PJP/pencarian), jadi kartu ini selalu selaras dengan apa yang sedang dilihat.
+function persenClass(percentage: number): string {
+    if (percentage >= 80) return "text-green-600";
+    if (percentage >= 50) return "text-amber-600";
+    return "text-red-600";
+}
+
 export default function MonitoringFotoOutletPage() {
     const [data, setData] = React.useState<ReportResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -87,6 +100,7 @@ export default function MonitoringFotoOutletPage() {
     // Beberapa baris boleh terbuka sekaligus -- membandingkan dua foto berdampingan lebih
     // berguna daripada memaksa hanya satu yang boleh mekar dalam satu waktu.
     const [barisMekar, setBarisMekar] = React.useState<Set<string>>(new Set());
+    const { urut, gantiUrut } = useUrutTabel<string>("");
     const [filter, setFilter] = React.useState({
         q: "",
         photoSlot: "ALL",
@@ -94,6 +108,7 @@ export default function MonitoringFotoOutletPage() {
         outletCategory: "",
         tap: "",
         salesforceId: "",
+        pjpDay: "",
     });
 
     const buatParams = React.useCallback((includePage = true) => {
@@ -107,6 +122,7 @@ export default function MonitoringFotoOutletPage() {
         if (filter.outletCategory) params.set("outletCategory", filter.outletCategory);
         if (filter.tap) params.set("tap", filter.tap);
         if (filter.salesforceId) params.set("salesforceId", filter.salesforceId);
+        if (filter.pjpDay) params.set("pjpDay", filter.pjpDay);
         return params;
     }, [filter, page]);
 
@@ -167,6 +183,21 @@ export default function MonitoringFotoOutletPage() {
         window.location.href = `/api/admin/mitra/photo-monitoring?${params.toString()}`;
     };
 
+    // Sort hanya mengurutkan ulang baris yang sedang dimuat di halaman ini -- data sudah
+    // dipaginasi server-side, jadi klik kolom tidak memicu request baru.
+    const barisTampil = React.useMemo(() => {
+        if (!data?.rows.length) return [];
+        return urutkanBaris(data.rows, urut, (row, kolom) => {
+            if (kolom === "outlet") return row.outletName;
+            if (kolom === "kategori") return row.photoLabel;
+            if (kolom === "status") return row.statusKey;
+            if (kolom === "updatedAt") return row.updatedAt ? new Date(row.updatedAt) : null;
+            if (kolom === "tap") return row.tap;
+            if (kolom === "wilayah") return row.kecamatan;
+            return "";
+        });
+    }, [data, urut]);
+
     return (
         <div className="space-y-6">
             <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
@@ -176,8 +207,8 @@ export default function MonitoringFotoOutletPage() {
                     <h1 className="text-2xl font-bold">Monitoring Foto Outlet</h1>
                     <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                         Satu baris mewakili satu kategori foto pada satu outlet. Gunakan filter untuk menemukan foto
-                        yang belum ada atau belum diperbarui sesuai jadwal kunjungan. Outlet yang belum pernah difoto
-                        sama sekali tidak ikut dihitung -- laporan ini untuk memantau outlet yang sudah mulai didata.
+                        yang belum ada atau belum diperbarui sesuai jadwal kunjungan. Persentase pada kartu ringkasan
+                        dan angka di bawahnya mengikuti filter yang sedang aktif.
                     </p>
                 </div>
                 <Button variant="outline" onClick={unduh} disabled={loading || !data}>
@@ -198,9 +229,12 @@ export default function MonitoringFotoOutletPage() {
                             className={`rounded-lg border bg-white p-4 text-left shadow-sm transition-colors hover:border-red-300 ${aktif ? "border-red-400 ring-2 ring-red-100" : ""}`}
                         >
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{slot.label}</p>
-                            <p className="mt-2 text-2xl font-extrabold text-red-600">{summary?.missing ?? 0}</p>
+                            <p className={`mt-2 text-2xl font-extrabold ${persenClass(summary?.percentage ?? 0)}`}>
+                                {summary?.percentage ?? 0}%
+                            </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                belum ada · {summary?.stale ?? 0} kedaluwarsa · {summary?.fresh ?? 0} terbaru
+                                {summary?.withPhoto ?? 0} dari {summary?.total ?? 0} outlet sudah berfoto ·{" "}
+                                {summary?.missing ?? 0} belum ada · {summary?.stale ?? 0} kedaluwarsa
                             </p>
                         </button>
                     );
@@ -209,7 +243,7 @@ export default function MonitoringFotoOutletPage() {
 
             <Card>
                 <CardContent className="p-5">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-2 xl:col-span-2">
                             <Label>Cari Outlet</Label>
                             <div className="relative">
@@ -241,6 +275,10 @@ export default function MonitoringFotoOutletPage() {
                             <option value="">Semua Salesforce</option>
                             {(data?.filters.salesforces || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </FilterSelect>
+                        <FilterSelect label="Hari PJP" value={filter.pjpDay} onChange={(value) => ubahFilter("pjpDay", value)}>
+                            <option value="">Semua hari</option>
+                            {PJP_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
+                        </FilterSelect>
                     </div>
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
@@ -260,19 +298,19 @@ export default function MonitoringFotoOutletPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Outlet</TableHead>
-                                <TableHead>Kategori Foto</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Terakhir Diperbarui</TableHead>
-                                <TableHead>TAP / Salesforce</TableHead>
-                                <TableHead>Wilayah</TableHead>
+                                <TableHead><TombolUrut kolom="outlet" label="Outlet" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="kategori" label="Kategori Foto" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="updatedAt" label="Terakhir Diperbarui" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="tap" label="TAP / Salesforce" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="wilayah" label="Wilayah" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead>Foto</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={7} className="h-28 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
-                            ) : data?.rows.length ? data.rows.map((row) => {
+                            ) : barisTampil.length ? barisTampil.map((row) => {
                                 const mekar = barisMekar.has(row.id);
                                 return (
                                 <React.Fragment key={row.id}>
