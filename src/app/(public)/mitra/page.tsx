@@ -40,7 +40,6 @@ interface PublicOutlet {
     tap: string;
     kabupaten: string;
     kecamatan: string;
-    territoryName?: string | null;
     category: string;
     pjpDay: string;
     pjpType: string;

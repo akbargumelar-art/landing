@@ -3,8 +3,8 @@ import { and, asc, count, desc, eq, inArray, like, or, type SQL } from "drizzle-
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
-import { mitraOutletDetails, mitraOutlets, mitraSalesforces, mitraTerritories } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { mitraOutletDetails, mitraOutlets, mitraSalesforces } from "@/db/schema";
+import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
@@ -42,12 +42,12 @@ export async function GET(request: Request) {
         filters.push(eq(mitraOutlets.status, status as "ACTIVE" | "INACTIVE" | "SUSPENDED"));
     }
 
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        const territoryIds = await getUserTerritoryIds(auth.session.userId);
-        if (territoryIds.length === 0) {
+    if (auth.session && isTapScopedRole(auth.session.role)) {
+        const taps = await getUserTaps(auth.session.userId);
+        if (taps.length === 0) {
             return NextResponse.json({ outlets: [], total: 0, page, pageSize });
         }
-        filters.push(inArray(mitraOutlets.territoryId, territoryIds));
+        filters.push(inArray(mitraOutlets.tap, taps));
     }
 
     const where = filters.length > 0 ? and(...filters) : undefined;
@@ -71,8 +71,6 @@ export async function GET(request: Request) {
             longitude: mitraOutlets.longitude,
             latitude: mitraOutlets.latitude,
             locationUrl: mitraOutlets.locationUrl,
-            territoryId: mitraOutlets.territoryId,
-            territoryName: mitraTerritories.name,
             category: mitraOutlets.category,
             pjpDay: mitraOutlets.pjpDay,
             pjpType: mitraOutlets.pjpType,
@@ -82,14 +80,12 @@ export async function GET(request: Request) {
             createdAt: mitraOutlets.createdAt,
         })
         .from(mitraOutlets)
-        .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
         .where(where)
         .orderBy(desc(mitraOutlets.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize);
 
-    const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.name));
     // Dipakai dropdown salesforce di editor outlet; hanya yang aktif yang bisa dipilih,
     // tetapi outlet yang terlanjur menaut ke yang nonaktif tetap ditampilkan apa adanya.
     const salesforces = await db
@@ -99,7 +95,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
         outlets,
-        territories,
         salesforces,
         total: totalRow?.value || 0,
         page,
@@ -138,7 +133,6 @@ export async function POST(request: Request) {
         latitude,
         // Tautan lokasi diturunkan dari koordinat, bukan diketik admin.
         locationUrl: resolveOutletMapsUrl(latitude, longitude, body.locationUrl) || null,
-        territoryId: body.territoryId || null,
         category: normalizeOutletCategory(body.category),
         pjpDay: normalizePjpDay(body.pjpDay),
         pjpType: normalizePjpType(body.pjpType),

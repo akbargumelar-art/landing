@@ -82,9 +82,6 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             photoPopTelkomselUpdatedAt: mitraOutlets.photoPopTelkomselUpdatedAt,
             photoPopKompetitorUrl: mitraOutlets.photoPopKompetitorUrl,
             photoPopKompetitorUpdatedAt: mitraOutlets.photoPopKompetitorUpdatedAt,
-            // Nama territory tidak lagi diambil: profil publik menampilkan TAP dan
-            // salesforce, sedangkan territoryId saja sudah cukup untuk pencocokan whitelist.
-            territoryId: mitraOutlets.territoryId,
         })
         .from(mitraOutlets)
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
@@ -228,7 +225,6 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             latitude: outletRecord.latitude,
             // Diturunkan dari koordinat supaya tautan selalu cocok dengan lat/long tersimpan.
             locationUrl: resolveOutletMapsUrl(outletRecord.latitude, outletRecord.longitude, outletRecord.locationUrl),
-            territoryId: outletRecord.territoryId,
         },
         detailSession,
         details: {

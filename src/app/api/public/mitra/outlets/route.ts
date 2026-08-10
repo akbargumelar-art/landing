@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, asc, count, eq, isNotNull, like, or, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
-import { mitraOutlets, mitraTerritories } from "@/db/schema";
+import { mitraOutlets } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +93,6 @@ export async function GET(request: Request) {
                 tap: mitraOutlets.tap,
                 kabupaten: mitraOutlets.kabupaten,
                 kecamatan: mitraOutlets.kecamatan,
-                territoryName: mitraTerritories.name,
                 category: mitraOutlets.category,
                 pjpDay: mitraOutlets.pjpDay,
                 pjpType: mitraOutlets.pjpType,
@@ -101,7 +100,6 @@ export async function GET(request: Request) {
                 photoUrl: mitraOutlets.photoUrl,
             })
             .from(mitraOutlets)
-            .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
             .where(where)
             .orderBy(asc(mitraOutlets.name))
             .limit(pageSize)

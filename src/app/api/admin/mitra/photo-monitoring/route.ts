@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole } from "@/lib/admin-auth";
+import { getUserTaps, isTapScopedRole, requireRole } from "@/lib/admin-auth";
 import { BATAS_SEGAR_HARI, MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
 import { OUTLET_CATEGORIES } from "@/lib/mitra-outlet-options";
 
@@ -17,8 +17,8 @@ type Kondisi = (typeof KONDISI)[number];
 
 type OutletRow = Awaited<ReturnType<typeof ambilOutletDalamScope>>[number];
 
-async function ambilOutletDalamScope(territoryIds: string[] | null) {
-    if (territoryIds?.length === 0) return [];
+async function ambilOutletDalamScope(taps: string[] | null) {
+    if (taps?.length === 0) return [];
 
     return db
         .select({
@@ -29,7 +29,6 @@ async function ambilOutletDalamScope(territoryIds: string[] | null) {
             tap: mitraOutlets.tap,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
-            territoryId: mitraOutlets.territoryId,
             salesforceId: mitraOutlets.salesforceId,
             salesforce: mitraSalesforces.name,
             photoUrl: mitraOutlets.photoUrl,
@@ -43,12 +42,24 @@ async function ambilOutletDalamScope(territoryIds: string[] | null) {
         })
         .from(mitraOutlets)
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
-        .where(territoryIds ? inArray(mitraOutlets.territoryId, territoryIds) : undefined)
+        .where(taps ? inArray(mitraOutlets.tap, taps) : undefined)
         .orderBy(mitraOutlets.name);
 }
 
 function teks(nilai: unknown): string {
     return String(nilai ?? "").trim();
+}
+
+/**
+ * Outlet yang keempat slot fotonya kosong sama sekali dianggap belum pernah didatangi
+ * untuk pendataan foto -- bukan outlet yang "kelewat" jadwal kunjungan. Ikut dihitung
+ * sebagai "belum ada" akan membanjiri kartu ringkasan dan tabel dengan outlet yang memang
+ * belum pernah difoto sekalipun, membuat angka kekurangan riil (outlet yang sudah mulai
+ * didata tapi satu slotnya masih kosong) tenggelam. Outlet yang sudah punya minimal satu
+ * foto tetap dihitung penuh, termasuk untuk slot lain yang masih kosong.
+ */
+function pernahDifoto(outlet: OutletRow): boolean {
+    return MITRA_PHOTO_SLOTS.some((slot) => teks(outlet[slot.urlColumn]));
 }
 
 function buatBarisFoto(outlet: OutletRow) {
@@ -113,12 +124,12 @@ export async function GET(request: Request) {
     const page = Math.max(Number(params.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(params.get("pageSize") || "50"), 1), 100);
 
-    let territoryIds: string[] | null = null;
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        territoryIds = await getUserTerritoryIds(auth.session.userId);
+    let scopeTaps: string[] | null = null;
+    if (auth.session && isTapScopedRole(auth.session.role)) {
+        scopeTaps = await getUserTaps(auth.session.userId);
     }
 
-    const scopedOutlets = await ambilOutletDalamScope(territoryIds);
+    const scopedOutlets = await ambilOutletDalamScope(scopeTaps);
     const taps = [...new Set(scopedOutlets.map((row) => row.tap).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id"));
     const salesforces = [...new Map(scopedOutlets
         .filter((row) => row.salesforceId && row.salesforce)
@@ -126,6 +137,7 @@ export async function GET(request: Request) {
         .sort((a, b) => a.name.localeCompare(b.name, "id"));
 
     const outletTersaring = scopedOutlets.filter((outlet) => {
+        if (!pernahDifoto(outlet)) return false;
         if (outletCategory && outlet.category !== outletCategory) return false;
         if (tap && outlet.tap !== tap) return false;
         if (salesforceId && outlet.salesforceId !== salesforceId) return false;

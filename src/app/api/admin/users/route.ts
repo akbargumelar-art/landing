@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { adminUserProfiles, adminUserTerritories, mitraTerritories, user, type AdminRole } from "@/db/schema";
+import { adminUserProfiles, adminUserTaps, user, type AdminRole } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
@@ -10,7 +10,7 @@ import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 export const dynamic = "force-dynamic";
 
 const VALID_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"];
-const TERRITORY_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
+const TAP_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
 export async function GET() {
     const authResult = await requireRole(["SUPER_ADMIN"]);
@@ -31,17 +31,15 @@ export async function GET() {
         .leftJoin(adminUserProfiles, eq(user.id, adminUserProfiles.userId))
         .orderBy(asc(user.name));
 
-    const assignments = await db.select().from(adminUserTerritories);
-    const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.type), asc(mitraTerritories.name));
+    const assignments = await db.select().from(adminUserTaps);
 
     return NextResponse.json({
         users: users.map((row) => ({
             ...row,
             role: row.role || "SUPER_ADMIN",
             isActive: row.isActive ?? true,
-            territoryIds: assignments.filter((assignment) => assignment.userId === row.id).map((assignment) => assignment.territoryId),
+            taps: assignments.filter((assignment) => assignment.userId === row.id).map((assignment) => assignment.tap),
         })),
-        territories,
     });
 }
 
@@ -54,7 +52,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     const role = String(body.role || "");
-    const territoryIds = Array.isArray(body.territoryIds) ? (body.territoryIds as unknown[]).map(String) : [];
+    const taps = Array.isArray(body.taps) ? (body.taps as unknown[]).map(String).filter(Boolean) : [];
 
     if (!name || name.length < 2) {
         return NextResponse.json({ error: "Nama wajib diisi minimal 2 karakter" }, { status: 400 });
@@ -68,8 +66,8 @@ export async function POST(request: Request) {
     if (!VALID_ROLES.includes(role as AdminRole)) {
         return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
     }
-    if (TERRITORY_SCOPED.includes(role as AdminRole) && territoryIds.length === 0) {
-        return NextResponse.json({ error: "Role ini wajib memiliki minimal satu wilayah" }, { status: 400 });
+    if (TAP_SCOPED.includes(role as AdminRole) && taps.length === 0) {
+        return NextResponse.json({ error: "Role ini wajib memiliki minimal satu TAP" }, { status: 400 });
     }
 
     let created;
@@ -91,8 +89,8 @@ export async function POST(request: Request) {
         createdAt: new Date(),
     });
 
-    if (territoryIds.length > 0) {
-        await db.insert(adminUserTerritories).values(territoryIds.map((territoryId) => ({ userId, territoryId })));
+    if (taps.length > 0) {
+        await db.insert(adminUserTaps).values(taps.map((tap) => ({ userId, tap })));
     }
 
     await writeAdminAuditLog({
@@ -100,7 +98,7 @@ export async function POST(request: Request) {
         action: "CREATE",
         entity: "admin_user",
         entityId: userId,
-        diff: { name, email, role, territoryCount: territoryIds.length },
+        diff: { name, email, role, tapCount: taps.length },
         ip: getClientIp(request),
     });
 

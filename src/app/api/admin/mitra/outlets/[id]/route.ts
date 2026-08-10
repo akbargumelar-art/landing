@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
@@ -29,11 +29,11 @@ export async function GET(
     const [outlet] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
     if (!outlet) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
 
-    // The list endpoint filters by territory, so this one must too - otherwise a scoped role
+    // The list endpoint filters by TAP, so this one must too - otherwise a scoped role
     // could read any outlet's sensitive performance detail just by knowing its id.
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        const territoryIds = await getUserTerritoryIds(auth.session.userId);
-        if (!outlet.territoryId || !territoryIds.includes(outlet.territoryId)) {
+    if (auth.session && isTapScopedRole(auth.session.role)) {
+        const taps = await getUserTaps(auth.session.userId);
+        if (!outlet.tap || !taps.includes(outlet.tap)) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
     }
@@ -84,7 +84,6 @@ export async function PUT(
         // Koordinat adalah sumber kebenaran tautan lokasi; nilai lama hanya dipakai
         // selama koordinat masih kosong.
         locationUrl: resolveOutletMapsUrl(latitude, longitude, existing.locationUrl) || null,
-        territoryId: body.territoryId === "" ? null : body.territoryId ?? existing.territoryId,
         category: normalizeOutletCategory(body.category ?? existing.category),
         pjpDay: normalizePjpDay(body.pjpDay ?? existing.pjpDay),
         pjpType: normalizePjpType(body.pjpType ?? existing.pjpType),

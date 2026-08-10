@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import {and, asc, count, desc, eq, like, lt, type SQL} from "drizzle-orm";
-import { v4 as uuid } from "uuid";
+import {and, count, desc, eq, like, lt, ne, type SQL} from "drizzle-orm";
 
 import { db } from "@/db";
 import {
     adminAuditLogs,
     mitraDetailSessions,
     mitraOtpRequests,
-    mitraTerritories,
+    mitraOutlets,
     user,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
@@ -57,12 +56,20 @@ export async function GET(request: Request) {
         });
     }
 
-    if (resource === "territories") {
-        const admin = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    // Daftar TAP unik lintas seluruh outlet (tidak dibatasi scope pemanggil): dipakai
+    // Kelola User untuk menetapkan TAP mana saja yang boleh diakses admin SUPERVISOR/
+    // SALESFORCE, jadi harus menampilkan semua TAP yang mungkin, bukan hanya milik
+    // pemanggil sendiri.
+    if (resource === "taps") {
+        const admin = await requireRole(["SUPER_ADMIN"]);
         if (admin.error) return admin.error;
 
-        const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.type), asc(mitraTerritories.name));
-        return NextResponse.json({ territories });
+        const rows = await db
+            .select({ tap: mitraOutlets.tap })
+            .from(mitraOutlets)
+            .where(ne(mitraOutlets.tap, ""));
+        const taps = [...new Set(rows.map((row) => row.tap))].sort((a, b) => a.localeCompare(b, "id"));
+        return NextResponse.json({ taps });
     }
 
     if (resource === "audit") {
@@ -136,35 +143,6 @@ export async function POST(request: Request) {
         });
 
         return NextResponse.json({ success: true, removed });
-    }
-
-    if (resource === "territory") {
-        const id = uuid();
-        const type = String(body.type || "AREA");
-
-        if (!body.name || !["REGION", "CLUSTER", "AREA"].includes(type)) {
-            return NextResponse.json({ error: "Nama dan tipe wilayah wajib valid" }, { status: 400 });
-        }
-
-        await db.insert(mitraTerritories).values({
-            id,
-            name: String(body.name),
-            type: type as "REGION" | "CLUSTER" | "AREA",
-            parentId: body.parentId || null,
-            createdAt: new Date(),
-        });
-
-        await writeAdminAuditLog({
-            userId: auth.session?.userId,
-            action: "CREATE",
-            entity: "mitra_territory",
-            entityId: id,
-            diff: { name: body.name, type },
-            ip: getClientIp(request),
-        });
-
-        const [created] = await db.select().from(mitraTerritories).where(eq(mitraTerritories.id, id));
-        return NextResponse.json(created, { status: 201 });
     }
 
     return NextResponse.json({ error: "Resource tidak valid" }, { status: 400 });

@@ -4,7 +4,7 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraMetricDefs, mitraOutletMetrics, mitraOutlets } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, toDecimalString } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +22,9 @@ export async function GET(request: Request) {
     const filters = [];
     if (outletId) filters.push(eq(mitraOutletMetrics.outletId, outletId));
     if (periodYm) filters.push(eq(mitraOutletMetrics.periodYm, periodYm));
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        const territoryIds = await getUserTerritoryIds(auth.session.userId);
-        filters.push(territoryIds.length > 0 ? inArray(mitraOutlets.territoryId, territoryIds) : eq(mitraOutlets.territoryId, "__none__"));
+    if (auth.session && isTapScopedRole(auth.session.role)) {
+        const taps = await getUserTaps(auth.session.userId);
+        filters.push(taps.length > 0 ? inArray(mitraOutlets.tap, taps) : eq(mitraOutlets.tap, "__none__"));
     }
 
     const rows = await db

@@ -3,12 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
-import { Activity, BadgeCheck, BookText, Camera, ClipboardList, Database, FileSpreadsheet, History, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
+import { Activity, BadgeCheck, BookText, Camera, ClipboardList, Database, FileSpreadsheet, History, Images, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface Summary {
     outlets: number;
@@ -16,12 +14,6 @@ interface Summary {
     otpEvents: number;
     imports: number;
     metrics: number;
-}
-
-interface Territory {
-    id: string;
-    name: string;
-    type: "REGION" | "CLUSTER" | "AREA";
 }
 
 interface HealthStatus {
@@ -49,6 +41,7 @@ interface FotoTerbaru {
 const modules = [
     { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Users, text: "Tambah, edit, hapus outlet dan QR satuan." },
     { href: "/admin/mitra/foto", label: "Monitoring Foto", icon: Camera, text: "Foto kosong atau kedaluwarsa per kategori, dengan ekspor Excel." },
+    { href: "/admin/mitra/galeri", label: "Galeri Foto", icon: Images, text: "Semua foto outlet, filter tanggal/TAP/PJP/wilayah, tanpa status kepatuhan." },
     { href: "/admin/mitra/import", label: "Upload Data", icon: FileSpreadsheet, text: "Import outlet dan performa: preview, validasi, commit." },
     { href: "/admin/mitra/performance", label: "Performance", icon: Activity, text: "Metric dan input performansi outlet." },
     { href: "/admin/mitra/salesforce", label: "Salesforce", icon: BadgeCheck, text: "Master nama dan foto salesforce yang ditaut outlet." },
@@ -61,21 +54,16 @@ const modules = [
 
 export default function AdminMitraPage() {
     const [summary, setSummary] = React.useState<Summary | null>(null);
-    const [territories, setTerritories] = React.useState<Territory[]>([]);
     const [health, setHealth] = React.useState<HealthStatus | null>(null);
     const [fotoTerbaru, setFotoTerbaru] = React.useState<FotoTerbaru[]>([]);
     const [memuatFoto, setMemuatFoto] = React.useState(true);
     const [cleaning, setCleaning] = React.useState(false);
-    const [territoryForm, setTerritoryForm] = React.useState({ name: "", type: "AREA", parentId: "" });
 
     const load = React.useCallback(() => {
         fetch("/api/admin/mitra")
             .then((res) => res.json())
             .then((data) => setSummary(data.summary || null))
             .catch(() => setSummary(null));
-        fetch("/api/admin/mitra?resource=territories")
-            .then((res) => res.ok ? res.json() : { territories: [] })
-            .then((data) => setTerritories(Array.isArray(data.territories) ? data.territories : []));
         fetch("/api/admin/mitra?resource=health")
             .then((res) => res.ok ? res.json() : null)
             .then(setHealth)
@@ -89,17 +77,6 @@ export default function AdminMitraPage() {
     }, []);
 
     React.useEffect(() => { load(); }, [load]);
-
-    const saveTerritory = async (event: React.FormEvent) => {
-        event.preventDefault();
-        await fetch("/api/admin/mitra", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ resource: "territory", ...territoryForm }),
-        });
-        setTerritoryForm({ name: "", type: "AREA", parentId: "" });
-        load();
-    };
 
     const cleanupExpiredAccess = async () => {
         setCleaning(true);
@@ -265,52 +242,23 @@ export default function AdminMitraPage() {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
-                    <CardContent className="p-5">
-                        <h2 className="font-bold">Territory</h2>
-                        <form onSubmit={saveTerritory} className="mt-4 grid gap-3 sm:grid-cols-3">
-                            <div className="space-y-2 sm:col-span-2">
-                                <Label>Nama Wilayah</Label>
-                                <Input value={territoryForm.name} onChange={(event) => setTerritoryForm((prev) => ({ ...prev, name: event.target.value }))} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Tipe</Label>
-                                <select value={territoryForm.type} onChange={(event) => setTerritoryForm((prev) => ({ ...prev, type: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
-                                    <option value="REGION">REGION</option>
-                                    <option value="CLUSTER">CLUSTER</option>
-                                    <option value="AREA">AREA</option>
-                                </select>
-                            </div>
-                            <Button className="sm:col-span-3">Tambah Territory</Button>
-                        </form>
-                        <div className="mt-4 max-h-56 space-y-2 overflow-auto">
-                            {territories.map((territory) => (
-                                <div key={territory.id} className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2 text-sm">
-                                    <span className="font-semibold">{territory.name}</span>
-                                    <span className="text-xs text-muted-foreground">{territory.type}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="flex flex-col items-start gap-3 p-5">
+            <Card>
+                <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
                         <h2 className="font-bold">Kelola User</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Pengelolaan role, akun, dan wilayah user internal sudah dipindahkan ke halaman
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Pengelolaan role, akun, dan TAP user internal sudah dipindahkan ke halaman
                             Kelola User (khusus Admin Super).
                         </p>
-                        <Link href="/admin/users">
-                            <Button variant="outline">
-                                <UserCog className="h-4 w-4" />
-                                Buka Kelola User
-                            </Button>
-                        </Link>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                    <Link href="/admin/users">
+                        <Button variant="outline">
+                            <UserCog className="h-4 w-4" />
+                            Buka Kelola User
+                        </Button>
+                    </Link>
+                </CardContent>
+            </Card>
         </div>
     );
 }

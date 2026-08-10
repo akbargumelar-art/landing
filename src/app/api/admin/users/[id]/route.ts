@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { adminUserProfiles, adminUserTerritories, type AdminRole } from "@/db/schema";
+import { adminUserProfiles, adminUserTaps, type AdminRole } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
 const VALID_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"];
-const TERRITORY_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
+const TAP_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authResult = await requireRole(["SUPER_ADMIN"]);
@@ -18,13 +18,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id: userId } = await params;
     const body = await request.json().catch(() => ({}));
     const role = String(body.role || "");
-    const territoryIds = Array.isArray(body.territoryIds) ? (body.territoryIds as unknown[]).map(String) : [];
+    const taps = Array.isArray(body.taps) ? (body.taps as unknown[]).map(String).filter(Boolean) : [];
 
     if (!VALID_ROLES.includes(role as AdminRole)) {
         return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
     }
-    if (TERRITORY_SCOPED.includes(role as AdminRole) && territoryIds.length === 0) {
-        return NextResponse.json({ error: "Role ini wajib memiliki minimal satu wilayah" }, { status: 400 });
+    if (TAP_SCOPED.includes(role as AdminRole) && taps.length === 0) {
+        return NextResponse.json({ error: "Role ini wajib memiliki minimal satu TAP" }, { status: 400 });
     }
     if (userId === authResult.session?.userId && role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "Tidak bisa menurunkan role akun sendiri" }, { status: 400 });
@@ -43,9 +43,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await db.insert(adminUserProfiles).values({ userId, ...values, createdAt: new Date() });
     }
 
-    await db.delete(adminUserTerritories).where(eq(adminUserTerritories.userId, userId));
-    if (territoryIds.length > 0) {
-        await db.insert(adminUserTerritories).values(territoryIds.map((territoryId) => ({ userId, territoryId })));
+    await db.delete(adminUserTaps).where(eq(adminUserTaps.userId, userId));
+    if (taps.length > 0) {
+        await db.insert(adminUserTaps).values(taps.map((tap) => ({ userId, tap })));
     }
 
     await writeAdminAuditLog({
@@ -53,7 +53,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         action: existing ? "UPDATE" : "CREATE",
         entity: "admin_user",
         entityId: userId,
-        diff: { role, isActive: values.isActive, territoryCount: territoryIds.length },
+        diff: { role, isActive: values.isActive, tapCount: taps.length },
         ip: getClientIp(request),
     });
 

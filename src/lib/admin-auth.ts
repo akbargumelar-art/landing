@@ -8,7 +8,7 @@ import { db } from "@/db";
 import {
     adminAuditLogs,
     adminUserProfiles,
-    adminUserTerritories,
+    adminUserTaps,
     type AdminRole,
 } from "@/db/schema";
 
@@ -22,10 +22,10 @@ export interface AdminSession {
     isActive: boolean;
 }
 
-const TERRITORY_SCOPED_ROLES: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
+const TAP_SCOPED_ROLES: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
-export function isTerritoryScopedRole(role: AdminRole): boolean {
-    return TERRITORY_SCOPED_ROLES.includes(role);
+export function isTapScopedRole(role: AdminRole): boolean {
+    return TAP_SCOPED_ROLES.includes(role);
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
@@ -86,13 +86,13 @@ export async function requireRole(roles: AdminRole[]) {
     return { error: null, session };
 }
 
-export async function getUserTerritoryIds(userId: string): Promise<string[]> {
+export async function getUserTaps(userId: string): Promise<string[]> {
     const rows = await db
-        .select({ territoryId: adminUserTerritories.territoryId })
-        .from(adminUserTerritories)
-        .where(eq(adminUserTerritories.userId, userId));
+        .select({ tap: adminUserTaps.tap })
+        .from(adminUserTaps)
+        .where(eq(adminUserTaps.userId, userId));
 
-    return rows.map((row) => row.territoryId);
+    return rows.map((row) => row.tap);
 }
 
 export async function writeAdminAuditLog(input: {

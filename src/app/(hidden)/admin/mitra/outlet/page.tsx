@@ -34,12 +34,6 @@ interface Outlet {
     kabupaten: string;
     kecamatan: string;
     status: string;
-    territoryName?: string;
-}
-
-interface Territory {
-    id: string;
-    name: string;
 }
 
 interface EditLog {
@@ -58,7 +52,6 @@ interface SalesforceOption {
 
 export default function AdminMitraOutletPage() {
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
-    const [territories, setTerritories] = React.useState<Territory[]>([]);
     const [salesforces, setSalesforces] = React.useState<SalesforceOption[]>([]);
     const [q, setQ] = React.useState("");
     const [loading, setLoading] = React.useState(true);
@@ -77,7 +70,6 @@ export default function AdminMitraOutletPage() {
         ownerPhone: "",
         kabupaten: "",
         kecamatan: "",
-        territoryId: "",
         category: String(DEFAULT_OUTLET_CATEGORY),
         pjpDay: String(DEFAULT_PJP_DAY),
         pjpType: String(DEFAULT_PJP_TYPE),
@@ -92,7 +84,6 @@ export default function AdminMitraOutletPage() {
             .then((res) => res.json())
             .then((data) => {
                 setOutlets(Array.isArray(data.outlets) ? data.outlets : []);
-                setTerritories(Array.isArray(data.territories) ? data.territories : []);
                 setSalesforces(Array.isArray(data.salesforces) ? data.salesforces : []);
             })
             .finally(() => setLoading(false));
@@ -159,7 +150,7 @@ export default function AdminMitraOutletPage() {
         });
         if (res.ok) {
             setForm({
-                outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "", territoryId: "",
+                outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "",
                 category: String(DEFAULT_OUTLET_CATEGORY), pjpDay: String(DEFAULT_PJP_DAY),
                 pjpType: String(DEFAULT_PJP_TYPE), branding: String(DEFAULT_OUTLET_BRANDING),
                 salesforceId: "",
@@ -240,13 +231,6 @@ export default function AdminMitraOutletPage() {
                         <Field label="WA Owner" value={form.ownerPhone} onChange={(value) => setForm((prev) => ({ ...prev, ownerPhone: value }))} />
                         <Field label="Kabupaten" value={form.kabupaten} onChange={(value) => setForm((prev) => ({ ...prev, kabupaten: value }))} />
                         <Field label="Kecamatan" value={form.kecamatan} onChange={(value) => setForm((prev) => ({ ...prev, kecamatan: value }))} />
-                        <div className="space-y-2">
-                            <Label>Territory</Label>
-                            <select value={form.territoryId} onChange={(event) => setForm((prev) => ({ ...prev, territoryId: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
-                                <option value="">Tanpa territory</option>
-                                {territories.map((territory) => <option key={territory.id} value={territory.id}>{territory.name}</option>)}
-                            </select>
-                        </div>
                         <div className="space-y-2">
                             <Label>Kategori Outlet</Label>
                             <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
@@ -333,13 +317,6 @@ export default function AdminMitraOutletPage() {
                                 <Link href="/admin/mitra/salesforce" className="text-xs font-semibold text-red-600 hover:underline">
                                     Kelola nama & foto salesforce
                                 </Link>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Territory</Label>
-                                <select value={String(editOutlet.territoryId || "")} onChange={(event) => updateEditField("territoryId", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
-                                    <option value="">Tanpa territory</option>
-                                    {territories.map((territory) => <option key={territory.id} value={territory.id}>{territory.name}</option>)}
-                                </select>
                             </div>
                             <div className="space-y-2">
                                 <Label>Kategori Outlet</Label>
