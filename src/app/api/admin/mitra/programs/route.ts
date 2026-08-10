@@ -8,6 +8,7 @@ import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import {
     buildRewardRuleValues,
     computeProgramRewards,
+    normalizeGroupBy,
     normalizeMechanismType,
     normalizeTargetType,
     recomputeProgramLeaderboard,
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
         slug: body.slug ? slugify(String(body.slug)) : slugify(name),
         targetType,
         mechanismType,
+        groupBy: normalizeGroupBy(body.groupBy),
+        thumbnailUrl: body.thumbnailUrl || null,
         descriptionMd: body.descriptionMd || "",
         mechanismMd: body.mechanismMd || "",
         periodStart: new Date(body.periodStart),

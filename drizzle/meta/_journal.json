@@ -218,6 +218,13 @@
       "when": 1786392096097,
       "tag": "0030_create_program_engine_and_masters",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1786395648385,
+      "tag": "0031_program_grouping_and_thumbnail",
+      "breakpoints": true
     }
   ]
 }

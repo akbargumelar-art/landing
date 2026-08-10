@@ -71,6 +71,8 @@ export function participantColumns(targetType: ProgramTargetType, id: string) {
         : { participantKey: participantKeyFor(targetType, id), outletId: id, salesforceId: null };
 }
 
+export type ProgramGroupBy = "NONE" | "TAP" | "KABUPATEN" | "KECAMATAN";
+
 export interface ProgramParticipantInfo {
     participantKey: string;
     id: string;
@@ -78,6 +80,25 @@ export interface ProgramParticipantInfo {
     name: string;
     /** Wilayah singkat untuk kolom tabel: kabupaten/kecamatan outlet, atau TAP salesforce. */
     area: string;
+    tap: string;
+    kabupaten: string;
+    kecamatan: string;
+}
+
+export function normalizeGroupBy(nilai: unknown): ProgramGroupBy {
+    const teks = String(nilai || "").toUpperCase();
+    return teks === "TAP" || teks === "KABUPATEN" || teks === "KECAMATAN" ? teks : "NONE";
+}
+
+/**
+ * Nilai wilayah yang dipakai sebagai pembagi liga. Peserta yang wilayahnya kosong
+ * dikumpulkan ke "(Tanpa <wilayah>)" alih-alih dibuang, supaya tidak diam-diam hilang
+ * dari papan peringkat hanya karena datanya belum lengkap.
+ */
+export function groupValueOf(info: ProgramParticipantInfo, groupBy: ProgramGroupBy): string {
+    if (groupBy === "NONE") return "";
+    const nilai = groupBy === "TAP" ? info.tap : groupBy === "KABUPATEN" ? info.kabupaten : info.kecamatan;
+    return nilai.trim() || `(Tanpa ${groupBy.charAt(0)}${groupBy.slice(1).toLowerCase()})`;
 }
 
 /**
@@ -107,6 +128,9 @@ export async function listProgramParticipants(programId: string, targetType: Pro
             code: row.name,
             name: row.name,
             area: row.tap || "",
+            tap: row.tap || "",
+            kabupaten: "",
+            kecamatan: "",
         }));
     }
 
@@ -116,6 +140,7 @@ export async function listProgramParticipants(programId: string, targetType: Pro
             id: mitraOutlets.id,
             code: mitraOutlets.outletCode,
             name: mitraOutlets.name,
+            tap: mitraOutlets.tap,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
         })
@@ -130,6 +155,9 @@ export async function listProgramParticipants(programId: string, targetType: Pro
         code: row.code,
         name: row.name,
         area: [row.kecamatan, row.kabupaten].filter(Boolean).join(", "),
+        tap: row.tap || "",
+        kabupaten: row.kabupaten || "",
+        kecamatan: row.kecamatan || "",
     }));
 }
 
@@ -156,6 +184,14 @@ export async function resolveParticipantCodes(targetType: ProgramTargetType, cod
     return new Map(rows.map((row) => [row.code, { id: row.id, name: row.name }]));
 }
 
+/** Identitas ringkas untuk picker admin; tidak membawa kolom wilayah pembagi liga. */
+export interface ParticipantCandidate {
+    id: string;
+    code: string;
+    name: string;
+    area: string;
+}
+
 export interface ParticipantFilter {
     /** Daftar kode/nama yang ditempel admin. Kalau diisi, filter wilayah diabaikan. */
     codes?: string[];
@@ -176,7 +212,7 @@ export interface ParticipantFilter {
 export async function findParticipantsBulk(
     targetType: ProgramTargetType,
     filter: ParticipantFilter
-): Promise<{ candidates: Omit<ProgramParticipantInfo, "participantKey">[]; unknown: string[] }> {
+): Promise<{ candidates: ParticipantCandidate[]; unknown: string[] }> {
     const codes = Array.from(new Set((filter.codes || []).map((code) => code.trim()).filter(Boolean)));
     const pakaiKode = codes.length > 0;
 
@@ -317,9 +353,12 @@ export async function recomputeProgramLeaderboard(programId: string) {
     const [program] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, programId)).limit(1);
     if (!program) return;
 
+    const targetType = program.targetType as ProgramTargetType;
+    const groupBy = program.groupBy as ProgramGroupBy;
+
     const [params, participants, previousRows] = await Promise.all([
         db.select().from(mitraProgramParams).where(eq(mitraProgramParams.programId, programId)).orderBy(asc(mitraProgramParams.sortOrder)),
-        db.select().from(mitraProgramParticipants).where(eq(mitraProgramParticipants.programId, programId)),
+        listProgramParticipants(programId, targetType),
         db
             .select({ participantKey: mitraProgramLeaderboard.participantKey, rank: mitraProgramLeaderboard.rank })
             .from(mitraProgramLeaderboard)
@@ -333,32 +372,41 @@ export async function recomputeProgramLeaderboard(programId: string) {
         participants.map((row) => row.participantKey)
     );
 
-    const totals = participants
-        .map((peserta) => ({
-            participantKey: peserta.participantKey,
-            outletId: peserta.outletId,
-            salesforceId: peserta.salesforceId,
-            totalPoints: params.reduce((total, param) => total + aggregates.get(peserta.participantKey, param.id).points, 0),
-        }))
-        .sort((a, b) => b.totalPoints - a.totalPoints);
+    /**
+     * Peringkat dihitung di dalam tiap kelompok, bukan sekali untuk seluruh peserta.
+     * Dengan begitu program yang dibagi per TAP menghasilkan juara 1 di setiap TAP, dan
+     * aturan hadiah berbasis peringkat langsung berlaku per wilayah tanpa aturan terpisah.
+     */
+    const perGroup = new Map<string, { info: ProgramParticipantInfo; totalPoints: number }[]>();
+    for (const peserta of participants) {
+        const groupKey = groupValueOf(peserta, groupBy);
+        const totalPoints = params.reduce((total, param) => total + aggregates.get(peserta.participantKey, param.id).points, 0);
+        const daftar = perGroup.get(groupKey) || [];
+        daftar.push({ info: peserta, totalPoints });
+        perGroup.set(groupKey, daftar);
+    }
 
     const now = new Date();
-    await db.delete(mitraProgramLeaderboard).where(eq(mitraProgramLeaderboard.programId, programId));
-    if (totals.length === 0) return;
+    const baris: (typeof mitraProgramLeaderboard.$inferInsert)[] = [];
 
-    await db.insert(mitraProgramLeaderboard).values(
-        totals.map((row, index) => ({
-            id: uuid(),
-            programId,
-            participantKey: row.participantKey,
-            outletId: row.outletId,
-            salesforceId: row.salesforceId,
-            totalPoints: toDecimalString(row.totalPoints),
-            rank: index + 1,
-            prevRank: previousRank.get(row.participantKey) ?? null,
-            computedAt: now,
-        }))
-    );
+    for (const [groupKey, daftar] of perGroup) {
+        daftar.sort((a, b) => b.totalPoints - a.totalPoints);
+        daftar.forEach((item, index) => {
+            baris.push({
+                id: uuid(),
+                programId,
+                ...participantColumns(targetType, item.info.id),
+                totalPoints: toDecimalString(item.totalPoints),
+                groupKey,
+                rank: index + 1,
+                prevRank: previousRank.get(item.info.participantKey) ?? null,
+                computedAt: now,
+            });
+        });
+    }
+
+    await db.delete(mitraProgramLeaderboard).where(eq(mitraProgramLeaderboard.programId, programId));
+    if (baris.length > 0) await db.insert(mitraProgramLeaderboard).values(baris);
 }
 
 export interface RewardMatch {
@@ -366,6 +414,7 @@ export interface RewardMatch {
     code: string;
     name: string;
     rank: number | null;
+    groupKey: string;
     rewardLabel: string;
     ruleId: string;
 }
@@ -387,6 +436,7 @@ export async function computeProgramRewards(programId: string): Promise<RewardMa
     if (rules.length === 0) return [];
 
     const targetType = program.targetType as ProgramTargetType;
+    const groupBy = program.groupBy as ProgramGroupBy;
     const peserta = await listProgramParticipants(programId, targetType);
     const pesertaByKey = new Map(peserta.map((item) => [item.participantKey, item]));
 
@@ -394,11 +444,12 @@ export async function computeProgramRewards(programId: string): Promise<RewardMa
         .select({
             participantKey: mitraProgramLeaderboard.participantKey,
             totalPoints: mitraProgramLeaderboard.totalPoints,
+            groupKey: mitraProgramLeaderboard.groupKey,
             rank: mitraProgramLeaderboard.rank,
         })
         .from(mitraProgramLeaderboard)
         .where(eq(mitraProgramLeaderboard.programId, programId))
-        .orderBy(asc(mitraProgramLeaderboard.rank));
+        .orderBy(asc(mitraProgramLeaderboard.groupKey), asc(mitraProgramLeaderboard.rank));
 
     const hasil: RewardMatch[] = [];
 
@@ -414,6 +465,7 @@ export async function computeProgramRewards(programId: string): Promise<RewardMa
                     code: info.code,
                     name: info.name,
                     rank: row.rank,
+                    groupKey: row.groupKey,
                     rewardLabel: rule.rewardLabel,
                     ruleId: rule.id,
                 });
@@ -455,6 +507,7 @@ export async function computeProgramRewards(programId: string): Promise<RewardMa
                 code: info.code,
                 name: info.name,
                 rank: null,
+                groupKey: groupValueOf(info, groupBy),
                 rewardLabel: rule.rewardLabel,
                 ruleId: rule.id,
             });
@@ -472,6 +525,7 @@ export async function getPublicPrograms(targetType: ProgramTargetType) {
             name: mitraPrograms.name,
             slug: mitraPrograms.slug,
             mechanismType: mitraPrograms.mechanismType,
+            thumbnailUrl: mitraPrograms.thumbnailUrl,
             descriptionMd: mitraPrograms.descriptionMd,
             periodStart: mitraPrograms.periodStart,
             periodEnd: mitraPrograms.periodEnd,
@@ -509,20 +563,39 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
         .where(eq(mitraProgramParams.programId, program.id))
         .orderBy(asc(mitraProgramParams.sortOrder));
 
+    const groupBy = program.groupBy as ProgramGroupBy;
     const peserta = await listProgramParticipants(program.id, targetType);
     const pesertaByKey = new Map(peserta.map((item) => [item.participantKey, item]));
+
+    // Aturan hadiah ikut dikirim ke publik supaya peserta tahu apa yang diperebutkan --
+    // sebelumnya hadiah hanya terlihat setelah pemenang diumumkan, yang sudah terlambat
+    // untuk memotivasi siapa pun.
+    const rewardRules = await db
+        .select({
+            id: mitraProgramRewardRules.id,
+            rankFrom: mitraProgramRewardRules.rankFrom,
+            rankTo: mitraProgramRewardRules.rankTo,
+            paramKey: mitraProgramRewardRules.paramKey,
+            comparator: mitraProgramRewardRules.comparator,
+            thresholdValue: mitraProgramRewardRules.thresholdValue,
+            rewardLabel: mitraProgramRewardRules.rewardLabel,
+        })
+        .from(mitraProgramRewardRules)
+        .where(eq(mitraProgramRewardRules.programId, program.id))
+        .orderBy(asc(mitraProgramRewardRules.sortOrder));
 
     const leaderboardRows = await db
         .select({
             participantKey: mitraProgramLeaderboard.participantKey,
             totalPoints: mitraProgramLeaderboard.totalPoints,
+            groupKey: mitraProgramLeaderboard.groupKey,
             rank: mitraProgramLeaderboard.rank,
             prevRank: mitraProgramLeaderboard.prevRank,
             computedAt: mitraProgramLeaderboard.computedAt,
         })
         .from(mitraProgramLeaderboard)
         .where(eq(mitraProgramLeaderboard.programId, program.id))
-        .orderBy(asc(mitraProgramLeaderboard.rank));
+        .orderBy(asc(mitraProgramLeaderboard.groupKey), asc(mitraProgramLeaderboard.rank));
 
     const aggregates = await computeParticipantParamAggregates(program.id, params, peserta.map((item) => item.participantKey));
 
@@ -536,6 +609,7 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
         ...leaderboardRows.map((row) => ({
             participantKey: row.participantKey,
             totalPoints: Number(row.totalPoints),
+            groupKey: row.groupKey,
             rank: row.rank as number | null,
             prevRank: row.prevRank,
             computedAt: row.computedAt as Date | null,
@@ -545,6 +619,7 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
             .map((item) => ({
                 participantKey: item.participantKey,
                 totalPoints: 0,
+                groupKey: groupValueOf(item, groupBy),
                 rank: null as number | null,
                 prevRank: null as number | null,
                 computedAt: null as Date | null,
@@ -571,6 +646,7 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
     const winnerRows = await db
         .select({
             participantKey: mitraProgramWinners.participantKey,
+            groupKey: mitraProgramWinners.groupKey,
             rank: mitraProgramWinners.rank,
             prizeLabel: mitraProgramWinners.prizeLabel,
         })
@@ -584,12 +660,19 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
             participantKey: row.participantKey,
             code: info?.code || "",
             name: info?.name || "",
+            groupKey: row.groupKey,
             rank: row.rank,
             prizeLabel: row.prizeLabel,
         };
     });
 
-    return { program, params, leaderboard, winners };
+    // Daftar wilayah diambil dari seluruh peserta, bukan dari hasil pencarian, supaya
+    // pilihan filter tidak menyusut ketika pengunjung sedang menyaring tabel.
+    const groups = groupBy === "NONE"
+        ? []
+        : Array.from(new Set(peserta.map((item) => groupValueOf(item, groupBy)))).sort((a, b) => a.localeCompare(b, "id"));
+
+    return { program, params, leaderboard, winners, rewardRules, groups };
 }
 
 /** Pencarian peserta untuk picker di halaman admin, seragam untuk kedua jenis program. */

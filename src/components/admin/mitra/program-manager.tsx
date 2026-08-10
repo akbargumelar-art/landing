@@ -26,6 +26,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type TargetType = "OUTLET" | "SALESFORCE";
 type MechanismType = "RACING" | "REWARD";
+type GroupBy = "NONE" | "TAP" | "KABUPATEN" | "KECAMATAN";
 
 interface ProgramParam {
     id: string;
@@ -52,6 +53,8 @@ interface Program {
     slug: string;
     targetType: TargetType;
     mechanismType: MechanismType;
+    groupBy: GroupBy;
+    thumbnailUrl: string | null;
     descriptionMd: string | null;
     mechanismMd: string | null;
     periodStart: string;
@@ -75,6 +78,7 @@ interface RewardPreviewRow {
     code: string;
     name: string;
     rank: number | null;
+    groupKey: string;
     rewardLabel: string;
     ruleId: string;
 }
@@ -181,9 +185,26 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         periodEnd: "",
         status: "DRAFT",
         isPublic: false,
+        groupBy: "NONE" as GroupBy,
+        thumbnailUrl: "",
         paramsText: "omzet,Omzet,1\nakuisisi,Akuisisi,1",
         rewardRulesText: MECHANISM_COPY.RACING.contoh,
     });
+    const [uploadingImage, setUploadingImage] = React.useState(false);
+    const [editGroupBy, setEditGroupBy] = React.useState<GroupBy>("NONE");
+    const [editThumb, setEditThumb] = React.useState("");
+
+    /** Key visual program; dipakai sebagai gambar kartu di daftar program publik. */
+    const unggahGambar = async (file: File, simpan: (url: string) => void) => {
+        setUploadingImage(true);
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        setUploadingImage(false);
+        if (res.ok && data.url) simpan(data.url);
+        else alert(data.error || "Gagal mengunggah gambar");
+    };
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -250,7 +271,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
             const data = await res.json().catch(() => ({}));
             return alert(data.error || "Gagal menyimpan program");
         }
-        setForm((prev) => ({ ...prev, name: "", descriptionMd: "", mechanismMd: "", periodStart: "", periodEnd: "" }));
+        setForm((prev) => ({ ...prev, name: "", descriptionMd: "", mechanismMd: "", periodStart: "", periodEnd: "", thumbnailUrl: "" }));
         setShowForm(false);
         load();
     };
@@ -267,6 +288,8 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         setWinnersText((data.winners || []).map((w: { code: string; rank: number; prizeLabel?: string | null }) => `${w.code},${w.rank},${w.prizeLabel || ""}`).join("\n"));
         setEditStatus(data.program.status);
         setEditIsPublic(Boolean(data.program.isPublic));
+        setEditGroupBy(data.program.groupBy || "NONE");
+        setEditThumb(data.program.thumbnailUrl || "");
         setQuery("");
         setCandidates([]);
         setRewards([]);
@@ -417,6 +440,39 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 <Input type="date" value={form.periodEnd} onChange={(e) => setForm((p) => ({ ...p, periodEnd: e.target.value }))} />
                             </div>
                             <div className="space-y-2 lg:col-span-2">
+                                <Label>Key Visual Program</Label>
+                                <div className="flex items-center gap-3">
+                                    {form.thumbnailUrl && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={form.thumbnailUrl} alt="Key visual" className="h-16 w-24 rounded-md border object-cover" />
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const berkas = e.target.files?.[0];
+                                            if (berkas) unggahGambar(berkas, (url) => setForm((p) => ({ ...p, thumbnailUrl: url })));
+                                        }}
+                                        className="block h-10 flex-1 rounded-md border px-3 py-2 text-sm"
+                                    />
+                                    {uploadingImage && <Loader2 className="h-4 w-4 animate-spin" />}
+                                </div>
+                                <p className="text-xs text-muted-foreground">Tampil sebagai gambar kartu program di halaman publik.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Bagi Peringkat Per</Label>
+                                <select value={form.groupBy} onChange={(e) => setForm((p) => ({ ...p, groupBy: e.target.value as GroupBy }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                    <option value="NONE">Tanpa pembagian (satu papan)</option>
+                                    <option value="TAP">TAP</option>
+                                    {!isSalesforce && <option value="KABUPATEN">Kabupaten</option>}
+                                    {!isSalesforce && <option value="KECAMATAN">Kecamatan</option>}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    Kalau dipilih, peringkat dihitung terpisah di tiap wilayah — aturan &quot;juara 1&quot; jadi
+                                    menghasilkan satu pemenang per wilayah.
+                                </p>
+                            </div>
+                            <div className="space-y-2 lg:col-span-2">
                                 <Label>Deskripsi Publik</Label>
                                 <Textarea rows={3} value={form.descriptionMd} onChange={(e) => setForm((p) => ({ ...p, descriptionMd: e.target.value }))} />
                             </div>
@@ -523,14 +579,59 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     <option value="PUBLISHED">PUBLISHED</option>
                                 </select>
                             </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Bagi Peringkat Per</Label>
+                                <select value={editGroupBy} onChange={(e) => setEditGroupBy(e.target.value as GroupBy)} className="h-10 rounded-md border px-3 text-sm">
+                                    <option value="NONE">Tanpa pembagian</option>
+                                    <option value="TAP">TAP</option>
+                                    {!isSalesforce && <option value="KABUPATEN">Kabupaten</option>}
+                                    {!isSalesforce && <option value="KECAMATAN">Kecamatan</option>}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Key Visual</Label>
+                                <div className="flex items-center gap-2">
+                                    {editThumb && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={editThumb} alt="Key visual" className="h-10 w-16 rounded border object-cover" />
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const berkas = e.target.files?.[0];
+                                            if (berkas) unggahGambar(berkas, setEditThumb);
+                                        }}
+                                        className="block h-10 w-48 rounded-md border px-2 py-2 text-xs"
+                                    />
+                                    {uploadingImage && <Loader2 className="h-4 w-4 animate-spin" />}
+                                </div>
+                            </div>
                             <label className="flex items-center gap-2 pb-2 text-sm">
                                 <input type="checkbox" checked={editIsPublic} onChange={(e) => setEditIsPublic(e.target.checked)} />
                                 Tampilkan publik
                             </label>
                             <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
-                                if (await kirimKelola({ status: editStatus, isPublic: editIsPublic }, "Status tersimpan.")) load();
+                                // Mengubah pembagian wilayah mengubah arti peringkat, jadi papan skor
+                                // langsung dihitung ulang -- tanpa itu peringkat lama tetap tampil
+                                // seolah masih berlaku.
+                                const perluHitungUlang = editGroupBy !== selected.groupBy;
+                                if (await kirimKelola(
+                                    { status: editStatus, isPublic: editIsPublic, groupBy: editGroupBy, thumbnailUrl: editThumb },
+                                    perluHitungUlang ? "" : "Pengaturan tersimpan."
+                                )) {
+                                    if (perluHitungUlang) {
+                                        await fetch("/api/admin/mitra/programs", {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ action: "recompute", programId: selected.id }),
+                                        });
+                                        alert("Pengaturan tersimpan dan papan skor dihitung ulang mengikuti pembagian wilayah baru.");
+                                    }
+                                    load();
+                                }
                             }}>
-                                <Save className="h-4 w-4" /> Simpan Status
+                                <Save className="h-4 w-4" /> Simpan Pengaturan
                             </Button>
                             <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
                                 setBusy(true);
@@ -800,7 +901,9 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                                 <div key={`${row.participantKey}-${row.ruleId}-${index}`} className="flex items-center justify-between rounded bg-muted/50 px-2 py-1.5 text-sm">
                                                     <div>
                                                         <p className="font-medium">{row.rank ? `#${row.rank} ` : ""}{row.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{row.code}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {row.code}{row.groupKey ? ` · ${row.groupKey}` : ""}
+                                                        </p>
                                                     </div>
                                                     <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold ring-1 ring-gray-200">{row.rewardLabel}</span>
                                                 </div>

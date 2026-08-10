@@ -23,6 +23,7 @@ interface MitraProgram {
     slug: string;
     name: string;
     descriptionMd?: string;
+    thumbnailUrl?: string | null;
     periodStart: string;
     periodEnd: string;
 }
@@ -54,6 +55,7 @@ export default function ProgramPage() {
                 title: program.name,
                 description: program.descriptionMd || "Program dan leaderboard Mitra Outlet ABK Ciraya.",
                 period: formatMitraPeriod(program.periodStart, program.periodEnd),
+                thumbnail: program.thumbnailUrl || undefined,
                 category: "mitra",
                 href: `/mitra/program/${program.slug}`,
             }));

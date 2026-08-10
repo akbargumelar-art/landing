@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, ArrowRight, Award, Crown, Gift, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, Crown, Filter, Gift, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ interface LeaderboardRow {
     code: string;
     name: string;
     area: string;
+    groupKey: string;
     totalPoints: number;
     /** null untuk peserta yang belum punya skor sama sekali. */
     rank: number | null;
@@ -28,8 +29,19 @@ interface WinnerRow {
     participantKey: string;
     code: string;
     name: string;
+    groupKey?: string;
     rank: number;
     prizeLabel?: string | null;
+}
+
+interface RewardRuleRow {
+    id: string;
+    rankFrom: number | null;
+    rankTo: number | null;
+    paramKey: string | null;
+    comparator: string | null;
+    thresholdValue: string | null;
+    rewardLabel: string;
 }
 
 interface ProgramParam {
@@ -44,6 +56,8 @@ interface ProgramDetail {
     program?: {
         name: string;
         mechanismType: MechanismType;
+        groupBy?: "NONE" | "TAP" | "KABUPATEN" | "KECAMATAN";
+        thumbnailUrl?: string | null;
         descriptionMd?: string | null;
         mechanismMd?: string | null;
         periodStart?: string | null;
@@ -53,6 +67,8 @@ interface ProgramDetail {
     params?: ProgramParam[];
     leaderboard: LeaderboardRow[];
     winners: WinnerRow[];
+    rewardRules?: RewardRuleRow[];
+    groups?: string[];
 }
 
 function formatTanggal(value?: string | null) {
@@ -125,10 +141,34 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
     const program = data?.program;
     const mechanismType: MechanismType = program?.mechanismType || "RACING";
     const isRacing = mechanismType === "RACING";
-    const leaderboard = data?.leaderboard || [];
-    const winners = data?.winners || [];
+    const semuaBaris = React.useMemo(() => data?.leaderboard || [], [data]);
+    const semuaPemenang = data?.winners || [];
     const programParams = data?.params || [];
+    const rewardRules = data?.rewardRules || [];
+    // Dibungkus useMemo karena dipakai sebagai dependensi effect: array baru tiap render
+    // akan membuat effect pemilih wilayah berjalan terus-menerus.
+    const groups = React.useMemo(() => data?.groups || [], [data]);
+    const groupBy = program?.groupBy || "NONE";
     const periode = [formatTanggal(program?.periodStart), formatTanggal(program?.periodEnd)].filter(Boolean).join(" – ");
+
+    /**
+     * Program yang dibagi per wilayah punya papan peringkat sendiri di tiap wilayah. Saat
+     * belum ada wilayah yang dipilih, wilayah pertama ditampilkan lebih dulu -- menumpuk
+     * semua wilayah dalam satu tabel akan menampilkan banyak "juara 1" berjajar tanpa
+     * penjelasan.
+     */
+    const [group, setGroup] = React.useState("");
+    React.useEffect(() => {
+        if (groups.length > 0) setGroup((sekarang) => (sekarang && groups.includes(sekarang) ? sekarang : groups[0]));
+    }, [groups]);
+
+    const leaderboard = React.useMemo(
+        () => (groupBy === "NONE" || !group ? semuaBaris : semuaBaris.filter((row) => row.groupKey === group)),
+        [semuaBaris, groupBy, group]
+    );
+    const winners = groupBy === "NONE" || !group
+        ? semuaPemenang
+        : semuaPemenang.filter((row) => (row.groupKey || "") === group);
     const diperbarui = leaderboard[0]?.computedAt;
 
     /**
@@ -180,6 +220,14 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                     {periode && <p className="mt-2 text-sm font-semibold text-white/90">Periode Program {periode}</p>}
                     {program?.descriptionMd && (
                         <p className="mt-4 max-w-3xl text-sm leading-6 text-white/85">{program.descriptionMd}</p>
+                    )}
+                    {program?.thumbnailUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={program.thumbnailUrl}
+                            alt={program.name}
+                            className="mt-5 max-h-52 w-full max-w-3xl rounded-lg object-cover shadow-lg"
+                        />
                     )}
                 </div>
             </section>
@@ -268,9 +316,43 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
             </section>
 
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+                {groups.length > 0 && (
+                    <div className="rounded-lg border bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-950">
+                                <Filter className="h-4 w-4 text-red-600" />
+                                Pilih {groupBy === "TAP" ? "TAP" : groupBy === "KABUPATEN" ? "Kabupaten" : "Kecamatan"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                Peringkat dan pemenang dihitung terpisah di tiap wilayah.
+                            </span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {groups.map((item) => (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => setGroup(item)}
+                                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        group === item
+                                            ? "bg-red-600 text-white"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    }`}
+                                >
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {isRacing
                     ? podium.length > 0 && <PodiumPemenang winners={podium} sementara={!adaPemenangResmi} />
                     : adaPemenangResmi && <DaftarPenerima winners={winners} />}
+
+                {rewardRules.length > 0 && (
+                    <DaftarHadiah rules={rewardRules} isRacing={isRacing} params={programParams} />
+                )}
 
                 {(programParams.length > 0 || program?.mechanismMd) && (
                     <div className="rounded-lg border bg-white p-5 shadow-sm">
@@ -374,6 +456,46 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                 </p>
             </section>
         </main>
+    );
+}
+
+/**
+ * Hadiah yang diperebutkan, dibaca dari aturan program. Sebelumnya hadiah baru terlihat
+ * setelah pemenang diumumkan -- terlambat untuk memotivasi siapa pun selama program
+ * masih berjalan.
+ */
+function DaftarHadiah({ rules, isRacing, params }: { rules: RewardRuleRow[]; isRacing: boolean; params: ProgramParam[] }) {
+    const labelParam = (key: string | null) => {
+        if (!key) return "Total poin";
+        return params.find((param) => param.key === key)?.label || key;
+    };
+
+    const syarat = (rule: RewardRuleRow) => {
+        if (isRacing) {
+            const dari = rule.rankFrom ?? 1;
+            const sampai = rule.rankTo ?? dari;
+            return dari === sampai ? `Juara ${dari}` : `Juara ${dari} – ${sampai}`;
+        }
+        return `${labelParam(rule.paramKey)} ${rule.comparator || ">="} ${formatPoin(rule.thresholdValue || 0)}`;
+    };
+
+    return (
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Gift className="h-5 w-5 text-red-600" />
+                <h2 className="font-bold">Hadiah Program</h2>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {rules.map((rule) => (
+                    <div key={rule.id} className="flex items-center gap-3 rounded-lg border bg-gray-50 px-4 py-3">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-red-700 ring-1 ring-red-200">
+                            {syarat(rule)}
+                        </span>
+                        <p className="min-w-0 truncate text-sm font-semibold text-gray-950">{rule.rewardLabel}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 

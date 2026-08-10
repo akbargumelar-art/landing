@@ -855,6 +855,13 @@ export const mitraPrograms = mysqlTable("mitra_programs", {
     slug: varchar("slug", { length: 255 }).notNull().unique(),
     targetType: mysqlEnum("target_type", ["OUTLET", "SALESFORCE"]).notNull().default("OUTLET"),
     mechanismType: mysqlEnum("mechanism_type", ["RACING", "REWARD"]).notNull().default("RACING"),
+    /**
+     * Membagi persaingan jadi beberapa liga terpisah. Pada NONE seluruh peserta diadu
+     * dalam satu papan; pada TAP/KABUPATEN/KECAMATAN peringkat dihitung ulang di dalam
+     * tiap wilayah, sehingga satu program bisa menghasilkan satu pemenang per wilayah.
+     */
+    groupBy: mysqlEnum("group_by", ["NONE", "TAP", "KABUPATEN", "KECAMATAN"]).notNull().default("NONE"),
+    thumbnailUrl: varchar("thumbnail_url", { length: 500 }),
     descriptionMd: text("description_md"),
     mechanismMd: text("mechanism_md"),
     periodStart: datetime("period_start").notNull(),
@@ -930,12 +937,14 @@ export const mitraProgramLeaderboard = mysqlTable("mitra_program_leaderboard", {
     outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
     salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
     totalPoints: decimal("total_points", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    /** Wilayah tempat peringkat ini berlaku; kosong bila program tidak dikelompokkan. */
+    groupKey: varchar("group_key", { length: 160 }).notNull().default(""),
     rank: int("rank").notNull(),
     prevRank: int("prev_rank"),
     computedAt: datetime("computed_at").notNull(),
 }, (table) => [
     uniqueIndex("mitra_program_leaderboard_unique_idx").on(table.programId, table.participantKey),
-    index("mitra_program_leaderboard_rank_idx").on(table.programId, table.rank),
+    index("mitra_program_leaderboard_rank_idx").on(table.programId, table.groupKey, table.rank),
 ]);
 
 export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
@@ -944,6 +953,7 @@ export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
     participantKey: varchar("participant_key", { length: 60 }).notNull(),
     outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
     salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    groupKey: varchar("group_key", { length: 160 }).notNull().default(""),
     rank: int("rank").notNull(),
     prizeLabel: varchar("prize_label", { length: 255 }),
     isPublished: boolean("is_published").notNull().default(false),

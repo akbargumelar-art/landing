@@ -13,9 +13,12 @@ import {
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import {
     buildRewardRuleValues,
+    groupValueOf,
     listProgramParticipants,
+    normalizeGroupBy,
     participantColumns,
     resolveParticipantCodes,
+    type ProgramGroupBy,
     type ProgramTargetType,
 } from "@/lib/mitra-programs";
 import { getClientIp, slugify } from "@/lib/mitra-utils";
@@ -49,6 +52,7 @@ export async function GET(
         participantKey: row.participantKey,
         code: pesertaByKey.get(row.participantKey)?.code || "",
         name: pesertaByKey.get(row.participantKey)?.name || "",
+        groupKey: row.groupKey,
         rank: row.rank,
         prizeLabel: row.prizeLabel,
         isPublished: row.isPublished,
@@ -127,7 +131,8 @@ export async function PUT(
          * posisi yang harus unik. Pada program REWARD peringkat hanya nomor urut daftar,
          * sehingga banyak penerima boleh berbagi nomor yang sama.
          */
-        if (existing.mechanismType === "RACING" && new Set(diminta.map((winner) => winner.rank)).size !== diminta.length) {
+        if (existing.groupBy === "NONE" && existing.mechanismType === "RACING"
+            && new Set(diminta.map((winner) => winner.rank)).size !== diminta.length) {
             return NextResponse.json({ error: "Peringkat pemenang tidak boleh duplikat pada program racing" }, { status: 400 });
         }
 
@@ -137,12 +142,19 @@ export async function PUT(
             return NextResponse.json({ error: `Peserta tidak ditemukan: ${tidakDikenal.join(", ")}` }, { status: 400 });
         }
 
+        // Wilayah pemenang diambil dari data pesertanya, bukan diminta dari form: sumber
+        // yang sama dipakai saat menghitung peringkat, jadi keduanya tidak bisa berselisih.
+        const groupBy = existing.groupBy as ProgramGroupBy;
+        const pesertaProgram = await listProgramParticipants(id, targetType);
+        const groupByCode = new Map(pesertaProgram.map((item) => [item.code, groupValueOf(item, groupBy)]));
+
         await db.transaction(async (tx) => {
             await tx.delete(mitraProgramWinners).where(eq(mitraProgramWinners.programId, id));
             await tx.insert(mitraProgramWinners).values(diminta.map((winner) => ({
                 id: uuid(),
                 programId: id,
                 ...participantColumns(targetType, resolved.get(winner.code)!.id),
+                groupKey: groupByCode.get(winner.code) || "",
                 rank: winner.rank,
                 prizeLabel: winner.prizeLabel,
                 isPublished: true,
@@ -169,6 +181,8 @@ export async function PUT(
         name: body.name ?? existing.name,
         slug: body.slug ? slugify(String(body.slug)) : existing.slug,
         mechanismType,
+        groupBy: body.groupBy ? normalizeGroupBy(body.groupBy) : existing.groupBy,
+        thumbnailUrl: body.thumbnailUrl === "" ? null : body.thumbnailUrl ?? existing.thumbnailUrl,
         descriptionMd: body.descriptionMd ?? existing.descriptionMd,
         mechanismMd: body.mechanismMd ?? existing.mechanismMd,
         periodStart: body.periodStart ? new Date(body.periodStart) : existing.periodStart,
