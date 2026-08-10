@@ -863,3 +863,48 @@ dependency, migrasi, atau konfigurasi izin lokal `.claude/settings.local.json` y
 Working tree sudah berisi perubahan lain sebelum audit dan sengaja tidak disentuh. Verifikasi
 audit terbatas pada scan source dan advisory npm terbaru; build/runtime test tidak dijalankan
 karena audit ini hanya mengubah dokumentasi.
+
+## Penyatuan tabel admin, market share, dan detail outlet - 10 Agustus 2026
+
+Seluruh tabel operasional utama sekarang memakai kontrol pengurutan yang sama dari
+`src/components/ui/sortable-head.tsx` dan logika generik `src/lib/use-sort.ts`. Perubahan berlaku
+pada lead IndiHome, ODP, peserta, audit Mitra, impor, outlet, performance, perubahan outlet,
+program, referensi metric, Salesforce, whitelist OTP, monitoring foto, dan market share. Klik
+judul kolom mengurutkan baris yang sedang dimuat dan klik kedua membalik arah; pada tabel yang
+dipaginasi server-side, pengurutan hanya berlaku pada halaman aktif.
+
+Monitoring foto kini memasukkan seluruh outlet dalam scope, termasuk outlet yang belum pernah
+memiliki foto. Empat kartu kategori menampilkan persentase outlet yang sudah berfoto beserta
+jumlah sudah ada, total, belum ada, dan kedaluwarsa. Filter Hari PJP ditambahkan ke UI dan
+endpoint `/api/admin/mitra/photo-monitoring`; filter ini juga ikut diterapkan pada ringkasan,
+pagination, dan ekspor karena seluruh keluaran memakai kumpulan outlet tersaring yang sama.
+
+Market share tidak lagi menyimpan Axis sebagai operator terpisah. Schema Drizzle, daftar field,
+dan snapshot diperbarui lewat migrasi `drizzle/0025_drop_market_share_axis.sql`, yang menjalankan
+`DROP COLUMN axis`. Halaman admin mendapat filter kecamatan yang mengikuti kabupaten dan grafik
+rata-rata horizontal dengan dua tampilan: sebelum merger serta setelah merger (XL + Smartfren
+menjadi XL Smart, Indosat + Tri menjadi IOH). Grafik yang sama ditampilkan pada detail outlet
+setelah OTP. Migrasi `0025` belum dijalankan pada database mana pun dalam sesi ini; backup dan
+review data Axis wajib dilakukan sebelum `npm run db:migrate` karena penghapusan kolom tidak
+dapat dibatalkan tanpa backup.
+
+Form edit profil outlet setelah OTP mengganti input bebas kabupaten/kecamatan menjadi dropdown
+yang saling terhubung dan bersumber dari pasangan wilayah yang sudah dipakai outlet. Tiga grup
+tabel performance detail sekarang tertutup secara default dan dapat dibuka satu per satu. Efek
+foto Salesforce yang sebelumnya menonjol keluar dari lingkaran dibatalkan; foto kembali dipotong
+penuh di dalam avatar lingkaran.
+
+Konfigurasi izin personal `.claude/settings.local.json` ditambahkan ke `.gitignore` agar wildcard
+command lokal tidak ikut ter-publish ke GitHub. Berkas lokalnya tidak dihapus dan tidak masuk
+commit.
+
+### Verifikasi
+
+- `npx tsc --noEmit` lulus.
+- `npx eslint src scripts` lulus tanpa error; tetap ada dua warning `<img>` lama pada
+  `src/app/(hidden)/admin/pengaturan/page.tsx`.
+- `npx drizzle-kit check` lulus (`Everything's fine`).
+- `npm run env:check` lulus; tetap memperingatkan `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` kosong.
+- `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 74 halaman statis.
+- Belum ada runtime test dengan MySQL hidup, uji browser untuk sorting/dropdown/grafik, atau
+  eksekusi migrasi `0025` pada data nyata.
