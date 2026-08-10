@@ -826,3 +826,14 @@ perubahan database.
 Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Build hanya menampilkan
 dua warning `<img>` lama di halaman pengaturan yang tidak terkait. Isi galeri dengan sesi admin
 dan database hidup belum diuji pada sesi ini.
+
+## Efek foto Salesforce keluar dari lingkaran - 10 Agustus 2026
+
+Foto Salesforce pada profil outlet publik tetap memakai bingkai lingkaran, tetapi bagian tengah
+atas foto kini dapat menonjol melewati batas bingkai. Efek dibuat dengan dua lapisan gambar yang
+memakai posisi identik: lapisan dasar dipotong penuh oleh lingkaran, sedangkan lapisan di atasnya
+hanya membuka irisan bagian atas. Sisi kiri, kanan, dan bawah tetap terpotong; foto pengganti
+berupa inisial tidak berubah. Tidak ada perubahan API, data, atau format unggahan.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus halaman profil outlet, dan `npm run build` lulus.
+Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.

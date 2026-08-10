@@ -260,11 +260,35 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
         <div className="col-span-2 rounded-lg border bg-gray-50 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nama Salesforce</p>
             <div className="mt-3 flex items-center gap-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm sm:h-24 sm:w-24">
+                <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
                     {photoUrl ? (
-                        <Image src={photoUrl} alt={displayName} fill sizes="96px" className="object-cover" unoptimized />
+                        <>
+                            <div className="absolute inset-0 overflow-hidden rounded-full bg-white">
+                                <Image
+                                    src={photoUrl}
+                                    alt={displayName}
+                                    width={96}
+                                    height={113}
+                                    sizes="96px"
+                                    className="absolute -top-[18%] left-0 h-[118%] w-full max-w-none object-cover object-top"
+                                    unoptimized
+                                />
+                            </div>
+                            <div className="pointer-events-none absolute inset-0 z-[1] rounded-full border-2 border-white shadow-sm" />
+                            <Image
+                                src={photoUrl}
+                                alt=""
+                                aria-hidden="true"
+                                width={96}
+                                height={113}
+                                sizes="96px"
+                                className="pointer-events-none absolute -top-[18%] left-0 z-[2] h-[118%] w-full max-w-none object-cover object-top"
+                                style={{ clipPath: "polygon(10% 0, 90% 0, 90% 23%, 10% 23%)" }}
+                                unoptimized
+                            />
+                        </>
                     ) : (
-                        <span className="flex h-full w-full items-center justify-center text-xl font-bold text-muted-foreground">
+                        <span className="flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-muted-foreground shadow-sm">
                             {initials || <User className="h-8 w-8" />}
                         </span>
                     )}
