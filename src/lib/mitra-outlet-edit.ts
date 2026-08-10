@@ -7,7 +7,7 @@ import { hashSessionToken, maskPhone } from "@/lib/mitra-utils";
 import { findMatchingWhitelist } from "@/lib/mitra-data";
 import { PESAN_TIDAK_BOLEH_EDIT, bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
 
-export type MitraEditAction = "PHOTO" | "LOCATION" | "BRANDING";
+export type MitraEditAction = "PHOTO" | "LOCATION" | "BRANDING" | "PROFILE";
 
 /**
  * Mengembalikan outlet beserta sesi detail yang sah, atau null.

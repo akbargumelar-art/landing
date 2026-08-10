@@ -307,9 +307,13 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
                                 />
                             </div>
                             <div className="pointer-events-none absolute inset-0 z-[1] rounded-full border-2 border-white shadow-sm" />
-                            {/* Salinan yang menyembul dipotong tepat di tepi atas lingkaran dan tidak
-                                dipersempit ke samping: batas kotak apa pun di sini akan terlihat sebagai
-                                blok, sedangkan di luar garis itu yang tampak hanya sosok di fotonya. */}
+                            {/* Salinan yang menyembul dipotong tepat di tepi atas lingkaran secara vertikal
+                                (garis potong dihitung dari geser/tinggi supaya tidak ada sisa kotak yang
+                                menutupi caption -- itu bug sebelumnya). Ke samping sengaja dipersempit
+                                10%-90%: lingkaran hanya membuka celah sempit di titik teratasnya, jadi
+                                sembulan selebar penuh kotak muncul sebagai potongan rata di dahi begitu
+                                bersambung dengan lingkaran. Dipersempit, sambungannya mengikuti bentuk
+                                kepala, bukan blok persegi. */}
                             <Image
                                 src={photoUrl}
                                 alt=""
@@ -321,7 +325,7 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
                                 style={{
                                     top: `-${FOTO_GESER_ATAS}%`,
                                     height: `${FOTO_TINGGI}%`,
-                                    clipPath: `polygon(0 0, 100% 0, 100% ${FOTO_POTONG}%, 0 ${FOTO_POTONG}%)`,
+                                    clipPath: `polygon(10% 0, 90% 0, 90% ${FOTO_POTONG}%, 10% ${FOTO_POTONG}%)`,
                                 }}
                                 unoptimized
                             />

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import React from "react";
-import { Camera, Download, ExternalLink, Loader2, Search } from "lucide-react";
+import { Camera, ChevronDown, ChevronUp, Download, ExternalLink, Loader2, Search } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,9 @@ export default function MonitoringFotoOutletPage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [page, setPage] = React.useState(1);
+    // Beberapa baris boleh terbuka sekaligus -- membandingkan dua foto berdampingan lebih
+    // berguna daripada memaksa hanya satu yang boleh mekar dalam satu waktu.
+    const [barisMekar, setBarisMekar] = React.useState<Set<string>>(new Set());
     const [filter, setFilter] = React.useState({
         q: "",
         photoSlot: "ALL",
@@ -120,6 +124,9 @@ export default function MonitoringFotoOutletPage() {
                 .then((body) => {
                     setData(body);
                     if (body.page !== page) setPage(body.page);
+                    // Baris mekar milik id di halaman lama; menyimpannya lewat pergantian
+                    // filter/halaman cuma menyisakan state yang tidak berpasangan dengan baris apa pun.
+                    setBarisMekar(new Set());
                 })
                 .catch((fetchError) => {
                     if (fetchError.name !== "AbortError") {
@@ -146,6 +153,14 @@ export default function MonitoringFotoOutletPage() {
         setFilter((current) => ({ ...current, photoSlot: slot, condition: "MISSING" }));
     };
 
+    const alihkanBaris = (id: string) => {
+        setBarisMekar((current) => {
+            const next = new Set(current);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
     const unduh = () => {
         const params = buatParams(false);
         params.set("format", "xlsx");
@@ -161,7 +176,8 @@ export default function MonitoringFotoOutletPage() {
                     <h1 className="text-2xl font-bold">Monitoring Foto Outlet</h1>
                     <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                         Satu baris mewakili satu kategori foto pada satu outlet. Gunakan filter untuk menemukan foto
-                        yang belum ada atau belum diperbarui sesuai jadwal kunjungan.
+                        yang belum ada atau belum diperbarui sesuai jadwal kunjungan. Outlet yang belum pernah difoto
+                        sama sekali tidak ikut dihitung -- laporan ini untuk memantau outlet yang sudah mulai didata.
                     </p>
                 </div>
                 <Button variant="outline" onClick={unduh} disabled={loading || !data}>
@@ -256,8 +272,17 @@ export default function MonitoringFotoOutletPage() {
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={7} className="h-28 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
-                            ) : data?.rows.length ? data.rows.map((row) => (
-                                <TableRow key={row.id}>
+                            ) : data?.rows.length ? data.rows.map((row) => {
+                                const mekar = barisMekar.has(row.id);
+                                return (
+                                <React.Fragment key={row.id}>
+                                <TableRow
+                                    // Baris hanya bisa diklik kalau ada fotonya -- tanpa foto tidak ada
+                                    // apa pun yang bisa dimekarkan.
+                                    onClick={row.photoUrl ? () => alihkanBaris(row.id) : undefined}
+                                    className={row.photoUrl ? "cursor-pointer" : undefined}
+                                    aria-expanded={row.photoUrl ? mekar : undefined}
+                                >
                                     <TableCell>
                                         <p className="font-semibold text-gray-950">{row.outletName}</p>
                                         <p className="text-xs text-muted-foreground">{row.outletCode} · {row.outletCategory}</p>
@@ -280,13 +305,55 @@ export default function MonitoringFotoOutletPage() {
                                     </TableCell>
                                     <TableCell>
                                         {row.photoUrl ? (
-                                            <a href={row.photoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline">
-                                                Lihat <ExternalLink className="h-3 w-3" />
-                                            </a>
+                                            <span className="inline-flex items-center gap-2">
+                                                <Image
+                                                    src={row.photoUrl}
+                                                    alt={`${row.outletName} - ${row.photoLabel}`}
+                                                    width={40}
+                                                    height={40}
+                                                    className="h-10 w-10 shrink-0 rounded-md border object-cover"
+                                                    unoptimized
+                                                />
+                                                {mekar
+                                                    ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                                            </span>
                                         ) : <span className="text-xs text-muted-foreground">-</span>}
                                     </TableCell>
                                 </TableRow>
-                            )) : (
+                                {mekar && row.photoUrl && (
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableCell colSpan={7} className="bg-gray-50/70 p-4">
+                                            <div className="flex flex-col items-start gap-4 sm:flex-row">
+                                                <Image
+                                                    src={row.photoUrl}
+                                                    alt={`${row.outletName} - ${row.photoLabel}`}
+                                                    width={320}
+                                                    height={320}
+                                                    className="max-h-80 w-auto max-w-full rounded-lg border bg-white object-contain"
+                                                    unoptimized
+                                                />
+                                                <div className="space-y-1 text-sm">
+                                                    <p className="font-semibold text-gray-950">{row.outletName} · {row.photoLabel}</p>
+                                                    <p className="text-xs text-muted-foreground">{row.outletCode} · {row.outletCategory}</p>
+                                                    <p className="text-xs text-muted-foreground">Diperbarui {formatWaktu(row.updatedAt)}</p>
+                                                    <a
+                                                        href={row.photoUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
+                                                    >
+                                                        Buka ukuran penuh di tab baru <ExternalLink className="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                </React.Fragment>
+                                );
+                            }) : (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
                                         <Camera className="mx-auto mb-2 h-5 w-5" />

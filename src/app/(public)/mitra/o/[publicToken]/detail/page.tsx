@@ -9,8 +9,10 @@ import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
-import { OUTLET_BRANDINGS } from "@/lib/mitra-outlet-options";
+import { OUTLET_BRANDINGS, OUTLET_CATEGORIES, PJP_DAYS, PJP_TYPES } from "@/lib/mitra-outlet-options";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
 
@@ -38,10 +40,21 @@ interface DetailData {
 
 interface EditLog {
     id: string;
-    action: "PHOTO" | "LOCATION" | "BRANDING";
+    action: "PHOTO" | "LOCATION" | "BRANDING" | "PROFILE";
     actorType: "MITRA" | "ADMIN";
     actorLabel: string;
     createdAt: string;
+}
+
+interface ProfilDraft {
+    name: string;
+    ownerName: string;
+    ownerPhone: string;
+    kabupaten: string;
+    kecamatan: string;
+    category: string;
+    pjpDay: string;
+    pjpType: string;
 }
 
 export default function MitraOutletDetailPage() {
@@ -57,7 +70,10 @@ export default function MitraOutletDetailPage() {
     // perlu -- memilih berkas sudah merupakan tindakan sadar tersendiri.
     const [editLokasi, setEditLokasi] = React.useState(false);
     const [editBranding, setEditBranding] = React.useState(false);
+    const [editProfil, setEditProfil] = React.useState(false);
     const [brandingDraft, setBrandingDraft] = React.useState("");
+    const [profilDraft, setProfilDraft] = React.useState<ProfilDraft | null>(null);
+    const [menyimpanProfil, setMenyimpanProfil] = React.useState(false);
     const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
 
     const muat = React.useCallback(() => {
@@ -116,6 +132,47 @@ export default function MitraOutletDetailPage() {
             setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan branding." });
         } finally {
             setMenyimpanBranding(false);
+        }
+    };
+
+    const bukaEditProfil = () => {
+        if (!data) return;
+        setProfilDraft({
+            name: String(data.outlet.name || ""),
+            ownerName: String(data.outlet.ownerName || ""),
+            ownerPhone: data.details.ownerPhone || "",
+            kabupaten: String(data.outlet.kabupaten || ""),
+            kecamatan: String(data.outlet.kecamatan || ""),
+            category: String(data.outlet.category || ""),
+            pjpDay: String(data.outlet.pjpDay || ""),
+            pjpType: String(data.outlet.pjpType || ""),
+        });
+        setEditProfil(true);
+    };
+
+    const simpanProfil = async () => {
+        if (!profilDraft) return;
+        setMenyimpanProfil(true);
+        setPesan(null);
+
+        try {
+            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/profile`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(profilDraft),
+            });
+            const hasil = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setPesan({ ok: false, teks: hasil.error || "Profil outlet gagal disimpan." });
+            } else {
+                setPesan({ ok: true, teks: "Profil outlet berhasil diperbarui." });
+                setEditProfil(false);
+                await muat();
+            }
+        } catch {
+            setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan profil outlet." });
+        } finally {
+            setMenyimpanProfil(false);
         }
     };
 
@@ -209,10 +266,18 @@ export default function MitraOutletDetailPage() {
                         </div>
                         {/* Peran ditampilkan supaya pengakses langsung paham mengapa tombol
                             ubah ada atau tidak ada, tanpa harus menebak. */}
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${data.bolehEdit ? "bg-green-50 text-green-700" : "bg-gray-100 text-muted-foreground"}`}>
-                            {data.bolehEdit ? <Pencil className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                            {data.peranPengakses || "Tanpa keterangan"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${data.bolehEdit ? "bg-green-50 text-green-700" : "bg-gray-100 text-muted-foreground"}`}>
+                                {data.bolehEdit ? <Pencil className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                                {data.peranPengakses || "Tanpa keterangan"}
+                            </span>
+                            {data.bolehEdit && !editProfil && (
+                                <Button type="button" variant="outline" size="sm" onClick={bukaEditProfil}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit Profil
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -223,6 +288,8 @@ export default function MitraOutletDetailPage() {
                         <InfoCard label="Salesforce" value={String(data.outlet.salesforce || "-")} />
                         <InfoCard label="Kabupaten" value={String(data.outlet.kabupaten || "-")} />
                         <InfoCard label="Kecamatan" value={String(data.outlet.kecamatan || "-")} />
+                        <InfoCard label="Kategori" value={String(data.outlet.category || "-")} />
+                        <InfoCard label="Jadwal PJP" value={`${String(data.outlet.pjpDay || "-")} / ${String(data.outlet.pjpType || "-")}`} />
                         <InfoCard label="Branding" value={String(data.outlet.branding || "-")} />
                     </div>
 
@@ -231,6 +298,113 @@ export default function MitraOutletDetailPage() {
                             <MapPin className="h-4 w-4" />
                             Buka lokasi outlet
                         </a>
+                    )}
+
+                    {/* ID Digipos dan Nomor RS tidak ada tombol edit apa pun di halaman ini --
+                        keduanya nomor administratif yang mengikat outlet ke sistem lain, dan
+                        TAP/Salesforce tetap penugasan internal yang hanya diubah lewat admin. */}
+                    {editProfil && profilDraft && (
+                        <div className="mt-4 space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4">
+                            <p className="text-xs text-muted-foreground">
+                                Nama outlet, owner, wilayah, kategori, dan jadwal PJP bisa diubah dari sini. ID Digipos,
+                                Nomor RS, TAP, dan Salesforce tetap dikelola admin.
+                            </p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-name">Nama Outlet</Label>
+                                    <Input
+                                        id="profil-name"
+                                        value={profilDraft.name}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, name: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-owner-name">Nama Owner</Label>
+                                    <Input
+                                        id="profil-owner-name"
+                                        value={profilDraft.ownerName}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, ownerName: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-owner-phone">Nomor WhatsApp Owner</Label>
+                                    <Input
+                                        id="profil-owner-phone"
+                                        value={profilDraft.ownerPhone}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, ownerPhone: event.target.value })}
+                                        placeholder="08xxxxxxxxxx"
+                                        inputMode="tel"
+                                        disabled={menyimpanProfil}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-kabupaten">Kabupaten</Label>
+                                    <Input
+                                        id="profil-kabupaten"
+                                        value={profilDraft.kabupaten}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, kabupaten: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-kecamatan">Kecamatan</Label>
+                                    <Input
+                                        id="profil-kecamatan"
+                                        value={profilDraft.kecamatan}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, kecamatan: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-category">Kategori Outlet</Label>
+                                    <select
+                                        id="profil-category"
+                                        value={profilDraft.category}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, category: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                    >
+                                        {OUTLET_CATEGORIES.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-pjp-day">Hari PJP</Label>
+                                    <select
+                                        id="profil-pjp-day"
+                                        value={profilDraft.pjpDay}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, pjpDay: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                    >
+                                        {PJP_DAYS.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="profil-pjp-type">Tipe PJP</Label>
+                                    <select
+                                        id="profil-pjp-type"
+                                        value={profilDraft.pjpType}
+                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, pjpType: event.target.value })}
+                                        disabled={menyimpanProfil}
+                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                    >
+                                        {PJP_TYPES.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={simpanProfil} disabled={menyimpanProfil}>
+                                    {menyimpanProfil ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                                    Simpan Profil
+                                </Button>
+                                <Button type="button" variant="ghost" onClick={() => setEditProfil(false)} disabled={menyimpanProfil}>
+                                    <X className="h-4 w-4" />
+                                    Batal
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
 
@@ -568,25 +742,15 @@ export default function MitraOutletDetailPage() {
                         <History className="h-4 w-4 text-red-600" />
                         <h2 className="font-bold">Riwayat Perubahan</h2>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Perubahan foto, lokasi, dan branding, baik oleh mitra maupun admin.</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Perubahan foto, lokasi, profil, dan branding, baik oleh mitra maupun admin.</p>
 
                     {data.editLogs?.length ? (
                         <ul className="mt-4 space-y-2">
                             {data.editLogs.map((log) => (
                                 <li key={log.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-gray-50 px-4 py-3 text-sm">
                                     <span className="flex items-center gap-2">
-                                        {log.action === "PHOTO"
-                                            ? <Camera className="h-4 w-4 text-muted-foreground" />
-                                            : log.action === "BRANDING"
-                                                ? <Tag className="h-4 w-4 text-muted-foreground" />
-                                                : <MapPin className="h-4 w-4 text-muted-foreground" />}
-                                        <span className="font-semibold text-gray-950">
-                                            {log.action === "PHOTO"
-                                                ? "Foto outlet diperbarui"
-                                                : log.action === "BRANDING"
-                                                    ? "Branding outlet diperbarui"
-                                                    : "Lokasi outlet diperbarui"}
-                                        </span>
+                                        {ikonRiwayat(log.action)}
+                                        <span className="font-semibold text-gray-950">{labelRiwayat(log.action)}</span>
                                         <span className="rounded-full bg-white px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-gray-200">
                                             {log.actorLabel}
                                         </span>
@@ -608,6 +772,20 @@ function formatWaktu(value: string) {
     return new Intl.DateTimeFormat("id-ID", {
         day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     }).format(new Date(value));
+}
+
+function ikonRiwayat(action: EditLog["action"]) {
+    if (action === "PHOTO") return <Camera className="h-4 w-4 text-muted-foreground" />;
+    if (action === "BRANDING") return <Tag className="h-4 w-4 text-muted-foreground" />;
+    if (action === "PROFILE") return <Pencil className="h-4 w-4 text-muted-foreground" />;
+    return <MapPin className="h-4 w-4 text-muted-foreground" />;
+}
+
+function labelRiwayat(action: EditLog["action"]) {
+    if (action === "PHOTO") return "Foto outlet diperbarui";
+    if (action === "BRANDING") return "Branding outlet diperbarui";
+    if (action === "PROFILE") return "Profil outlet diperbarui";
+    return "Lokasi outlet diperbarui";
 }
 
 function formatValue(value: number | undefined) {
