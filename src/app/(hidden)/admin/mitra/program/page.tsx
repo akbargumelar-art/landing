@@ -85,6 +85,9 @@ export default function AdminMitraProgramPage() {
     const [managementSaving, setManagementSaving] = React.useState(false);
     const [rewardsPreview, setRewardsPreview] = React.useState<RewardPreviewRow[]>([]);
     const [rewardsLoading, setRewardsLoading] = React.useState(false);
+    const [editStatus, setEditStatus] = React.useState("DRAFT");
+    const [editIsPublic, setEditIsPublic] = React.useState(false);
+    const [statusSaving, setStatusSaving] = React.useState(false);
     const { urut, gantiUrut } = useUrutTabel<string>("");
     const [form, setForm] = React.useState({
         name: "",
@@ -180,6 +183,22 @@ export default function AdminMitraProgramPage() {
         setOutletQuery("");
         setOutletResults([]);
         setRewardsPreview([]);
+        setEditStatus(data.program?.status || "DRAFT");
+        setEditIsPublic(Boolean(data.program?.isPublic));
+    };
+
+    const saveStatus = async () => {
+        setStatusSaving(true);
+        const res = await fetch(`/api/admin/mitra/programs/${selectedProgramId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: editStatus, isPublic: editIsPublic }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setStatusSaving(false);
+        if (!res.ok) return alert(data.error || "Gagal menyimpan status");
+        load();
+        alert("Status program tersimpan.");
     };
 
     // Peserta selalu berasal dari pencarian ke database outlet admin/mitra, bukan kode
@@ -392,6 +411,31 @@ export default function AdminMitraProgramPage() {
             {selectedProgramId && (
                 <Card>
                     <CardContent className="grid gap-5 p-5 lg:grid-cols-2">
+                        <div className="space-y-3 rounded-md border p-3 lg:col-span-2">
+                            <h2 className="font-bold">Status Program</h2>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Status</Label>
+                                    <select value={editStatus} onChange={(event) => setEditStatus(event.target.value)} className="h-10 rounded-md border px-3 text-sm">
+                                        <option value="DRAFT">DRAFT</option>
+                                        <option value="ACTIVE">ACTIVE</option>
+                                        <option value="ENDED">ENDED</option>
+                                        <option value="PUBLISHED">PUBLISHED</option>
+                                    </select>
+                                </div>
+                                <label className="flex items-center gap-2 pb-2 text-sm">
+                                    <input type="checkbox" checked={editIsPublic} onChange={(event) => setEditIsPublic(event.target.checked)} />
+                                    Tampilkan publik
+                                </label>
+                                <Button type="button" variant="outline" size="sm" onClick={saveStatus} disabled={statusSaving}>
+                                    {statusSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    Simpan Status
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Program hanya tampil di halaman publik bila status ACTIVE/ENDED/PUBLISHED <em>dan</em> &quot;Tampilkan publik&quot; dicentang.
+                            </p>
+                        </div>
                         <div className="space-y-3">
                             <div>
                                 <h2 className="font-bold">Peserta Program</h2>
