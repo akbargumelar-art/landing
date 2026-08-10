@@ -114,8 +114,8 @@ export async function getPublicOutletByToken(publicToken: string) {
         // Keempat slot foto ikut dibuka di profil publik: foto outlet bukan data
         // sensitif, dan kebaruannya justru bukti kunjungan yang ingin dilihat.
         photoUrl: row.photoUrl,
-        // Koordinat memang sudah publik lewat peta sebaran di /mitra; dikirim di sini
-        // supaya profil outlet bisa menggambar peta ODP sekitarnya.
+        // Koordinat outlet memang sudah publik lewat peta sebaran di /mitra. Rincian ODP
+        // sekitar tidak memakai respons ini dan tetap dilindungi sesi OTP.
         latitude: row.latitude,
         longitude: row.longitude,
         photoUpdatedAt: row.photoUpdatedAt,
@@ -139,13 +139,15 @@ export async function getPublicOutletByToken(publicToken: string) {
     };
 }
 
-export async function getOutletDetailWithSession(publicToken: string, sessionToken: string | undefined) {
+/**
+ * Memastikan sesi detail berasal dari OTP yang sah untuk outlet yang sama. Helper ini
+ * dipakai semua data tambahan yang hanya boleh terbuka setelah OTP, termasuk rincian ODP.
+ */
+export async function getOutletWithValidDetailSession(publicToken: string, sessionToken: string | undefined) {
     if (!sessionToken) return null;
 
     const outletRecord = await getMitraOutletRecordByToken(publicToken);
-    const outlet = await getPublicOutletByToken(publicToken);
     if (!outletRecord) return null;
-    if (!outlet) return null;
 
     const [detailSession] = await db
         .select()
@@ -159,7 +161,16 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         )
         .limit(1);
 
-    if (!detailSession) return null;
+    return detailSession ? { outletRecord, detailSession } : null;
+}
+
+export async function getOutletDetailWithSession(publicToken: string, sessionToken: string | undefined) {
+    const access = await getOutletWithValidDetailSession(publicToken, sessionToken);
+    if (!access) return null;
+
+    const { outletRecord, detailSession } = access;
+    const outlet = await getPublicOutletByToken(publicToken);
+    if (!outlet) return null;
 
     const [detailRow] = await db
         .select({

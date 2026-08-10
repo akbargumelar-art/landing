@@ -7,7 +7,6 @@ import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldA
 
 import { BackLink } from "@/components/back-link";
 import { InfoCard } from "@/components/mitra/info-card";
-import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -225,22 +224,6 @@ export default function MitraOutletProfilePage() {
 
             <section className="mx-auto max-w-6xl space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
                 <OutletPhotoCard outlet={outlet} />
-
-                {/* Hanya digambar bila outletnya punya koordinat; tanpa titik acuan,
-                    pencarian ODP sekitar tidak punya pusat. */}
-                {outlet.latitude != null && outlet.longitude != null && (
-                    <OdpSekitar
-                        outlet={{
-                            publicToken: outlet.publicToken,
-                            outletCode: outlet.outletCode,
-                            name: outlet.name,
-                            kabupaten: outlet.kabupaten,
-                            kecamatan: outlet.kecamatan,
-                            latitude: outlet.latitude,
-                            longitude: outlet.longitude,
-                        }}
-                    />
-                )}
             </section>
 
             <Dialog open={Boolean(notice)} onOpenChange={(open) => { if (!open) setNotice(null); }}>

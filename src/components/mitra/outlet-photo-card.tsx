@@ -36,6 +36,11 @@ interface FotoTerbuka {
  * object-contain -- diperbesar sebesar layar, bukan sekadar diperlebar.
  */
 function PopupFoto({ foto, onTutup }: { foto: FotoTerbuka; onTutup: () => void }) {
+    // Ukuran awal hanya dipakai sampai gambar selesai dibaca. Setelah itu atribut dimensi
+    // mengikuti ukuran aslinya, sehingga kotak klik sama dengan gambar yang terlihat --
+    // bukan persegi panjang 80vh penuh yang mencakup area letterbox gelap.
+    const [dimensi, setDimensi] = React.useState({ width: 1600, height: 900 });
+
     React.useEffect(() => {
         const tekan = (event: KeyboardEvent) => {
             if (event.key === "Escape") onTutup();
@@ -70,10 +75,25 @@ function PopupFoto({ foto, onTutup }: { foto: FotoTerbuka; onTutup: () => void }
                 <X className="h-5 w-5" />
             </button>
 
-            {/* Klik pada fotonya sendiri tidak menutup: yang menutup adalah area gelap di
-                sekelilingnya, supaya pengguna bisa menahan foto untuk menyimpannya. */}
-            <div className="relative h-[80vh] w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-                <Image src={foto.url} alt={foto.label} fill sizes="100vw" className="object-contain" unoptimized />
+            {/* Pembungkus tidak menghentikan event: area kosong di sekeliling gambar tetap
+                menjadi bagian backdrop. Hanya elemen gambar yang menghentikan klik. */}
+            <div className="flex max-h-[80vh] max-w-[calc(100vw-2rem)] items-center justify-center">
+                <Image
+                    src={foto.url}
+                    alt={foto.label}
+                    width={dimensi.width}
+                    height={dimensi.height}
+                    sizes="100vw"
+                    className="h-auto max-h-[80vh] w-auto max-w-full object-contain"
+                    unoptimized
+                    onLoad={(event) => {
+                        const { naturalWidth, naturalHeight } = event.currentTarget;
+                        if (naturalWidth > 0 && naturalHeight > 0) {
+                            setDimensi({ width: naturalWidth, height: naturalHeight });
+                        }
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                />
             </div>
 
             <p className="text-sm font-semibold text-white">{foto.label}</p>

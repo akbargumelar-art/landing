@@ -12,15 +12,15 @@ import "leaflet/dist/leaflet.css";
 
 export interface OdpMarker {
     id: string;
-    name: string | null;
-    kabupaten: string;
-    kecamatan: string;
+    name?: string | null;
+    kabupaten?: string;
+    kecamatan?: string;
     latitude: number;
     longitude: number;
-    portTotal: number;
-    portUsed: number;
-    portAvailable: number;
-    category: OdpCategory | null;
+    portTotal?: number;
+    portUsed?: number;
+    portAvailable?: number;
+    category?: OdpCategory | null;
 }
 
 export interface OutletMarker {
@@ -272,6 +272,7 @@ export default function OutletMap({
     onStreetView,
     userPosition = null,
     odp = [],
+    showOdpDetails = false,
     onAreaChange,
     onOdpStreetView,
     heightClass = "h-[360px] sm:h-[460px]",
@@ -282,6 +283,8 @@ export default function OutletMap({
     onStreetView?: (publicToken: string) => void;
     userPosition?: PosisiPengguna | null;
     odp?: OdpMarker[];
+    /** Hanya aktif pada halaman detail outlet yang sudah melewati validasi OTP. */
+    showOdpDetails?: boolean;
     onAreaChange?: (bbox: string, zoom: number) => void;
     onOdpStreetView?: (titik: OdpMarker) => void;
     /**
@@ -338,27 +341,36 @@ export default function OutletMap({
             {/* ODP digambar sebelum outlet supaya penanda outlet berada di lapisan atas
                 ketika keduanya bertumpuk -- outlet yang lebih sering diklik. */}
             {odp.map((titik) => {
-                const kategori = infoKategori(titik.category, titik.portUsed, titik.portTotal);
-                const occupancy = hitungOccupancy(titik.portUsed, titik.portTotal);
+                const portUsed = titik.portUsed ?? 0;
+                const portTotal = titik.portTotal ?? 0;
+                const kategori = infoKategori(titik.category, portUsed, portTotal);
+                const occupancy = hitungOccupancy(portUsed, portTotal);
+                const warna = showOdpDetails ? kategori.color : "#2563eb";
 
                 return (
-                    <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(kategori.color)}>
+                    <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(warna)}>
                         <Popup>
-                            <span className="block text-sm font-bold text-gray-950">
-                                ODP {titik.name || titik.kecamatan}
-                            </span>
-                            <span className="mt-0.5 block text-xs text-gray-600">
-                                {titik.kecamatan}, {titik.kabupaten}
-                            </span>
-                            <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: kategori.color }}>
-                                {kategori.label}
-                            </span>
-                            <span className="mt-2 block text-xs text-gray-700">
-                                Port: <strong>{titik.portTotal}</strong> total, {titik.portUsed} terpakai, {titik.portAvailable} tersedia
-                            </span>
-                            <span className="mt-0.5 block text-xs text-gray-700">
-                                Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
-                            </span>
+                            {showOdpDetails ? (
+                                <>
+                                    <span className="block text-sm font-bold text-gray-950">
+                                        ODP {titik.name || titik.kecamatan || "Tanpa Nama"}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-gray-600">
+                                        {titik.kecamatan}, {titik.kabupaten}
+                                    </span>
+                                    <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: kategori.color }}>
+                                        {kategori.label}
+                                    </span>
+                                    <span className="mt-2 block text-xs text-gray-700">
+                                        Port: <strong>{portTotal}</strong> total, {portUsed} terpakai, {titik.portAvailable ?? 0} tersedia
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-gray-700">
+                                        Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="block text-sm font-bold text-gray-950">Titik ODP</span>
+                            )}
                             <span className="mt-2 flex flex-col gap-1">
                                 {onOdpStreetView && (
                                     <button

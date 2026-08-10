@@ -739,3 +739,74 @@ naik/turun.
 
 `tsc`, `eslint src scripts`, `npm run build`, dan `npm run env:check` lulus di setiap commit.
 Tidak ada pengujian runtime pada sesi ini.
+
+## Pembaruan rate limit OTP per outlet - 10 Agustus 2026
+
+Rate limit per nomor pada endpoint permintaan OTP sekarang memakai pasangan **nomor WhatsApp +
+outlet**. Batas 1 permintaan/menit, 5/jam, dan 10/24 jam tidak lagi terbawa ketika nomor yang
+sama membuka outlet berbeda. Batas global 15 permintaan/jam per IP tetap dipertahankan sebagai
+pengaman spam lintas outlet. Perubahan hanya menambahkan filter `outlet_id` pada query hitung;
+tidak ada perubahan skema database maupun kontrak API.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus route OTP, dan `npm run build` lulus. Build tetap
+menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait perubahan ini.
+
+## Privasi sebaran ODP publik - 10 Agustus 2026
+
+Peta sebaran ODP di `/mitra` sekarang hanya menampilkan titik lokasi dengan satu warna netral.
+Legenda Green/Yellow/Orange/Black, nama ODP, wilayah, kapasitas port, dan occupancy tidak lagi
+tersedia pada tampilan publik. Popup titik tetap menyediakan Google Maps dan Street View hanya
+dari koordinatnya, tanpa membuka rincian ODP. Endpoint
+`/api/public/indihome/odp` juga diperkecil agar hanya mengembalikan ID serta koordinat, sehingga
+detail tidak dapat diambil dengan membaca respons jaringan halaman publik.
+
+Rincian ODP sekitar outlet dipindahkan sepenuhnya ke `/mitra/o/[publicToken]/detail`. Komponen
+tersebut membaca endpoint baru `/api/public/mitra/outlets/[publicToken]/odp`, yang memvalidasi
+cookie sesi detail hasil OTP dan memastikan sesi terikat pada outlet yang sama. Pusat radius
+diambil dari koordinat outlet di server agar sesi outlet lain tidak dapat dipakai memindai lokasi
+sembarang. Kartu ODP di profil outlet sebelum OTP sudah dihapus. Tidak ada perubahan database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Build mengenali route
+ODP terlindungi baru; hanya dua warning `<img>` lama di halaman pengaturan yang tetap muncul.
+Smoke test production server pada endpoint rincian tanpa cookie OTP menghasilkan HTTP 401 dengan
+pesan verifikasi OTP, lalu server pengujian dihentikan.
+
+## Monitoring foto outlet - 10 Agustus 2026
+
+Modul baru `/admin/mitra/foto` ditambahkan dari kartu **Monitoring Foto** di halaman Database
+Mitra Outlet. Laporan memakai bentuk satu baris untuk satu pasangan outlet dan kategori foto,
+sehingga outlet yang kehilangan beberapa kategori muncul terpisah dan tanggal pembaruannya tidak
+tercampur. Empat kategorinya tetap bersumber dari `MITRA_PHOTO_SLOTS`: Tampak Depan, Etalase,
+POP Material Telkomsel, dan POP Kompetitor.
+
+Filter laporan meliputi pencarian outlet, kategori foto, kondisi foto, kategori outlet, TAP, dan
+Salesforce. Kondisi yang tersedia adalah belum ada, belum ada atau kedaluwarsa, kedaluwarsa,
+terbaru, dan semua. Batas kedaluwarsa memakai aturan bersama `BATAS_SEGAR_HARI` (7 hari), bukan
+angka baru khusus laporan. Empat kartu ringkasan menampilkan jumlah belum ada, kedaluwarsa, dan
+terbaru per kategori foto; kartu dapat diklik untuk langsung membuka daftar foto kosong.
+
+Endpoint `/api/admin/mitra/photo-monitoring` melayani JSON berhalaman dan ekspor Excel dengan
+filter yang sama. Akses diberikan kepada SUPER_ADMIN, ADMIN_INPUT, MANAGER, SUPERVISOR, dan
+SALESFORCE. Untuk SUPERVISOR/SALESFORCE, outlet dibatasi pada territory yang ditetapkan sebelum
+ringkasan, filter, pagination, atau Excel dibentuk; akun tanpa territory memperoleh data kosong.
+Ekspor dibatasi 20.000 baris dan menyertakan identitas outlet, kategori outlet/foto, status,
+tanggal pembaruan WIB, umur foto, wilayah, TAP, Salesforce, serta URL foto. Tidak ada migrasi
+database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Output build memuat
+halaman `/admin/mitra/foto` serta endpoint `/api/admin/mitra/photo-monitoring`. Smoke test
+production server tanpa sesi menghasilkan HTTP 401 pada endpoint laporan, lalu server uji
+dihentikan. Isi laporan, filter territory, dan berkas Excel belum diuji terhadap sesi admin dan
+database hidup pada sesi ini.
+
+## Perilaku tutup popup foto - 10 Agustus 2026
+
+Lightbox pada `OutletPhotoCard` sekarang dapat ditutup dengan mengklik area mana pun di luar
+gambar, selain tetap mendukung tombol X dan tombol Escape. Sebelumnya pembungkus gambar berukuran
+`w-full` dan `80vh` menghentikan propagasi klik, sehingga area letterbox yang terlihat gelap tetap
+dianggap bagian gambar. Hitbox sekarang mengikuti dimensi alami gambar; hanya klik tepat pada
+gambar yang tidak menutup popup. Perubahan berlaku sekaligus pada profil outlet publik dan
+halaman detail outlet setelah OTP karena keduanya memakai komponen yang sama.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus `outlet-photo-card.tsx`, dan `npm run build` lulus.
+Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.

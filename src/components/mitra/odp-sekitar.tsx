@@ -11,7 +11,7 @@ import { formatJarak } from "@/lib/geo";
 /**
  * Memakai komponen peta yang sama dengan direktori outlet, bukan peta kedua. Perilaku
  * "muat ODP mengikuti area" tidak ikut menyala karena onAreaChange sengaja tidak diisi --
- * di sini titiknya sudah ditentukan sekali dari radius sekitar outlet.
+ * di sini titiknya sudah ditentukan sekali dari radius sekitar outlet oleh endpoint OTP.
  */
 const OutletMap = dynamic(() => import("@/components/mitra/outlet-map"), {
     ssr: false,
@@ -23,6 +23,13 @@ const OutletMap = dynamic(() => import("@/components/mitra/outlet-map"), {
 });
 
 interface OdpDenganJarak extends OdpMarker {
+    name: string | null;
+    kabupaten: string;
+    kecamatan: string;
+    portTotal: number;
+    portUsed: number;
+    portAvailable: number;
+    category: NonNullable<OdpMarker["category"]> | null;
     jarak: number;
 }
 
@@ -33,17 +40,12 @@ export function OdpSekitar({ outlet }: { outlet: OutletMarker }) {
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
-        const params = new URLSearchParams({
-            near: `${outlet.latitude},${outlet.longitude}`,
-            radius: String(RADIUS_METER),
-        });
-
-        fetch(`/api/public/indihome/odp?${params}`)
+        fetch(`/api/public/mitra/outlets/${outlet.publicToken}/odp`)
             .then((res) => res.ok ? res.json() : null)
             .then((data) => setOdp(Array.isArray(data?.odp) ? data.odp : []))
             .catch(() => setOdp([]))
             .finally(() => setLoading(false));
-    }, [outlet.latitude, outlet.longitude]);
+    }, [outlet.publicToken]);
 
     // Kartu disembunyikan sepenuhnya bila tidak ada ODP di sekitar: kotak kosong bertuliskan
     // "tidak ada data" hanya menambah panjang halaman tanpa memberi tahu apa pun.
@@ -82,7 +84,7 @@ export function OdpSekitar({ outlet }: { outlet: OutletMarker }) {
                 <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Memuat titik ODP...</div>
             ) : (
                 <>
-                    <OutletMap markers={[outlet]} odp={odp} />
+                    <OutletMap markers={[outlet]} odp={odp} showOdpDetails />
 
                     <div className="divide-y border-t">
                         {odp.slice(0, 5).map((titik) => {

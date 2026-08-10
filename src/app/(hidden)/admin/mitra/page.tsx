@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Activity, BadgeCheck, BookText, ClipboardList, Database, FileSpreadsheet, History, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
+import { Activity, BadgeCheck, BookText, Camera, ClipboardList, Database, FileSpreadsheet, History, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ interface HealthStatus {
 
 const modules = [
     { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Users, text: "Tambah, edit, hapus outlet dan QR satuan." },
+    { href: "/admin/mitra/foto", label: "Monitoring Foto", icon: Camera, text: "Foto kosong atau kedaluwarsa per kategori, dengan ekspor Excel." },
     { href: "/admin/mitra/import", label: "Upload Data", icon: FileSpreadsheet, text: "Import outlet dan performa: preview, validasi, commit." },
     { href: "/admin/mitra/performance", label: "Performance", icon: Activity, text: "Metric dan input performansi outlet." },
     { href: "/admin/mitra/salesforce", label: "Salesforce", icon: BadgeCheck, text: "Master nama dan foto salesforce yang ditaut outlet." },

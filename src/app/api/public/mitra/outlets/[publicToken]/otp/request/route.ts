@@ -53,10 +53,12 @@ export async function POST(
     const oneHourAgo = addMinutes(now, -60);
     const oneDayAgo = addMinutes(now, -60 * 24);
 
+    // Batas per nomor berlaku terpisah untuk setiap outlet. Nomor yang sama
+    // boleh langsung meminta OTP saat membuka outlet lain.
     const [[recentPhone], [hourPhone], [dayPhone], [hourIp]] = await Promise.all([
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneMinuteAgo))),
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneHourAgo))),
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneDayAgo))),
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneMinuteAgo))),
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneHourAgo))),
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneDayAgo))),
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.ip, ip), gt(mitraOtpRequests.createdAt, oneHourAgo))),
     ]);
 

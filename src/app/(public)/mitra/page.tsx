@@ -10,7 +10,6 @@ import dynamic from "next/dynamic";
 import { QrOutletScanner } from "@/components/mitra/qr-outlet-scanner";
 import { StreetViewPanel } from "@/components/mitra/street-view-panel";
 import type { OdpMarker, OutletMarker, PosisiPengguna } from "@/components/mitra/outlet-map";
-import { ODP_CATEGORIES } from "@/lib/indihome-odp";
 import { formatJarak, jarakMeter } from "@/lib/geo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,18 +96,13 @@ export default function MitraOutletDirectoryPage() {
         [map, streetViewToken]
     );
 
-    /**
-     * Satu panel dipakai bersama outlet dan ODP. Outlet tetap ditelusuri dari daftar
-     * penanda supaya panelnya tertutup sendiri ketika filter berubah; ODP disimpan sebagai
-     * objek karena daftarnya berganti setiap peta digeser -- menelusuri ulang di sana akan
-     * menutup panel hanya karena pengguna menggeser peta sedikit.
-     */
+    /** Street View publik memakai koordinat saja; status dan kapasitas ODP tetap terkunci. */
     const titikStreetView = React.useMemo(() => {
         if (streetViewOdp) {
             return {
                 id: streetViewOdp.id,
-                judul: `ODP ${streetViewOdp.name || streetViewOdp.kecamatan}`,
-                keterangan: `${streetViewOdp.kecamatan}, ${streetViewOdp.kabupaten}`,
+                judul: "Titik ODP",
+                keterangan: "Lokasi sebaran ODP di sekitar outlet",
                 latitude: streetViewOdp.latitude,
                 longitude: streetViewOdp.longitude,
             };
@@ -231,7 +225,6 @@ export default function MitraOutletDirectoryPage() {
         if (!hasMarker) return;
 
         setFocusedOutlet(publicToken);
-        // Membuka salah satu menutup yang lain supaya tidak ada dua sumber panel aktif.
         if (STREET_VIEW_ENABLED) {
             setStreetViewOdp(null);
             setStreetViewToken(publicToken);
@@ -401,16 +394,7 @@ export default function MitraOutletDirectoryPage() {
                         </div>
 
                         {tampilkanOdp && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b bg-gray-50 px-5 py-3">
-                                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    Kategori ODP
-                                </span>
-                                {ODP_CATEGORIES.map((kategori) => (
-                                    <span key={kategori.key} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <span className="h-3 w-3 rounded-sm" style={{ background: kategori.color }} />
-                                        <strong className="text-gray-950">{kategori.label}</strong> {kategori.keterangan}
-                                    </span>
-                                ))}
+                            <div className="border-b bg-gray-50 px-5 py-3">
                                 <span className="text-xs text-muted-foreground">
                                     {zoomPeta < ZOOM_MINIMAL_ODP
                                         ? "Perbesar peta untuk menampilkan titik ODP"
