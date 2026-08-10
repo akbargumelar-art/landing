@@ -53,7 +53,12 @@ export async function POST(request: Request) {
     const type = String(form.get("type") || "") as ImportType;
     const mode = String(form.get("mode") || "preview");
 
-    if (!file || !["whitelist", "performance", "program_score", "outlet"].includes(type)) {
+    // Daftar ini diturunkan dari ImportType, bukan ditulis ulang sebagai literal: versi
+    // sebelumnya kelewat mencantumkan "outlet_detail", sehingga pilihan "Detail Outlet" di
+    // layar Upload Data selalu ditolak 400 padahal validasi dan commit-nya sudah ada.
+    const TIPE_DIDUKUNG: ImportType[] = ["whitelist", "performance", "program_score", "outlet", "outlet_detail"];
+
+    if (!file || !TIPE_DIDUKUNG.includes(type)) {
         return NextResponse.json({ error: "File dan tipe import wajib dipilih" }, { status: 400 });
     }
 
