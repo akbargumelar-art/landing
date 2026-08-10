@@ -6,14 +6,14 @@ import { db } from "@/db";
 import { mitraMarketShares, mitraOutlets } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/mitra-utils";
-import { MITRA_MARKET_SHARE_OPERATORS, normalizeSharePercent } from "@/lib/mitra-market-share";
+import { MITRA_MARKET_SHARE_FIELDS, normalizeSharePercent } from "@/lib/mitra-market-share";
 
 export const dynamic = "force-dynamic";
 
 function readShares(body: Record<string, unknown>) {
     return Object.fromEntries(
-        MITRA_MARKET_SHARE_OPERATORS.map((operator) => [operator.key, normalizeSharePercent(body[operator.key])])
-    ) as Record<(typeof MITRA_MARKET_SHARE_OPERATORS)[number]["key"], string>;
+        MITRA_MARKET_SHARE_FIELDS.map((field) => [field.key, normalizeSharePercent(body[field.key])])
+    ) as Record<(typeof MITRA_MARKET_SHARE_FIELDS)[number]["key"], string>;
 }
 
 export async function GET(request: Request) {

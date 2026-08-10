@@ -13,10 +13,12 @@ import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { bandingkanNilai, useUrutTabel } from "@/lib/use-sort";
 import {
-    MITRA_MARKET_SHARE_MERGED_GROUPS,
-    MITRA_MARKET_SHARE_OPERATORS,
+    MITRA_MARKET_SHARE_AFTER_OPERATORS,
+    MITRA_MARKET_SHARE_BEFORE_OPERATORS,
+    MITRA_MARKET_SHARE_FIELDS,
     type MitraMarketShareKey,
-    sumShares,
+    sumAfterShares,
+    sumBeforeShares,
 } from "@/lib/mitra-market-share";
 
 interface MarketShareRow extends Record<MitraMarketShareKey, string> {
@@ -34,7 +36,7 @@ const KOSONG = {
     id: "",
     kabupaten: "",
     kecamatan: "",
-    ...Object.fromEntries(MITRA_MARKET_SHARE_OPERATORS.map((operator) => [operator.key, ""])),
+    ...Object.fromEntries(MITRA_MARKET_SHARE_FIELDS.map((field) => [field.key, ""])),
 } as unknown as MarketShareRow;
 
 export default function AdminMitraMarketSharePage() {
@@ -77,7 +79,8 @@ export default function AdminMitraMarketSharePage() {
         areas.filter((area) => !form.kabupaten || area.kabupaten === form.kabupaten).map((area) => area.kecamatan)
     )).sort();
 
-    const total = sumShares(form);
+    const totalSebelum = sumBeforeShares(form);
+    const totalSesudah = sumAfterShares(form);
 
     const daftarKabupaten = Array.from(new Set(rows.map((row) => row.kabupaten))).sort();
     // Daftar kecamatan menyesuaikan kabupaten yang sedang difilter, sama seperti datalist di formulir.
@@ -95,14 +98,17 @@ export default function AdminMitraMarketSharePage() {
             .filter((row) => !filterKabupaten || row.kabupaten === filterKabupaten)
             .filter((row) => !filterKecamatan || row.kecamatan === filterKecamatan);
 
-        const angka = new Set(MITRA_MARKET_SHARE_OPERATORS.map((operator) => String(operator.key)));
+        const angka = new Set(MITRA_MARKET_SHARE_FIELDS.map((field) => String(field.key)));
 
         return [...disaring].sort((a, b) => {
             let nilaiA: unknown;
             let nilaiB: unknown;
-            if (urut.kolom === "total") {
-                nilaiA = sumShares(a);
-                nilaiB = sumShares(b);
+            if (urut.kolom === "totalBefore") {
+                nilaiA = sumBeforeShares(a);
+                nilaiB = sumBeforeShares(b);
+            } else if (urut.kolom === "totalAfter") {
+                nilaiA = sumAfterShares(a);
+                nilaiB = sumAfterShares(b);
             } else if (angka.has(urut.kolom)) {
                 nilaiA = Number(a[urut.kolom as MitraMarketShareKey] || 0);
                 nilaiB = Number(b[urut.kolom as MitraMarketShareKey] || 0);
@@ -118,18 +124,18 @@ export default function AdminMitraMarketSharePage() {
     const ringkasan = React.useMemo(() => {
         if (barisTampil.length === 0) return null;
 
-        const rataOperator = MITRA_MARKET_SHARE_OPERATORS.map((operator) => ({
+        const rataSebelum = MITRA_MARKET_SHARE_BEFORE_OPERATORS.map((operator) => ({
             ...operator,
             rata: barisTampil.reduce((jumlah, row) => jumlah + Number(row[operator.key] || 0), 0) / barisTampil.length,
         }));
-        const rataGabungan = MITRA_MARKET_SHARE_MERGED_GROUPS.map((group) => ({
-            ...group,
-            rata: barisTampil.reduce((jumlah, row) => jumlah + group.sumber.reduce((s, key) => s + Number(row[key] || 0), 0), 0) / barisTampil.length,
+        const rataSesudah = MITRA_MARKET_SHARE_AFTER_OPERATORS.map((operator) => ({
+            ...operator,
+            rata: barisTampil.reduce((jumlah, row) => jumlah + Number(row[operator.key] || 0), 0) / barisTampil.length,
         }));
-        const tertinggi = [...barisTampil].sort((a, b) => Number(b.telkomsel || 0) - Number(a.telkomsel || 0))[0];
-        const terendah = [...barisTampil].sort((a, b) => Number(a.telkomsel || 0) - Number(b.telkomsel || 0))[0];
+        const tertinggi = [...barisTampil].sort((a, b) => Number(b.telkomselAfter || 0) - Number(a.telkomselAfter || 0))[0];
+        const terendah = [...barisTampil].sort((a, b) => Number(a.telkomselAfter || 0) - Number(b.telkomselAfter || 0))[0];
 
-        return { rataOperator, rataGabungan, tertinggi, terendah, jumlah: barisTampil.length };
+        return { rataSebelum, rataSesudah, tertinggi, terendah, jumlah: barisTampil.length };
     }, [barisTampil]);
 
     const updateField = (key: string, value: string) => {
@@ -213,9 +219,9 @@ export default function AdminMitraMarketSharePage() {
                     </Card>
                     <Card>
                         <CardContent className="p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Rata-rata Telkomsel</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Rata-rata Telkomsel Pasca-Merger</p>
                             <p className="mt-2 text-2xl font-extrabold text-red-600">
-                                {(ringkasan.rataOperator[0]?.rata ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%
+                                {(ringkasan.rataSesudah[0]?.rata ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">Dari kecamatan yang sedang tampil</p>
                         </CardContent>
@@ -225,7 +231,7 @@ export default function AdminMitraMarketSharePage() {
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Telkomsel Tertinggi</p>
                             <p className="mt-2 truncate text-lg font-extrabold text-gray-950">{ringkasan.tertinggi?.kecamatan}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {Number(ringkasan.tertinggi?.telkomsel || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}% - {ringkasan.tertinggi?.kabupaten}
+                                {Number(ringkasan.tertinggi?.telkomselAfter || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}% - {ringkasan.tertinggi?.kabupaten}
                             </p>
                         </CardContent>
                     </Card>
@@ -234,7 +240,7 @@ export default function AdminMitraMarketSharePage() {
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Telkomsel Terendah</p>
                             <p className="mt-2 truncate text-lg font-extrabold text-gray-950">{ringkasan.terendah?.kecamatan}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {Number(ringkasan.terendah?.telkomsel || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}% - {ringkasan.terendah?.kabupaten}
+                                {Number(ringkasan.terendah?.telkomselAfter || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}% - {ringkasan.terendah?.kabupaten}
                             </p>
                         </CardContent>
                     </Card>
@@ -255,7 +261,7 @@ export default function AdminMitraMarketSharePage() {
                                     Sebelum Merger
                                 </p>
                                 <OperatorShareChart
-                                    data={ringkasan.rataOperator.map((operator) => ({
+                                    data={ringkasan.rataSebelum.map((operator) => ({
                                         key: operator.key,
                                         label: operator.label,
                                         color: operator.color,
@@ -265,14 +271,14 @@ export default function AdminMitraMarketSharePage() {
                             </div>
                             <div className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                                 <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    Setelah Merger (XL Smart &amp; IOH)
+                                    Setelah Merger (Input Langsung)
                                 </p>
                                 <OperatorShareChart
-                                    data={ringkasan.rataGabungan.map((group) => ({
-                                        key: group.key,
-                                        label: group.label,
-                                        color: group.color,
-                                        percent: group.rata,
+                                    data={ringkasan.rataSesudah.map((operator) => ({
+                                        key: operator.key,
+                                        label: operator.label,
+                                        color: operator.color,
+                                        percent: operator.rata,
                                     }))}
                                 />
                             </div>
@@ -286,7 +292,8 @@ export default function AdminMitraMarketSharePage() {
                     <div>
                         <h2 className="font-bold">Unggah Banyak Sekaligus</h2>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            Berkas XLSX atau CSV berkolom kabupaten, kecamatan, dan enam operator. Wilayah yang sudah ada akan diperbarui.
+                            Berkas XLSX atau CSV memuat data sebelum merger dan tiga nilai pasca-merger mandiri:
+                            telkomsel_setelah_merger, xlsmart, serta ioh. Wilayah yang sudah ada akan diperbarui.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -358,23 +365,23 @@ export default function AdminMitraMarketSharePage() {
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {MITRA_MARKET_SHARE_OPERATORS.map((operator) => (
-                                <div key={operator.key} className="space-y-2">
-                                    <Label className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: operator.color }} />
-                                        {operator.label} (%)
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step="0.01"
-                                        value={form[operator.key] ?? ""}
-                                        onChange={(event) => updateField(operator.key, event.target.value)}
-                                    />
-                                </div>
-                            ))}
+                        <div className="grid gap-5 lg:grid-cols-2">
+                            <MarketShareInputGroup
+                                title="Sebelum Merger"
+                                description="Data operator lama tetap disimpan sebagai pembanding historis."
+                                fields={MITRA_MARKET_SHARE_BEFORE_OPERATORS}
+                                form={form}
+                                updateField={updateField}
+                                total={totalSebelum}
+                            />
+                            <MarketShareInputGroup
+                                title="Setelah Merger - Input Mandiri"
+                                description="Isi Telkomsel, XL Smart, dan IOH langsung; tidak dihitung dari data sebelum merger."
+                                fields={MITRA_MARKET_SHARE_AFTER_OPERATORS}
+                                form={form}
+                                updateField={updateField}
+                                total={totalSesudah}
+                            />
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
@@ -388,12 +395,6 @@ export default function AdminMitraMarketSharePage() {
                                     Batal edit
                                 </Button>
                             )}
-                            {/* Totalnya tidak dipaksa 100: sumber data survei sering menyisakan
-                                kategori "lainnya" yang tidak masuk enam operator ini. */}
-                            <p className="text-sm text-muted-foreground">
-                                Total: <span className="font-semibold text-gray-950">{total.toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</span>
-                                {total > 100 && <span className="ml-2 text-red-600">melebihi 100%</span>}
-                            </p>
                         </div>
                     </form>
                 </CardContent>
@@ -443,33 +444,57 @@ export default function AdminMitraMarketSharePage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead><TombolUrut kolom="kecamatan" label="Kecamatan" urut={urut} onKlik={gantiUrut} /></TableHead>
-                                    <TableHead><TombolUrut kolom="kabupaten" label="Kabupaten" urut={urut} onKlik={gantiUrut} /></TableHead>
-                                    {MITRA_MARKET_SHARE_OPERATORS.map((operator) => (
-                                        <TableHead key={operator.key} className="text-right">
+                                    <TableHead rowSpan={2}><TombolUrut kolom="kecamatan" label="Kecamatan" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead rowSpan={2}><TombolUrut kolom="kabupaten" label="Kabupaten" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead colSpan={MITRA_MARKET_SHARE_BEFORE_OPERATORS.length} className="border-l text-center">
+                                        Sebelum Merger
+                                    </TableHead>
+                                    <TableHead colSpan={MITRA_MARKET_SHARE_AFTER_OPERATORS.length} className="border-l text-center">
+                                        Setelah Merger - Input Langsung
+                                    </TableHead>
+                                    <TableHead rowSpan={2} className="border-l text-right">
+                                        <TombolUrut kolom="totalBefore" label="Total Sebelum" urut={urut} onKlik={gantiUrut} kanan />
+                                    </TableHead>
+                                    <TableHead rowSpan={2} className="text-right">
+                                        <TombolUrut kolom="totalAfter" label="Total Sesudah" urut={urut} onKlik={gantiUrut} kanan />
+                                    </TableHead>
+                                    <TableHead rowSpan={2} className="text-right">Aksi</TableHead>
+                                </TableRow>
+                                <TableRow>
+                                    {MITRA_MARKET_SHARE_BEFORE_OPERATORS.map((operator, index) => (
+                                        <TableHead key={operator.key} className={`text-right ${index === 0 ? "border-l" : ""}`}>
                                             <TombolUrut kolom={operator.key} label={operator.label} urut={urut} onKlik={gantiUrut} kanan />
                                         </TableHead>
                                     ))}
-                                    <TableHead className="text-right">
-                                        <TombolUrut kolom="total" label="Total" urut={urut} onKlik={gantiUrut} kanan />
-                                    </TableHead>
-                                    <TableHead className="text-right">Aksi</TableHead>
+                                    {MITRA_MARKET_SHARE_AFTER_OPERATORS.map((operator, index) => (
+                                        <TableHead key={operator.key} className={`text-right ${index === 0 ? "border-l" : ""}`}>
+                                            <TombolUrut kolom={operator.key} label={operator.label} urut={urut} onKlik={gantiUrut} kanan />
+                                        </TableHead>
+                                    ))}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={13} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
                                 ) : barisTampil.length ? barisTampil.map((row) => (
                                     <TableRow key={row.id}>
                                         <TableCell className="font-semibold">{row.kecamatan}</TableCell>
                                         <TableCell className="text-sm text-muted-foreground">{row.kabupaten}</TableCell>
-                                        {MITRA_MARKET_SHARE_OPERATORS.map((operator) => (
-                                            <TableCell key={operator.key} className="text-right tabular-nums">
+                                        {MITRA_MARKET_SHARE_BEFORE_OPERATORS.map((operator, index) => (
+                                            <TableCell key={operator.key} className={`text-right tabular-nums ${index === 0 ? "border-l" : ""}`}>
                                                 {Number(row[operator.key] ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
                                             </TableCell>
                                         ))}
+                                        {MITRA_MARKET_SHARE_AFTER_OPERATORS.map((operator, index) => (
+                                            <TableCell key={operator.key} className={`text-right tabular-nums ${index === 0 ? "border-l" : ""}`}>
+                                                {Number(row[operator.key] ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                            </TableCell>
+                                        ))}
+                                        <TableCell className="border-l text-right font-semibold tabular-nums">
+                                            {sumBeforeShares(row).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                        </TableCell>
                                         <TableCell className="text-right font-semibold tabular-nums">
-                                            {sumShares(row).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                            {sumAfterShares(row).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
@@ -483,13 +508,61 @@ export default function AdminMitraMarketSharePage() {
                                         </TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center text-muted-foreground">Belum ada data market share.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={13} className="h-24 text-center text-muted-foreground">Belum ada data market share.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
             </Card>
+        </div>
+    );
+}
+
+type MarketShareField = (typeof MITRA_MARKET_SHARE_FIELDS)[number];
+
+function MarketShareInputGroup({
+    title,
+    description,
+    fields,
+    form,
+    updateField,
+    total,
+}: {
+    title: string;
+    description: string;
+    fields: readonly MarketShareField[];
+    form: MarketShareRow;
+    updateField: (key: string, value: string) => void;
+    total: number;
+}) {
+    return (
+        <div className="rounded-lg border bg-gray-50/60 p-4">
+            <h3 className="font-bold text-gray-950">{title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {fields.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ background: field.color }} />
+                            {field.label} (%)
+                        </Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            value={form[field.key] ?? ""}
+                            onChange={(event) => updateField(field.key, event.target.value)}
+                        />
+                    </div>
+                ))}
+            </div>
+            {/* Total tidak dipaksa 100 karena sumber survei dapat menyisakan kategori lain. */}
+            <p className="mt-4 text-sm text-muted-foreground">
+                Total kelompok: <span className="font-semibold text-gray-950">{total.toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</span>
+                {total > 100 && <span className="ml-2 text-red-600">melebihi 100%</span>}
+            </p>
         </div>
     );
 }

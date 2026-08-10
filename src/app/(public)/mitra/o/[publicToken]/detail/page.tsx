@@ -7,7 +7,7 @@ import { ArrowLeft, Camera, ChevronDown, ChevronUp, Crosshair, History, Loader2,
 
 import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
-import { mergedShareData, operatorShareData, OperatorShareChart } from "@/components/mitra/operator-share-chart";
+import { afterMergerShareData, operatorShareData, OperatorShareChart } from "@/components/mitra/operator-share-chart";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -473,9 +473,9 @@ export default function MitraOutletDetailPage() {
                             </div>
                             <div className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                                 <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    Setelah Merger (XL Smart &amp; IOH)
+                                    Setelah Merger (Data Input Langsung)
                                 </p>
-                                <OperatorShareChart data={mergedShareData(data.marketShare)} />
+                                <OperatorShareChart data={afterMergerShareData(data.marketShare)} />
                             </div>
                         </div>
                     ) : (

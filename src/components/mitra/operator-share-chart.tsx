@@ -1,4 +1,8 @@
-import { MITRA_MARKET_SHARE_MERGED_GROUPS, MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
+import {
+    MITRA_MARKET_SHARE_AFTER_OPERATORS,
+    MITRA_MARKET_SHARE_BEFORE_OPERATORS,
+    type MitraMarketShareKey,
+} from "@/lib/mitra-market-share";
 
 export interface OperatorShareDatum {
     key: string;
@@ -48,7 +52,7 @@ export function OperatorShareChart({ data, className = "" }: { data: OperatorSha
 }
 
 export function operatorShareData(values: Partial<Record<MitraMarketShareKey, string | number>>): OperatorShareDatum[] {
-    return MITRA_MARKET_SHARE_OPERATORS.map((operator) => ({
+    return MITRA_MARKET_SHARE_BEFORE_OPERATORS.map((operator) => ({
         key: operator.key,
         label: operator.label,
         color: operator.color,
@@ -56,13 +60,12 @@ export function operatorShareData(values: Partial<Record<MitraMarketShareKey, st
     }));
 }
 
-/** Sama seperti operatorShareData, tapi XL+Smartfren dan Indosat+Tri dijumlahkan
- *  jadi satu bar sesuai entitas hasil merger (XL Smart, IOH). */
-export function mergedShareData(values: Partial<Record<MitraMarketShareKey, string | number>>): OperatorShareDatum[] {
-    return MITRA_MARKET_SHARE_MERGED_GROUPS.map((group) => ({
-        key: group.key,
-        label: group.label,
-        color: group.color,
-        percent: group.sumber.reduce((total, key) => total + Number(values[key] ?? 0), 0),
+/** Data pasca-merger dibaca dari kolom mandiri, bukan hasil penjumlahan data lama. */
+export function afterMergerShareData(values: Partial<Record<MitraMarketShareKey, string | number>>): OperatorShareDatum[] {
+    return MITRA_MARKET_SHARE_AFTER_OPERATORS.map((operator) => ({
+        key: operator.key,
+        label: operator.label,
+        color: operator.color,
+        percent: Number(values[operator.key] ?? 0),
     }));
 }

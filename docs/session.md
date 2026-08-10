@@ -908,3 +908,43 @@ commit.
 - `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 74 halaman statis.
 - Belum ada runtime test dengan MySQL hidup, uji browser untuk sorting/dropdown/grafik, atau
   eksekusi migrasi `0025` pada data nyata.
+
+## Input mandiri market share pasca-merger - 10 Agustus 2026
+
+Perhitungan pasca-merger dari sesi sebelumnya dibatalkan setelah klarifikasi: **XL Smart dan IOH
+bukan hasil penjumlahan data sebelum merger**. Data pasca-merger kini mempunyai tiga input dan
+kolom database mandiri: `telkomsel_after`, `xlsmart`, dan `ioh`. Telkomsel juga diberi kolom
+pasca-merger sendiri sehingga seluruh grafik setelah merger berasal dari satu set data baru,
+bukan memakai ulang nilai lama.
+
+Migrasi additive `drizzle/0026_add_post_merger_market_share.sql` menambahkan ketiga kolom sebagai
+`decimal(5,2) NOT NULL DEFAULT 0.00`. Tidak ada backfill dari `telkomsel`, `xl`, `smartfren`,
+`indosat`, atau `tri`; angka nol pada baris lama sengaja menandakan data pasca-merger belum pernah
+diinput. Data sebelum merger tetap dipertahankan untuk pembanding historis.
+
+Form `/admin/mitra/market-share` sekarang memisahkan dua kelompok input dan dua total. Tabel dan
+grafik rata-rata juga membedakan kolom sebelum merger dengan data input langsung setelah merger.
+Ringkasan Telkomsel tertinggi/terendah memakai `telkomsel_after`. Halaman detail outlet setelah
+OTP membaca ketiga kolom baru secara langsung.
+
+Template import berisi kolom:
+
+`kabupaten`, `kecamatan`, `telkomsel`, `xl`, `smartfren`, `indosat`, `tri`,
+`telkomsel_setelah_merger`, `xlsmart`, dan `ioh`.
+
+Parser tetap menerima label/alias seperti `XL Smart`, tetapi menyimpan nilainya langsung ke
+`xlsmart`; tidak ada jalur kode yang menjumlahkan XL dengan Smartfren atau Indosat dengan Tri.
+
+### Verifikasi
+
+- `npx tsc --noEmit` lulus.
+- ESLint terarah pada schema, API, form, detail outlet, komponen grafik, dan library lulus tanpa
+  warning atau error.
+- `npx drizzle-kit check` lulus (`Everything's fine`).
+- `npm run env:check` lulus; warning Street View key kosong tetap ada dan tidak terkait.
+- `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 74 halaman statis; hanya dua
+  warning `<img>` lama pada halaman pengaturan.
+- Smoke script kontrak menghasilkan header template yang benar dan membuktikan grafik pasca-
+  merger membaca `41/27/22` dari `telkomselAfter/xlsmart/ioh` walau kolom lama berisi angka lain.
+- Migrasi `0025` dan `0026` belum dijalankan pada database nyata; runtime input/upload dengan
+  sesi admin dan MySQL hidup belum diuji.

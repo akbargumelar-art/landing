@@ -607,6 +607,9 @@ export const mitraMarketShares = mysqlTable("mitra_market_shares", {
     smartfren: decimal("smartfren", { precision: 5, scale: 2 }).notNull().default("0.00"),
     indosat: decimal("indosat", { precision: 5, scale: 2 }).notNull().default("0.00"),
     tri: decimal("tri", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    telkomselAfter: decimal("telkomsel_after", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    xlsmart: decimal("xlsmart", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    ioh: decimal("ioh", { precision: 5, scale: 2 }).notNull().default("0.00"),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
