@@ -837,3 +837,29 @@ berupa inisial tidak berubah. Tidak ada perubahan API, data, atau format unggaha
 
 Verifikasi: `npx tsc --noEmit`, ESLint khusus halaman profil outlet, dan `npm run build` lulus.
 Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.
+
+## Audit OWASP Agentic dan dependency - 10 Agustus 2026
+
+Audit memakai skill lokal `agent-owasp-compliance`, tetapi repo ini tidak memiliki runtime
+AI/LLM/agent: tidak ada model, prompt execution, tool registry, MCP, memori agent, maupun
+komunikasi antar-agent. Karena itu OWASP Top 10 for Agentic Applications 2026 dinilai **tidak
+berlaku (N/A)**, bukan gagal 0/10. Audit juga menemukan bahwa nama dan pemetaan ASI-01 sampai
+ASI-10 di skill lokal tidak sesuai taksonomi resmi OWASP 2026; skill perlu diperbarui sebelum
+dipakai untuk skor kepatuhan.
+
+Sebagai pemeriksaan pendamping, `npm audit --omit=dev --json` menemukan 12 dependency produksi:
+1 kritis, 9 tinggi, dan 2 sedang. Dependency langsung yang ditandai adalah `better-auth` 1.5.0,
+`drizzle-orm` 0.39.3, `next` 15.5.12, `sharp` 0.34.5, `uuid` 11.1.0, dan `xlsx` 0.18.5. Audit
+penuh termasuk tooling menemukan 21 dependency: 2 kritis, 13 tinggi, dan 6 sedang.
+
+Exploitability dipilah berdasarkan pemakaian: `sharp` memproses buffer unggahan pengguna dan
+`xlsx` membaca workbook impor; `uuid` hanya dipakai sebagai v4 tanpa buffer; Better Auth hanya
+mengaktifkan email/password sehingga plugin OAuth/OIDC/MCP/magic-link yang disebut mayoritas
+advisory tidak terlihat aktif. Tidak ditemukan dynamic shell/code execution, identifier SQL
+dinamis, atau kandidat rahasia umum pada pemindaian ringan.
+
+Laporan lengkap disimpan di `docs/audit-agentic-dependency-2026-08-10.md`. Tidak ada source,
+dependency, migrasi, atau konfigurasi izin lokal `.claude/settings.local.json` yang diubah.
+Working tree sudah berisi perubahan lain sebelum audit dan sengaja tidak disentuh. Verifikasi
+audit terbatas pada scan source dan advisory npm terbaru; build/runtime test tidak dijalankan
+karena audit ini hanya mengubah dokumentasi.
