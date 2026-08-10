@@ -373,8 +373,8 @@ export default function PengaturanPage() {
                                 <p className="text-xs text-muted-foreground">
                                     Mengirim satu pesan ke group setiap salesforce selesai memperbarui foto
                                     outlet. Satu kunjungan (satu sesi OTP) = satu pesan, dikirim sekitar
-                                    2 menit setelah unggahan terakhir, memakai foto Tampak Depan dari
-                                    kunjungan itu. Perubahan long-lat tidak dikirim ke group.
+                                    2 menit setelah unggahan terakhir, dengan satu foto yang diundi dari
+                                    foto yang baru diunggah. Perubahan long-lat tidak dikirim ke group.
                                 </p>
                             </div>
                             <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
@@ -412,8 +412,13 @@ export default function PengaturanPage() {
                             <p className="text-xs text-muted-foreground">
                                 Dipakai sebagai caption foto. Placeholder: <code>&#123;salesforce&#125;</code>,
                                 <code> &#123;digipos&#125;</code>, <code>&#123;outlet&#125;</code>, <code>&#123;tap&#125;</code>,
-                                <code> &#123;perubahan&#125;</code>, <code>&#123;tanggal&#125;</code>, <code>&#123;link&#125;</code>.
-                                Dikosongkan berarti memakai template bawaan.
+                                <code> &#123;foto&#125;</code>, <code>&#123;perubahan&#125;</code>, <code>&#123;tanggal&#125;</code>,
+                                <code> &#123;link&#125;</code>. Dikosongkan berarti memakai template bawaan.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                <code>&#123;foto&#125;</code> berisi jenis foto yang terundi, mis.
+                                &quot;Foto Tampak Depan&quot; atau &quot;Foto POP Kompetitor&quot;. Bila template
+                                tidak memuatnya, keterangan itu otomatis dipasang tebal di baris pertama.
                             </p>
                         </div>
                     </div>

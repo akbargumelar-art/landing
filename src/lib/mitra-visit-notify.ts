@@ -3,7 +3,6 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces, mitraVisitNotifications } from "@/db/schema";
-import { MITRA_PHOTO_SLOTS } from "@/lib/mitra-outlet-photos";
 import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMessage } from "@/lib/whatsapp";
 
 /**
@@ -16,9 +15,10 @@ import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMe
  *    per sesi OTP dan baru dikirim setelah JEDA_HENING_MS berlalu tanpa unggahan baru.
  *    Hanya foto yang memicu notifikasi -- perubahan long-lat cukup masuk riwayat edit.
  *
- * 2. YANG DIKIRIM ADALAH FOTO TAMPAK DEPAN. WhatsApp hanya memuat satu gambar per pesan,
- *    dan tampak depan adalah satu-satunya slot yang bisa dinilai sekilas oleh pembaca group.
- *    Diambil dari foto kunjungan INI, bukan foto tersimpan dari kunjungan sebelumnya.
+ * 2. FOTO YANG DIKIRIM DIUNDI, DAN JENISNYA DISEBUT. WhatsApp hanya memuat satu gambar per
+ *    pesan, jadi satu foto dipilih acak dari foto yang diunggah PADA KUNJUNGAN INI. Karena
+ *    yang terkirim bisa berupa etalase atau POP -- bukan selalu muka outlet -- captionnya
+ *    dibuka dengan jenis fotonya, supaya pembaca group tahu yang dilihatnya apa.
  *
  * 3. ANTAR PESAN DIBERI JEDA ACAK 30-120 DETIK. Beberapa outlet bisa selesai berbarengan;
  *    mengirim beruntun tanpa jeda adalah pola yang membuat nomor WhatsApp diblokir.
@@ -30,13 +30,6 @@ import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMe
 const JEDA_HENING_MS = 2 * 60 * 1000;
 const JEDA_KIRIM_MIN_MS = 30_000;
 const JEDA_KIRIM_MAKS_MS = 120_000;
-
-/**
- * Slot yang dikirim ke group. Diturunkan dari penanda `utama` di MITRA_PHOTO_SLOTS, bukan
- * ditulis "depan" langsung di sini, supaya kalau suatu saat slot utamanya dipindah, yang
- * terkirim ikut pindah alih-alih diam-diam menunjuk slot yang sudah bukan foto utama.
- */
-const SLOT_DIKIRIM = MITRA_PHOTO_SLOTS.find((slot) => slot.utama)?.key ?? "depan";
 
 /** Selang periksa saat masih ada antrean tetapi belum ada yang melewati jeda hening. */
 const SELANG_PERIKSA_MS = 15_000;
@@ -291,11 +284,24 @@ async function kirimSatu(baris: BarisNotifikasi): Promise<void> {
 
         const foto = baris.photosJson || [];
 
-        const pesan = renderTemplate(config.template, {
+        // Aturan 2: satu foto diundi dari foto kunjungan ini.
+        const terpilih = foto.length ? foto[Math.floor(Math.random() * foto.length)] : null;
+        const gambar = terpilih ? urlAbsolut(terpilih.url) : null;
+
+        if (terpilih && !gambar) {
+            console.warn("[Visit WA] NEXT_PUBLIC_BASE_URL belum diisi, pesan dikirim tanpa foto.");
+        }
+
+        // Judul foto ikut kosong bila gambarnya batal terkirim, supaya pesan teks polos tidak
+        // mengumumkan foto yang tidak ada di dalamnya.
+        const judulFoto = terpilih && gambar ? `Foto ${terpilih.label}` : "";
+
+        let pesan = renderTemplate(config.template, {
             salesforce: outlet.salesforce || "-",
             digipos: outlet.outletCode,
             outlet: outlet.name,
             tap: outlet.tap || "-",
+            foto: judulFoto,
             perubahan: `${foto.length} foto diperbarui`,
             tanggal: new Intl.DateTimeFormat("id-ID", {
                 dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta",
@@ -303,14 +309,10 @@ async function kirimSatu(baris: BarisNotifikasi): Promise<void> {
             link: urlAbsolut(`/mitra/o/${outlet.publicToken}`) || "",
         });
 
-        // Aturan 2: tampak depan yang dikirim. Kunjungan bisa saja hanya memperbarui etalase
-        // atau POP tanpa memotret ulang muka outlet; dalam hal itu foto pertama kunjungan ini
-        // yang dipakai, supaya pesannya tetap membawa bukti kunjungan alih-alih kosong.
-        const terpilih = foto.find((f) => f.slot === SLOT_DIKIRIM) || foto[0] || null;
-        const gambar = terpilih ? urlAbsolut(terpilih.url) : null;
-
-        if (terpilih && !gambar) {
-            console.warn("[Visit WA] NEXT_PUBLIC_BASE_URL belum diisi, pesan dikirim tanpa foto.");
+        // Template yang sudah memuat {foto} berarti admin menaruhnya sendiri; jangan
+        // ditambahkan lagi di depan. Kalau belum ada, judulnya dipasang di baris pertama.
+        if (judulFoto && !/\{foto\}/i.test(config.template)) {
+            pesan = `*${judulFoto}*\n\n${pesan}`;
         }
 
         const hasil = gambar
