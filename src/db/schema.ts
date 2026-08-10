@@ -4,6 +4,7 @@ import {
     text,
     int,
     boolean,
+    date,
     datetime,
     timestamp,
     decimal,
@@ -849,6 +850,7 @@ export const mitraPrograms = mysqlTable("mitra_programs", {
     periodEnd: datetime("period_end").notNull(),
     status: mysqlEnum("status", ["DRAFT", "ACTIVE", "ENDED", "PUBLISHED"]).notNull().default("DRAFT"),
     rankingMode: mysqlEnum("ranking_mode", ["POINT", "RANK"]).notNull().default("POINT"),
+    mechanismType: mysqlEnum("mechanism_type", ["RANKING", "THRESHOLD", "HYBRID"]).notNull().default("RANKING"),
     tieBreaker: varchar("tie_breaker", { length: 120 }),
     isPublic: boolean("is_public").notNull().default(false),
     createdAt: datetime("created_at").notNull(),
@@ -888,11 +890,11 @@ export const mitraProgramScores = mysqlTable("mitra_program_scores", {
     paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
     rawValue: decimal("raw_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
     points: decimal("points", { precision: 18, scale: 2 }).notNull().default("0.00"),
-    periodYm: varchar("period_ym", { length: 7 }).notNull(),
+    achievementDate: date("achievement_date", { mode: "string" }).notNull(),
     batchId: varchar("batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
-    uniqueIndex("mitra_program_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.periodYm),
+    uniqueIndex("mitra_program_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.achievementDate),
     index("mitra_program_scores_outlet_idx").on(table.outletId),
     index("mitra_program_scores_batch_idx").on(table.batchId),
 ]);
@@ -920,6 +922,21 @@ export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
 }, (table) => [
     index("mitra_program_winners_program_idx").on(table.programId),
     index("mitra_program_winners_public_idx").on(table.isPublished),
+]);
+
+export const mitraProgramRewardRules = mysqlTable("mitra_program_reward_rules", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    ruleType: mysqlEnum("rule_type", ["RANK", "THRESHOLD"]).notNull(),
+    rankFrom: int("rank_from"),
+    rankTo: int("rank_to"),
+    paramKey: varchar("param_key", { length: 120 }),
+    comparator: mysqlEnum("comparator", [">=", ">", "<=", "<", "="]),
+    thresholdValue: decimal("threshold_value", { precision: 18, scale: 2 }),
+    rewardLabel: varchar("reward_label", { length: 255 }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+}, (table) => [
+    index("mitra_program_reward_rules_program_idx").on(table.programId),
 ]);
 
 export const mitraAuditLogs = mysqlTable("mitra_audit_logs", {
@@ -966,6 +983,7 @@ export const mitraProgramsRelations = relations(mitraPrograms, ({ many }) => ({
     participants: many(mitraProgramParticipants),
     leaderboard: many(mitraProgramLeaderboard),
     winners: many(mitraProgramWinners),
+    rewardRules: many(mitraProgramRewardRules),
 }));
 
 export const mitraProgramParamsRelations = relations(mitraProgramParams, ({ one, many }) => ({
@@ -992,6 +1010,10 @@ export const mitraProgramLeaderboardRelations = relations(mitraProgramLeaderboar
 export const mitraProgramWinnersRelations = relations(mitraProgramWinners, ({ one }) => ({
     program: one(mitraPrograms, { fields: [mitraProgramWinners.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramWinners.outletId], references: [mitraOutlets.id] }),
+}));
+
+export const mitraProgramRewardRulesRelations = relations(mitraProgramRewardRules, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramRewardRules.programId], references: [mitraPrograms.id] }),
 }));
 
 // ========== RBAC Umum (PRD Fase 0 - prd-total-revamp.md) ==========

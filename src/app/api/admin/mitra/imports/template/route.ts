@@ -60,9 +60,8 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
             outletCode: "OUT-001",
             programSlug: "program-agustus-2026",
             paramKey: "recharge",
-            periodYm: "2026-08",
+            achievementDate: "2026-08-01",
             rawValue: 500000,
-            points: 50,
         },
     ],
     /**

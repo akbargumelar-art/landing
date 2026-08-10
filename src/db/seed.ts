@@ -646,8 +646,8 @@ async function seed() {
                 { programId, outletId: outletBId, joinedAt: new Date("2026-08-01") },
             ]);
             await db.insert(mitraProgramScores).values([
-                { id: uuid(), programId, outletId: outletAId, paramId, rawValue: "12500000.00", points: "12500000.00", periodYm: "2026-08" },
-                { id: uuid(), programId, outletId: outletBId, paramId, rawValue: "9800000.00", points: "9800000.00", periodYm: "2026-08" },
+                { id: uuid(), programId, outletId: outletAId, paramId, rawValue: "12500000.00", points: "12500000.00", achievementDate: "2026-08-01" },
+                { id: uuid(), programId, outletId: outletBId, paramId, rawValue: "9800000.00", points: "9800000.00", achievementDate: "2026-08-01" },
             ]);
             await db.insert(mitraProgramLeaderboard).values([
                 { id: uuid(), programId, outletId: outletAId, totalPoints: "12500000.00", rank: 1, computedAt: new Date() },

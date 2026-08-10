@@ -91,6 +91,15 @@ export default function AdminMitraImportPage() {
                     dengan data lama menimpa isinya; yang belum ada ditambahkan. Kolom yang dikosongkan
                     dibiarkan apa adanya — mengosongkan sel tidak menghapus isi di database.
                 </p>
+                {type === "program_score" && (
+                    <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                        <strong>Pencapaian Program Mitra bergranularitas harian.</strong> Setiap baris adalah satu
+                        outlet + parameter + tanggal (kolom <code>achievementDate</code>, format YYYY-MM-DD).
+                        Upload ulang tanggal yang sama akan menimpa nilainya, bukan menambah baris baru — jadi
+                        aman diunggah setiap hari sampai akhir periode. Cukup isi angka mentahnya
+                        (<code>rawValue</code>); poin dihitung otomatis dari weight parameter, tidak perlu dihitung manual.
+                    </p>
+                )}
             </div>
 
             <Card>

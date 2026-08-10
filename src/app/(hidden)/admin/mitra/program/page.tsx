@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Award, Loader2, Plus, RefreshCw, Save } from "lucide-react";
+import { Award, Loader2, Plus, RefreshCw, Save, Search, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,14 +23,68 @@ interface Program {
     params?: { id: string; key: string; label: string; weight: string }[];
 }
 
+interface Peserta {
+    outletId: string;
+    outletCode: string;
+    outletName: string;
+}
+
+interface RewardRule {
+    id?: string;
+    ruleType: "RANK" | "THRESHOLD";
+    rankFrom?: number | null;
+    rankTo?: number | null;
+    paramKey?: string | null;
+    comparator?: string | null;
+    thresholdValue?: string | null;
+    rewardLabel: string;
+}
+
+interface RewardPreviewRow {
+    outletId: string;
+    outletCode: string;
+    outletName: string;
+    ruleId: string;
+    rewardLabel: string;
+}
+
+/** "RANK,1,1,Motor" / "THRESHOLD,omzet,>=,5000000,Voucher 500rb" -> baris aturan reward. */
+function parseRewardRulesText(text: string): RewardRule[] {
+    return text.split("\n").map((line) => {
+        const parts = line.split(",").map((part) => part.trim());
+        if (parts[0]?.toUpperCase() === "THRESHOLD") {
+            const [, paramKey, comparator, thresholdValue, ...labelParts] = parts;
+            return {
+                ruleType: "THRESHOLD" as const,
+                paramKey: paramKey || null,
+                comparator: comparator || ">=",
+                thresholdValue: thresholdValue || "0",
+                rewardLabel: labelParts.join(",").trim(),
+            };
+        }
+        const [, rankFrom, rankTo, ...labelParts] = parts;
+        return {
+            ruleType: "RANK" as const,
+            rankFrom: Number(rankFrom) || null,
+            rankTo: Number(rankTo) || Number(rankFrom) || null,
+            rewardLabel: labelParts.join(",").trim(),
+        };
+    }).filter((rule) => rule.rewardLabel);
+}
+
 export default function AdminMitraProgramPage() {
     const [programs, setPrograms] = React.useState<Program[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [selectedProgramId, setSelectedProgramId] = React.useState("");
-    const [participantCodes, setParticipantCodes] = React.useState("");
+    const [participants, setParticipants] = React.useState<Peserta[]>([]);
+    const [outletQuery, setOutletQuery] = React.useState("");
+    const [outletResults, setOutletResults] = React.useState<Peserta[]>([]);
+    const [outletSearching, setOutletSearching] = React.useState(false);
     const [winnersText, setWinnersText] = React.useState("");
     const [managementSaving, setManagementSaving] = React.useState(false);
+    const [rewardsPreview, setRewardsPreview] = React.useState<RewardPreviewRow[]>([]);
+    const [rewardsLoading, setRewardsLoading] = React.useState(false);
     const { urut, gantiUrut } = useUrutTabel<string>("");
     const [form, setForm] = React.useState({
         name: "",
@@ -40,7 +94,9 @@ export default function AdminMitraProgramPage() {
         periodEnd: "",
         status: "DRAFT",
         isPublic: false,
+        mechanismType: "RANKING",
         paramsText: "omzet,Omzet,1\nakuisisi,Akuisisi Outlet,1",
+        rewardRulesText: "RANK,1,1,Hadiah Juara 1\nRANK,2,3,Hadiah Juara 2-3",
     });
 
     const load = React.useCallback(() => {
@@ -60,14 +116,19 @@ export default function AdminMitraProgramPage() {
             const [key, label, weight] = line.split(",").map((part) => part?.trim());
             return { key, label: label || key, weight: weight || "1" };
         }).filter((param) => param.key);
+        const rewardRules = parseRewardRulesText(form.rewardRulesText);
 
         const res = await fetch("/api/admin/mitra/programs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...form, params }),
+            body: JSON.stringify({ ...form, params, rewardRules }),
         });
         if (res.ok) {
-            setForm({ name: "", descriptionMd: "", mechanismMd: "", periodStart: "", periodEnd: "", status: "DRAFT", isPublic: false, paramsText: form.paramsText });
+            setForm({
+                name: "", descriptionMd: "", mechanismMd: "", periodStart: "", periodEnd: "",
+                status: "DRAFT", isPublic: false, mechanismType: "RANKING",
+                paramsText: form.paramsText, rewardRulesText: form.rewardRulesText,
+            });
             load();
         } else {
             const data = await res.json().catch(() => ({}));
@@ -93,13 +154,44 @@ export default function AdminMitraProgramPage() {
             return;
         }
         setSelectedProgramId(programId);
-        setParticipantCodes((data.participants || []).map((participant: { outletCode: string }) => participant.outletCode).join("\n"));
+        setParticipants(data.participants || []);
         setWinnersText((data.winners || []).map((winner: { outletCode: string; rank: number; prizeLabel?: string | null }) => `${winner.outletCode},${winner.rank},${winner.prizeLabel || ""}`).join("\n"));
+        setOutletQuery("");
+        setOutletResults([]);
+        setRewardsPreview([]);
+    };
+
+    // Peserta selalu berasal dari pencarian ke database outlet admin/mitra, bukan kode
+    // yang diketik bebas -- supaya program tidak pernah menunjuk outlet yang tidak ada.
+    React.useEffect(() => {
+        if (!outletQuery.trim()) { setOutletResults([]); return; }
+        setOutletSearching(true);
+        const timer = setTimeout(() => {
+            fetch(`/api/admin/mitra/outlets?q=${encodeURIComponent(outletQuery)}&pageSize=8`)
+                .then((res) => res.json())
+                .then((data) => setOutletResults(
+                    (data.outlets || []).map((outlet: { id: string; outletCode: string; name: string }) => ({
+                        outletId: outlet.id, outletCode: outlet.outletCode, outletName: outlet.name,
+                    }))
+                ))
+                .finally(() => setOutletSearching(false));
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [outletQuery]);
+
+    const tambahPeserta = (outlet: Peserta) => {
+        setParticipants((prev) => prev.some((item) => item.outletId === outlet.outletId) ? prev : [...prev, outlet]);
+        setOutletQuery("");
+        setOutletResults([]);
+    };
+
+    const hapusPeserta = (outletId: string) => {
+        setParticipants((prev) => prev.filter((item) => item.outletId !== outletId));
     };
 
     const saveParticipants = async () => {
         setManagementSaving(true);
-        const outletCodes = participantCodes.split(/[\n,;]/).map((code) => code.trim()).filter(Boolean);
+        const outletCodes = participants.map((peserta) => peserta.outletCode);
         const res = await fetch(`/api/admin/mitra/programs/${selectedProgramId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -109,6 +201,24 @@ export default function AdminMitraProgramPage() {
         setManagementSaving(false);
         if (!res.ok) return alert(data.error || "Gagal menyimpan peserta");
         alert(`${data.participantCount || 0} peserta tersimpan.`);
+    };
+
+    const hitungReward = async () => {
+        setRewardsLoading(true);
+        const res = await fetch("/api/admin/mitra/programs", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "compute_rewards", programId: selectedProgramId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setRewardsLoading(false);
+        if (!res.ok) return alert(data.error || "Gagal menghitung reward");
+        setRewardsPreview(data.rewards || []);
+        if ((data.rewards || []).length === 0) alert("Belum ada outlet yang cocok dengan aturan reward, atau leaderboard belum di-recompute.");
+    };
+
+    const isiKePemenang = () => {
+        setWinnersText(rewardsPreview.map((row, index) => `${row.outletCode},${index + 1},${row.rewardLabel}`).join("\n"));
     };
 
     const publishWinners = async () => {
@@ -170,6 +280,7 @@ export default function AdminMitraProgramPage() {
                         <div className="space-y-2 lg:col-span-2">
                             <Label>Parameter Score (key,label,weight per baris)</Label>
                             <Textarea value={form.paramsText} onChange={(event) => setForm((prev) => ({ ...prev, paramsText: event.target.value }))} rows={4} />
+                            <p className="text-xs text-muted-foreground">Weight otomatis dikalikan ke setiap pencapaian yang diupload — tidak perlu dihitung manual.</p>
                         </div>
                         <div className="space-y-2">
                             <Label>Status</Label>
@@ -179,6 +290,22 @@ export default function AdminMitraProgramPage() {
                                 <option value="ENDED">ENDED</option>
                                 <option value="PUBLISHED">PUBLISHED</option>
                             </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Mekanisme Reward</Label>
+                            <select value={form.mechanismType} onChange={(event) => setForm((prev) => ({ ...prev, mechanismType: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
+                                <option value="RANKING">Racing (berdasarkan peringkat)</option>
+                                <option value="THRESHOLD">Threshold (berdasarkan target)</option>
+                                <option value="HYBRID">Keduanya</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2 lg:col-span-3">
+                            <Label>Aturan Reward (per baris)</Label>
+                            <Textarea value={form.rewardRulesText} onChange={(event) => setForm((prev) => ({ ...prev, rewardRulesText: event.target.value }))} rows={3} />
+                            <p className="text-xs text-muted-foreground">
+                                Racing: <code>RANK,dariPeringkat,sampaiPeringkat,label</code> — mis. <code>RANK,1,1,Motor</code>.{" "}
+                                Threshold: <code>THRESHOLD,paramKey,pembanding,nilai,label</code> — mis. <code>THRESHOLD,omzet,&gt;=,5000000,Voucher 500rb</code> (paramKey kosong = total poin leaderboard).
+                            </p>
                         </div>
                         <label className="flex items-end gap-2 pb-2 text-sm">
                             <input type="checkbox" checked={form.isPublic} onChange={(event) => setForm((prev) => ({ ...prev, isPublic: event.target.checked }))} />
@@ -237,11 +364,49 @@ export default function AdminMitraProgramPage() {
                         <div className="space-y-3">
                             <div>
                                 <h2 className="font-bold">Peserta Program</h2>
-                                <p className="text-sm text-muted-foreground">Masukkan kode outlet, satu per baris atau dipisahkan koma.</p>
+                                <p className="text-sm text-muted-foreground">Cari dari database outlet mitra, lalu klik untuk menambahkan.</p>
                             </div>
-                            <Textarea value={participantCodes} onChange={(event) => setParticipantCodes(event.target.value)} rows={10} placeholder="OUTLET-001" />
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={outletQuery}
+                                    onChange={(event) => setOutletQuery(event.target.value)}
+                                    placeholder="Cari nama atau kode outlet..."
+                                    className="pl-9"
+                                />
+                                {outletSearching && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
+                                {outletResults.length > 0 && (
+                                    <div className="absolute z-10 mt-1 w-full rounded-md border bg-white shadow-lg">
+                                        {outletResults.map((outlet) => (
+                                            <button
+                                                type="button"
+                                                key={outlet.outletId}
+                                                onClick={() => tambahPeserta(outlet)}
+                                                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-muted"
+                                            >
+                                                <span className="font-medium">{outlet.outletName}</span>
+                                                <span className="text-xs text-muted-foreground">{outlet.outletCode}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
+                                {participants.length === 0 && <p className="p-2 text-sm text-muted-foreground">Belum ada peserta.</p>}
+                                {participants.map((peserta) => (
+                                    <div key={peserta.outletId} className="flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-muted">
+                                        <div>
+                                            <p className="font-medium">{peserta.outletName}</p>
+                                            <p className="text-xs text-muted-foreground">{peserta.outletCode}</p>
+                                        </div>
+                                        <button type="button" onClick={() => hapusPeserta(peserta.outletId)} className="text-muted-foreground hover:text-red-600">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                             <Button variant="outline" onClick={saveParticipants} disabled={managementSaving}>
-                                <Save className="h-4 w-4" /> Simpan Peserta
+                                <Save className="h-4 w-4" /> Simpan Peserta ({participants.length})
                             </Button>
                         </div>
                         <div className="space-y-3">
@@ -249,10 +414,39 @@ export default function AdminMitraProgramPage() {
                                 <h2 className="font-bold">Pemenang</h2>
                                 <p className="text-sm text-muted-foreground">Format per baris: kode outlet, peringkat, hadiah.</p>
                             </div>
-                            <Textarea value={winnersText} onChange={(event) => setWinnersText(event.target.value)} rows={10} placeholder="OUTLET-001,1,Hadiah Utama" />
+                            <Textarea value={winnersText} onChange={(event) => setWinnersText(event.target.value)} rows={6} placeholder="OUTLET-001,1,Hadiah Utama" />
                             <Button onClick={publishWinners} disabled={managementSaving}>
                                 <Award className="h-4 w-4" /> Publikasikan Pemenang
                             </Button>
+
+                            <div className="space-y-2 rounded-md border p-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold">Reward Otomatis (Preview)</h3>
+                                    <Button type="button" variant="outline" size="sm" onClick={hitungReward} disabled={rewardsLoading}>
+                                        {rewardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                        Hitung Reward
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Dihitung dari leaderboard terbaru (klik Recompute dulu bila perlu) dan aturan reward program. Hasilnya masih bisa diedit sebelum dipublikasikan.
+                                </p>
+                                {rewardsPreview.length > 0 && (
+                                    <>
+                                        <div className="max-h-48 space-y-1 overflow-y-auto">
+                                            {rewardsPreview.map((row, index) => (
+                                                <div key={`${row.outletId}-${row.ruleId}-${index}`} className="flex items-center justify-between rounded bg-muted/50 px-2 py-1.5 text-sm">
+                                                    <div>
+                                                        <p className="font-medium">{row.outletName}</p>
+                                                        <p className="text-xs text-muted-foreground">{row.outletCode}</p>
+                                                    </div>
+                                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold ring-1 ring-gray-200">{row.rewardLabel}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <Button type="button" variant="outline" size="sm" onClick={isiKePemenang}>Isi ke Pemenang</Button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

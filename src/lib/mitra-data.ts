@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, like, or } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { resolveOutletMapsUrl } from "@/lib/mitra-outlet-options";
@@ -15,6 +15,7 @@ import {
     mitraProgramLeaderboard,
     mitraProgramParams,
     mitraProgramParticipants,
+    mitraProgramRewardRules,
     mitraProgramScores,
     mitraPrograms,
     mitraProgramWinners,
@@ -316,6 +317,80 @@ export async function getPublicMitraPrograms() {
         .orderBy(desc(mitraPrograms.periodStart));
 }
 
+/**
+ * Menggabungkan baris `mitraProgramScores` (satu baris per outlet/parameter/hari) jadi
+ * satu nilai per outlet per parameter, sesuai mode agregasi parameter itu (SUM/AVG/LAST).
+ * `points` di setiap baris sudah berbobot (dihitung saat commit import), jadi di sini
+ * tinggal digabung -- weight tidak dikalikan ulang. Dipakai bareng oleh halaman publik
+ * (tampilan per-parameter) dan recompute leaderboard (total per outlet), supaya
+ * keduanya konsisten menghormati mode agregasi tiap parameter.
+ */
+async function computeOutletParamAggregates(
+    programId: string,
+    params: { id: string; aggregation: "SUM" | "AVG" | "LAST" }[],
+    outletIds: string[]
+) {
+    const skorRows = outletIds.length > 0 && params.length > 0
+        ? await db
+            .select({
+                outletId: mitraProgramScores.outletId,
+                paramId: mitraProgramScores.paramId,
+                achievementDate: mitraProgramScores.achievementDate,
+                rawValue: mitraProgramScores.rawValue,
+                points: mitraProgramScores.points,
+            })
+            .from(mitraProgramScores)
+            .where(and(
+                eq(mitraProgramScores.programId, programId),
+                inArray(mitraProgramScores.outletId, outletIds)
+            ))
+        : [];
+
+    const paramById = new Map(params.map((param) => [param.id, param]));
+    const kumpulan = new Map<string, { raw: number[]; points: number[]; tanggalTerakhir: string }>();
+
+    for (const skor of skorRows) {
+        const kunci = `${skor.outletId}::${skor.paramId}`;
+        const param = paramById.get(skor.paramId);
+        if (!param) continue;
+
+        const bucket = kumpulan.get(kunci) || { raw: [], points: [], tanggalTerakhir: "" };
+
+        if (param.aggregation === "LAST") {
+            // Hanya tanggal terbaru yang dipakai; tanggal lama dibuang saat ketemu yang lebih baru.
+            if (skor.achievementDate > bucket.tanggalTerakhir) {
+                bucket.tanggalTerakhir = skor.achievementDate;
+                bucket.raw = [Number(skor.rawValue)];
+                bucket.points = [Number(skor.points)];
+            }
+        } else {
+            bucket.raw.push(Number(skor.rawValue));
+            bucket.points.push(Number(skor.points));
+            if (skor.achievementDate > bucket.tanggalTerakhir) bucket.tanggalTerakhir = skor.achievementDate;
+        }
+
+        kumpulan.set(kunci, bucket);
+    }
+
+    const ringkas = (nilai: number[], mode: string) => {
+        if (nilai.length === 0) return 0;
+        if (mode === "AVG") return nilai.reduce((total, item) => total + item, 0) / nilai.length;
+        // SUM dan LAST sama-sama menjumlah; untuk LAST isinya memang tinggal satu nilai.
+        return nilai.reduce((total, item) => total + item, 0);
+    };
+
+    return {
+        get(outletId: string, paramId: string) {
+            const bucket = kumpulan.get(`${outletId}::${paramId}`);
+            const mode = paramById.get(paramId)?.aggregation || "SUM";
+            return {
+                raw: ringkas(bucket?.raw || [], mode),
+                points: ringkas(bucket?.points || [], mode),
+            };
+        },
+    };
+}
+
 export async function getPublicMitraProgramDetail(slug: string, search = "") {
     const [program] = await db
         .select()
@@ -412,73 +487,13 @@ export async function getPublicMitraProgramDetail(slug: string, search = "") {
 
     const barisTampil = [...leaderboard.map((row) => ({ ...row, rank: row.rank as number | null })), ...tanpaSkor];
 
-    /**
-     * Pencapaian per parameter. Skor mentahnya sudah lama tersimpan per bulan, tetapi
-     * belum pernah dikirim ke halaman publik -- yang dikirim hanya total poin.
-     *
-     * Digabungkan di JavaScript, bukan lewat SUM() di SQL, karena tiap parameter punya
-     * mode agregasinya sendiri (SUM/AVG/LAST) dan LAST berarti "ambil periode terbaru",
-     * yang tidak bisa diwakili satu fungsi agregat SQL.
-     */
+    // Pencapaian per parameter, digabung sesuai mode agregasi (SUM/AVG/LAST) masing-masing.
     const outletIds = barisTampil.map((row) => row.outletId);
-    const skorRows = outletIds.length > 0 && params.length > 0
-        ? await db
-            .select({
-                outletId: mitraProgramScores.outletId,
-                paramId: mitraProgramScores.paramId,
-                periodYm: mitraProgramScores.periodYm,
-                rawValue: mitraProgramScores.rawValue,
-                points: mitraProgramScores.points,
-            })
-            .from(mitraProgramScores)
-            .where(and(
-                eq(mitraProgramScores.programId, program.id),
-                inArray(mitraProgramScores.outletId, outletIds)
-            ))
-        : [];
-
-    const paramById = new Map(params.map((param) => [param.id, param]));
-    const kumpulan = new Map<string, { raw: number[]; points: number[]; periodTerakhir: string }>();
-
-    for (const skor of skorRows) {
-        const kunci = `${skor.outletId}::${skor.paramId}`;
-        const param = paramById.get(skor.paramId);
-        if (!param) continue;
-
-        const bucket = kumpulan.get(kunci) || { raw: [], points: [], periodTerakhir: "" };
-
-        if (param.aggregation === "LAST") {
-            // Hanya periode terbaru yang dipakai; periode lama dibuang saat ketemu yang lebih baru.
-            if (skor.periodYm > bucket.periodTerakhir) {
-                bucket.periodTerakhir = skor.periodYm;
-                bucket.raw = [Number(skor.rawValue)];
-                bucket.points = [Number(skor.points)];
-            }
-        } else {
-            bucket.raw.push(Number(skor.rawValue));
-            bucket.points.push(Number(skor.points));
-            if (skor.periodYm > bucket.periodTerakhir) bucket.periodTerakhir = skor.periodYm;
-        }
-
-        kumpulan.set(kunci, bucket);
-    }
-
-    const ringkas = (nilai: number[], mode: string) => {
-        if (nilai.length === 0) return 0;
-        if (mode === "AVG") return nilai.reduce((total, item) => total + item, 0) / nilai.length;
-        // SUM dan LAST sama-sama menjumlah; untuk LAST isinya memang tinggal satu nilai.
-        return nilai.reduce((total, item) => total + item, 0);
-    };
+    const aggregates = await computeOutletParamAggregates(program.id, params, outletIds);
 
     const barisDenganMetrik = barisTampil.map((row) => ({
         ...row,
-        metrics: Object.fromEntries(params.map((param) => {
-            const bucket = kumpulan.get(`${row.outletId}::${param.id}`);
-            return [param.key, {
-                raw: ringkas(bucket?.raw || [], param.aggregation),
-                points: ringkas(bucket?.points || [], param.aggregation),
-            }];
-        })),
+        metrics: Object.fromEntries(params.map((param) => [param.key, aggregates.get(row.outletId, param.id)])),
     }));
 
     return { program, params, leaderboard: barisDenganMetrik, winners };
@@ -496,26 +511,38 @@ export async function recomputeMitraProgramLeaderboard(programId: string) {
         .where(eq(mitraProgramLeaderboard.programId, programId));
     const previousRank = new Map(previousRows.map((row) => [row.outletId, row.rank]));
 
-    const rows = await db
-        .select({
-            outletId: mitraProgramScores.outletId,
-            totalPoints: sql<string>`sum(${mitraProgramScores.points})`,
-        })
+    const params = await db
+        .select()
+        .from(mitraProgramParams)
+        .where(eq(mitraProgramParams.programId, programId))
+        .orderBy(asc(mitraProgramParams.sortOrder));
+
+    const scoredOutlets = await db
+        .selectDistinct({ outletId: mitraProgramScores.outletId })
         .from(mitraProgramScores)
         .where(and(
             eq(mitraProgramScores.programId, programId),
             participantIds.length > 0 ? inArray(mitraProgramScores.outletId, participantIds) : undefined
-        ))
-        .groupBy(mitraProgramScores.outletId)
-        .orderBy(desc(sql`sum(${mitraProgramScores.points})`));
+        ));
+    const outletIds = scoredOutlets.map((row) => row.outletId);
+
+    // Total per outlet = jumlah nilai teragregasi tiap parameter (bukan SUM mentah semua
+    // baris), supaya parameter ber-mode AVG/LAST tidak ikut kejumlah per hari.
+    const aggregates = await computeOutletParamAggregates(programId, params, outletIds);
+    const totals = outletIds
+        .map((outletId) => ({
+            outletId,
+            totalPoints: params.reduce((total, param) => total + aggregates.get(outletId, param.id).points, 0),
+        }))
+        .sort((a, b) => b.totalPoints - a.totalPoints);
 
     const now = new Date();
     await db.delete(mitraProgramLeaderboard).where(eq(mitraProgramLeaderboard.programId, programId));
 
-    if (rows.length === 0) return;
+    if (totals.length === 0) return;
 
     await db.insert(mitraProgramLeaderboard).values(
-        rows.map((row, index) => ({
+        totals.map((row, index) => ({
             id: uuid(),
             programId,
             outletId: row.outletId,
@@ -525,6 +552,84 @@ export async function recomputeMitraProgramLeaderboard(programId: string) {
             computedAt: now,
         }))
     );
+}
+
+/**
+ * Mencocokkan leaderboard + pencapaian per parameter terhadap aturan reward program
+ * (RANK atau THRESHOLD). Dipanggil setelah recompute, hasilnya preview -- admin masih
+ * perlu menyalin ke "Pemenang" dan publish secara sadar sebelum tampil ke publik.
+ */
+export async function computeMitraProgramRewards(programId: string) {
+    const rules = await db
+        .select()
+        .from(mitraProgramRewardRules)
+        .where(eq(mitraProgramRewardRules.programId, programId))
+        .orderBy(asc(mitraProgramRewardRules.sortOrder));
+
+    if (rules.length === 0) return [];
+
+    const leaderboard = await db
+        .select({
+            outletId: mitraOutlets.id,
+            outletName: mitraOutlets.name,
+            outletCode: mitraOutlets.outletCode,
+            totalPoints: mitraProgramLeaderboard.totalPoints,
+            rank: mitraProgramLeaderboard.rank,
+        })
+        .from(mitraProgramLeaderboard)
+        .innerJoin(mitraOutlets, eq(mitraProgramLeaderboard.outletId, mitraOutlets.id))
+        .where(eq(mitraProgramLeaderboard.programId, programId))
+        .orderBy(asc(mitraProgramLeaderboard.rank));
+
+    const needsParamValues = rules.some((rule) => rule.ruleType === "THRESHOLD" && rule.paramKey);
+    let aggregates: Awaited<ReturnType<typeof computeOutletParamAggregates>> | null = null;
+    let paramByKey = new Map<string, { id: string; aggregation: "SUM" | "AVG" | "LAST" }>();
+
+    if (needsParamValues) {
+        const params = await db
+            .select()
+            .from(mitraProgramParams)
+            .where(eq(mitraProgramParams.programId, programId));
+        paramByKey = new Map(params.map((param) => [param.key, param]));
+        aggregates = await computeOutletParamAggregates(programId, params, leaderboard.map((row) => row.outletId));
+    }
+
+    const comparators: Record<string, (value: number, target: number) => boolean> = {
+        ">=": (value, target) => value >= target,
+        ">": (value, target) => value > target,
+        "<=": (value, target) => value <= target,
+        "<": (value, target) => value < target,
+        "=": (value, target) => value === target,
+    };
+
+    const hasil: { outletId: string; outletName: string; outletCode: string; ruleId: string; rewardLabel: string }[] = [];
+
+    for (const rule of rules) {
+        if (rule.ruleType === "RANK") {
+            const dari = rule.rankFrom ?? 1;
+            const sampai = rule.rankTo ?? dari;
+            for (const row of leaderboard) {
+                if (row.rank !== null && row.rank >= dari && row.rank <= sampai) {
+                    hasil.push({ outletId: row.outletId, outletName: row.outletName, outletCode: row.outletCode, ruleId: rule.id, rewardLabel: rule.rewardLabel });
+                }
+            }
+        } else {
+            const target = Number(rule.thresholdValue ?? 0);
+            const bandingkan = comparators[rule.comparator ?? ">="];
+            const param = rule.paramKey ? paramByKey.get(rule.paramKey) : null;
+
+            for (const row of leaderboard) {
+                const nilai = rule.paramKey
+                    ? (param && aggregates ? aggregates.get(row.outletId, param.id).points : null)
+                    : Number(row.totalPoints);
+                if (nilai !== null && bandingkan(nilai, target)) {
+                    hasil.push({ outletId: row.outletId, outletName: row.outletName, outletCode: row.outletCode, ruleId: rule.id, rewardLabel: rule.rewardLabel });
+                }
+            }
+        }
+    }
+
+    return hasil;
 }
 
 export async function getMitraAdminSummary() {
