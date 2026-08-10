@@ -8,6 +8,7 @@ import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldA
 import { BackLink } from "@/components/back-link";
 import { InfoCard } from "@/components/mitra/info-card";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
+import { PetaSekitar } from "@/components/mitra/peta-sekitar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -224,6 +225,23 @@ export default function MitraOutletProfilePage() {
 
             <section className="mx-auto max-w-6xl space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
                 <OutletPhotoCard outlet={outlet} />
+
+                {/* Peta sekitar ikut tampil sebelum OTP. Yang dibuka hanya sebaran titiknya --
+                    koordinat outlet memang sudah publik di direktori /mitra, dan titik ODP
+                    dikirim tanpa nama maupun kapasitas port. Rincian ODP tetap di balik OTP. */}
+                {outlet.latitude != null && outlet.longitude != null && (
+                    <PetaSekitar
+                        outlet={{
+                            publicToken: outlet.publicToken,
+                            outletCode: outlet.outletCode,
+                            name: outlet.name,
+                            kabupaten: outlet.kabupaten,
+                            kecamatan: outlet.kecamatan,
+                            latitude: Number(outlet.latitude),
+                            longitude: Number(outlet.longitude),
+                        }}
+                    />
+                )}
             </section>
 
             <Dialog open={Boolean(notice)} onOpenChange={(open) => { if (!open) setNotice(null); }}>
@@ -241,6 +259,19 @@ export default function MitraOutletProfilePage() {
         </main>
     );
 }
+
+/**
+ * Foto salesforce digeser ke atas supaya kepalanya menyembul dari lingkaran. Ketiga angka
+ * di bawah harus tetap sejalan: garis potong salinan yang menyembul dihitung dari geseran
+ * dan tinggi fotonya, bukan diketik terpisah. Ketika garis potong jatuh di bawah tepi atas
+ * lingkaran, sisa gambarnya tergambar sebagai kotak persegi yang menutupi bingkai putih dan
+ * caption di atasnya -- persis keluhan "caption tertutup blok kotak". Dengan rumus ini
+ * potongannya berhenti tepat di tepi lingkaran, sehingga yang menutupi caption hanya piksel
+ * fotonya sendiri (foto salesforce diunggah dengan latar transparan).
+ */
+const FOTO_GESER_ATAS = 18; // persen tinggi kotak avatar
+const FOTO_TINGGI = 118;    // persen tinggi kotak avatar
+const FOTO_POTONG = (FOTO_GESER_ATAS / FOTO_TINGGI) * 100;
 
 // Salesforce dapat kartunya sendiri (selebar dua kolom) karena hanya kolom ini yang
 // membawa foto; menaruhnya di grid Info biasa akan membuat satu sel jauh lebih tinggi
@@ -270,11 +301,15 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
                                     width={96}
                                     height={113}
                                     sizes="96px"
-                                    className="absolute -top-[18%] left-0 h-[118%] w-full max-w-none object-cover object-top"
+                                    className="absolute left-0 w-full max-w-none object-cover object-top"
+                                    style={{ top: `-${FOTO_GESER_ATAS}%`, height: `${FOTO_TINGGI}%` }}
                                     unoptimized
                                 />
                             </div>
                             <div className="pointer-events-none absolute inset-0 z-[1] rounded-full border-2 border-white shadow-sm" />
+                            {/* Salinan yang menyembul dipotong tepat di tepi atas lingkaran dan tidak
+                                dipersempit ke samping: batas kotak apa pun di sini akan terlihat sebagai
+                                blok, sedangkan di luar garis itu yang tampak hanya sosok di fotonya. */}
                             <Image
                                 src={photoUrl}
                                 alt=""
@@ -282,8 +317,12 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
                                 width={96}
                                 height={113}
                                 sizes="96px"
-                                className="pointer-events-none absolute -top-[18%] left-0 z-[2] h-[118%] w-full max-w-none object-cover object-top"
-                                style={{ clipPath: "polygon(10% 0, 90% 0, 90% 23%, 10% 23%)" }}
+                                className="pointer-events-none absolute left-0 z-[2] w-full max-w-none object-cover object-top"
+                                style={{
+                                    top: `-${FOTO_GESER_ATAS}%`,
+                                    height: `${FOTO_TINGGI}%`,
+                                    clipPath: `polygon(0 0, 100% 0, 100% ${FOTO_POTONG}%, 0 ${FOTO_POTONG}%)`,
+                                }}
                                 unoptimized
                             />
                         </>
