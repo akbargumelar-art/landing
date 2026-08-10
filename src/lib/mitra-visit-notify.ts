@@ -11,8 +11,9 @@ import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMe
  * Tiga aturan yang membentuk seluruh modul ini:
  *
  * 1. SATU KUNJUNGAN = SATU PESAN. Foto diunggah satu per satu, jadi kalau route unggah
- *    langsung mengirim WA, satu kunjungan menghasilkan empat pesan. Aktivitas dikumpulkan
- *    per sesi OTP dan baru dikirim setelah JEDA_HENING_MS berlalu tanpa aktivitas baru.
+ *    langsung mengirim WA, satu kunjungan menghasilkan empat pesan. Unggahan dikumpulkan
+ *    per sesi OTP dan baru dikirim setelah JEDA_HENING_MS berlalu tanpa unggahan baru.
+ *    Hanya foto yang memicu notifikasi -- perubahan long-lat cukup masuk riwayat edit.
  *
  * 2. FOTO YANG DIKIRIM DIUNDI. WhatsApp hanya memuat satu gambar per pesan, jadi satu foto
  *    dipilih acak dari foto yang diunggah PADA KUNJUNGAN INI -- foto lama dari kunjungan
@@ -76,8 +77,7 @@ interface AktivitasKunjungan {
     /** id sesi OTP; inilah kunci "satu kunjungan". */
     sessionId: string;
     actorPhone?: string | null;
-    foto?: FotoKunjungan;
-    lokasiBerubah?: boolean;
+    foto: FotoKunjungan;
 }
 
 /**
@@ -105,8 +105,7 @@ export async function catatAktivitasKunjungan(input: AktivitasKunjungan): Promis
                 outletId: input.outletId,
                 sessionId: input.sessionId,
                 actorPhone: input.actorPhone || null,
-                photosJson: input.foto ? [input.foto] : [],
-                locationChanged: Boolean(input.lokasiBerubah),
+                photosJson: [input.foto],
                 status: "PENDING",
                 lastActivityAt: sekarang,
                 createdAt: sekarang,
@@ -115,17 +114,13 @@ export async function catatAktivitasKunjungan(input: AktivitasKunjungan): Promis
             // Aturan 1: aktivitas susulan menambah isi pesan dan menggeser jeda hening,
             // bukan membuat pesan kedua.
             const foto = adaBaris.photosJson || [];
-            const fotoBaru = input.foto
-                // Slot yang sama diunggah ulang cukup menimpa entri lamanya, supaya undian
-                // tidak jadi berat sebelah ke slot yang kebetulan difoto berkali-kali.
-                ? [...foto.filter((f) => f.slot !== input.foto!.slot), input.foto]
-                : foto;
 
             await db
                 .update(mitraVisitNotifications)
                 .set({
-                    photosJson: fotoBaru,
-                    locationChanged: adaBaris.locationChanged || Boolean(input.lokasiBerubah),
+                    // Slot yang sama diunggah ulang cukup menimpa entri lamanya, supaya undian
+                    // tidak jadi berat sebelah ke slot yang kebetulan difoto berkali-kali.
+                    photosJson: [...foto.filter((f) => f.slot !== input.foto.slot), input.foto],
                     lastActivityAt: sekarang,
                 })
                 .where(eq(mitraVisitNotifications.id, adaBaris.id));
@@ -286,28 +281,18 @@ async function kirimSatu(baris: BarisNotifikasi): Promise<void> {
         }
 
         const foto = baris.photosJson || [];
-        const perubahan = [
-            foto.length ? `${foto.length} foto diperbarui` : null,
-            baris.locationChanged ? "titik long-lat diperbarui" : null,
-        ].filter(Boolean).join(", ");
 
-        let pesan = renderTemplate(config.template, {
+        const pesan = renderTemplate(config.template, {
             salesforce: outlet.salesforce || "-",
             digipos: outlet.outletCode,
             outlet: outlet.name,
             tap: outlet.tap || "-",
-            perubahan: perubahan || "-",
+            perubahan: `${foto.length} foto diperbarui`,
             tanggal: new Intl.DateTimeFormat("id-ID", {
                 dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta",
             }).format(baris.lastActivityAt),
             link: urlAbsolut(`/mitra/o/${outlet.publicToken}`) || "",
         });
-
-        // Perubahan koordinat tidak terlihat dari foto, jadi disebut eksplisit -- tanpa ini
-        // group tidak punya cara membedakan kunjungan yang ikut membetulkan titik peta.
-        if (baris.locationChanged) {
-            pesan += "\n\n_Titik long-lat outlet diperbarui pada kunjungan ini._";
-        }
 
         // Aturan 2: satu foto diundi dari foto kunjungan ini.
         const terpilih = foto.length ? foto[Math.floor(Math.random() * foto.length)] : null;
@@ -319,7 +304,8 @@ async function kirimSatu(baris: BarisNotifikasi): Promise<void> {
 
         const hasil = gambar
             ? await sendWhatsAppImage(config.chatId, gambar, pesan, `${terpilih!.slot}.jpg`)
-            // Kunjungan yang hanya membetulkan koordinat memang tidak punya foto baru.
+            // Hanya terjadi bila URL absolutnya tidak bisa dibentuk: pesannya tetap dikirim
+            // supaya kunjungannya tercatat di group, sekadar tanpa gambar.
             : await sendWhatsAppMessage(config.chatId, pesan);
 
         await tandai(baris, hasil.ok, hasil.error);

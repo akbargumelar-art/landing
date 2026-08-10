@@ -4,7 +4,6 @@ CREATE TABLE `mitra_visit_notifications` (
 	`session_id` varchar(36) NOT NULL,
 	`actor_phone` varchar(50),
 	`photos_json` json,
-	`location_changed` boolean NOT NULL DEFAULT false,
 	`status` enum('PENDING','SENDING','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
 	`attempts` int NOT NULL DEFAULT 0,
 	`last_error` varchar(500),

@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
 import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
 import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
-import { catatAktivitasKunjungan } from "@/lib/mitra-visit-notify";
 import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -68,14 +67,7 @@ export async function POST(
         ip: getClientIp(request),
     });
 
-    // Ikut dikumpulkan ke notifikasi kunjungan yang sama dengan unggahan fotonya, sehingga
-    // salesforce yang membetulkan titik peta lalu memotret outlet tetap menghasilkan satu pesan.
-    await catatAktivitasKunjungan({
-        outletId: akses.outlet.id,
-        sessionId: akses.session.id,
-        actorPhone: akses.session.phoneE164,
-        lokasiBerubah: true,
-    });
-
+    // Sengaja TIDAK memicu notifikasi group: hanya unggahan foto yang diteruskan ke sana.
+    // Perubahan koordinat tetap terekam di riwayat edit outlet di atas.
     return NextResponse.json({ success: true, latitude, longitude, locationUrl });
 }

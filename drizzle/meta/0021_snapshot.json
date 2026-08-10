@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "39dc138c-48ef-4a51-be65-1d48838d3723",
+  "id": "5a61a945-0bae-4349-8698-375612ec2cf6",
   "prevId": "ca587f8d-7585-4ad7-a4c8-5950ae5a5daf",
   "tables": {
     "account": {
@@ -4107,14 +4107,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "location_changed": {
-          "name": "location_changed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "status": {
           "name": "status",

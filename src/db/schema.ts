@@ -823,7 +823,6 @@ export const mitraVisitNotifications = mysqlTable("mitra_visit_notifications", {
     actorPhone: varchar("actor_phone", { length: 50 }),
     /** Foto yang diunggah pada kunjungan ini: [{ slot, label, url }]. Undian diambil dari sini. */
     photosJson: json("photos_json").$type<{ slot: string; label: string; url: string }[]>(),
-    locationChanged: boolean("location_changed").notNull().default(false),
     status: mysqlEnum("status", ["PENDING", "SENDING", "SENT", "FAILED"]).notNull().default("PENDING"),
     attempts: int("attempts").notNull().default(0),
     lastError: varchar("last_error", { length: 500 }),
