@@ -7,7 +7,9 @@ import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface Batch {
     id: string;
@@ -30,6 +32,7 @@ export default function AdminMitraImportPage() {
         ringkasan?: { tambah: number; perbarui: number } | null;
     } | null>(null);
     const [batches, setBatches] = React.useState<Batch[]>([]);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         fetch("/api/admin/mitra/imports")
@@ -63,6 +66,14 @@ export default function AdminMitraImportPage() {
         if (!res.ok) alert(data.error || "Rollback gagal");
         load();
     };
+
+    const batchesTampil = urutkanBaris(batches, urut, (batch, kolom) => {
+        if (kolom === "file") return batch.fileName;
+        if (kolom === "tipe") return batch.type;
+        if (kolom === "rows") return batch.rowCount;
+        if (kolom === "status") return batch.status;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -145,15 +156,15 @@ export default function AdminMitraImportPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>File</TableHead>
-                                <TableHead>Tipe</TableHead>
-                                <TableHead>Rows</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead><TombolUrut kolom="file" label="File" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="tipe" label="Tipe" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="rows" label="Rows" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {batches.length ? batches.map((batch) => (
+                            {batchesTampil.length ? batchesTampil.map((batch) => (
                                 <TableRow key={batch.id}>
                                     <TableCell><p className="font-semibold">{batch.fileName}</p><p className="text-xs text-muted-foreground">{new Date(batch.createdAt).toLocaleString("id-ID")}</p></TableCell>
                                     <TableCell>{batch.type}</TableCell>

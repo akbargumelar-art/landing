@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ODP_CATEGORIES, hitungOccupancy, infoKategori, type OdpCategory } from "@/lib/indihome-odp";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface OdpRow {
     id: string;
@@ -42,6 +44,7 @@ export function IndihomeOdpPanel() {
     const [mengunggah, setMengunggah] = React.useState(false);
     const [hasilUnggah, setHasilUnggah] = React.useState<{ saved: number; errors: { row: number; message: string }[] } | null>(null);
     const [form, setForm] = React.useState(KOSONG);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -113,6 +116,15 @@ export function IndihomeOdpPanel() {
         if (!res.ok) return alert("Gagal menghapus data ODP");
         load();
     };
+
+    const rowsTampil = urutkanBaris(rows, urut, (row, kolom) => {
+        if (kolom === "odp") return row.name || "";
+        if (kolom === "wilayah") return row.kecamatan;
+        if (kolom === "port") return row.portTotal;
+        if (kolom === "occupancy") return hitungOccupancy(row.portUsed, row.portTotal);
+        if (kolom === "kategori") return infoKategori(row.category, row.portUsed, row.portTotal).label;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -217,18 +229,18 @@ export function IndihomeOdpPanel() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>ODP</TableHead>
-                                    <TableHead>Wilayah</TableHead>
-                                    <TableHead className="text-right">Port</TableHead>
-                                    <TableHead className="text-right">Occupancy</TableHead>
-                                    <TableHead>Kategori</TableHead>
+                                    <TableHead><TombolUrut kolom="odp" label="ODP" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead><TombolUrut kolom="wilayah" label="Wilayah" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead className="text-right"><TombolUrut kolom="port" label="Port" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                    <TableHead className="text-right"><TombolUrut kolom="occupancy" label="Occupancy" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                    <TableHead><TombolUrut kolom="kategori" label="Kategori" urut={urut} onKlik={gantiUrut} /></TableHead>
                                     <TableHead className="text-right">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                                ) : rows.length ? rows.map((row) => {
+                                ) : rowsTampil.length ? rowsTampil.map((row) => {
                                     const kategori = infoKategori(row.category, row.portUsed, row.portTotal);
                                     const occupancy = hitungOccupancy(row.portUsed, row.portTotal);
                                     return (

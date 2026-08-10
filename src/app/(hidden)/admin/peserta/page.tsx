@@ -8,10 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 import {
     CheckCircle, XCircle, Clock, Eye, Search, Download, Loader2, Calendar, Trash2, AlertTriangle
 } from "lucide-react";
@@ -52,6 +54,7 @@ export default function PesertaPage() {
     const [editingPeriod, setEditingPeriod] = useState("");
     const [savingPeriod, setSavingPeriod] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const fetchSubmissions = () => {
         const params = new URLSearchParams();
@@ -147,6 +150,15 @@ export default function PesertaPage() {
     // Collect unique periods from existing submissions for autocomplete
     const existingPeriods = [...new Set(submissions.map(s => s.period).filter(Boolean))].sort();
 
+    const submissionsTampil = urutkanBaris(submissions, urut, (sub, kolom) => {
+        if (kolom === "nama") return sub.participantName || "";
+        if (kolom === "program") return sub.form.program.title;
+        if (kolom === "periode") return sub.period || "";
+        if (kolom === "tanggal") return new Date(sub.submittedAt);
+        if (kolom === "status") return sub.status;
+        return "";
+    });
+
     if (loading && submissions.length === 0) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
     return (
@@ -188,18 +200,18 @@ export default function PesertaPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[50px]">No</TableHead>
-                                <TableHead>Nama / ID</TableHead>
-                                <TableHead>Program</TableHead>
-                                <TableHead>Periode</TableHead>
-                                <TableHead>Tanggal</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead><TombolUrut kolom="nama" label="Nama / ID" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="program" label="Program" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="periode" label="Periode" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="tanggal" label="Tanggal" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {submissions.length === 0 ? (
+                            {submissionsTampil.length === 0 ? (
                                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Belum ada data peserta</TableCell></TableRow>
-                            ) : submissions.map((sub, i) => (
+                            ) : submissionsTampil.map((sub, i) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="text-sm">{i + 1}</TableCell>
                                     <TableCell className="font-semibold text-gray-900 border-r border-gray-100/50">

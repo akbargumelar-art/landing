@@ -9,10 +9,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IndihomeOdpPanel } from "@/components/admin/indihome-odp-panel";
 import { INDIHOME_LEAD_STATUSES, type IndihomeLeadStatus } from "@/lib/indihome-admin";
 import { INDIHOME_LOCATIONS } from "@/lib/indihome-products";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 type AdminProduct = {
     id: string;
@@ -87,6 +89,7 @@ export default function AdminIndihomePage() {
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
+    const { urut: urutLeads, gantiUrut: gantiUrutLeads } = useUrutTabel<string>("");
 
     const loadProducts = useCallback(async () => {
         const response = await fetch("/api/admin/indihome/products");
@@ -216,6 +219,15 @@ export default function AdminIndihomePage() {
         }));
     }
 
+    const leadsTampil = urutkanBaris(leads, urutLeads, (lead, kolom) => {
+        if (kolom === "nama") return lead.fullName;
+        if (kolom === "paket") return lead.packageName;
+        if (kolom === "lokasi") return lead.location;
+        if (kolom === "tanggal") return new Date(lead.createdAt);
+        if (kolom === "status") return statusLabels[lead.status];
+        return "";
+    });
+
     if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-red-600" /></div>;
 
     return (
@@ -277,8 +289,15 @@ export default function AdminIndihomePage() {
                         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"><option value="">Semua status</option>{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select>
                         <Button type="submit" variant="outline" className="rounded-lg"><Search className="mr-2 h-4 w-4" /> Terapkan</Button>
                     </form>
-                    <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Pelanggan</TableHead><TableHead>Paket</TableHead><TableHead>Lokasi</TableHead><TableHead>Tanggal</TableHead><TableHead>Status</TableHead><TableHead className="w-16"><span className="sr-only">Detail</span></TableHead></TableRow></TableHeader><TableBody>
-                        {leads.length === 0 ? <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Belum ada pengajuan sesuai filter.</TableCell></TableRow> : leads.map((lead) => (
+                    <Card><CardContent className="p-0"><Table><TableHeader><TableRow>
+                        <TableHead><TombolUrut kolom="nama" label="Pelanggan" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="paket" label="Paket" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="lokasi" label="Lokasi" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="tanggal" label="Tanggal" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="status" label="Status" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead className="w-16"><span className="sr-only">Detail</span></TableHead>
+                    </TableRow></TableHeader><TableBody>
+                        {leadsTampil.length === 0 ? <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Belum ada pengajuan sesuai filter.</TableCell></TableRow> : leadsTampil.map((lead) => (
                             <TableRow key={lead.id}>
                                 <TableCell><p className="font-semibold text-gray-950">{lead.fullName}</p><p className="mt-1 text-xs text-muted-foreground">{lead.phoneE164}</p></TableCell>
                                 <TableCell className="font-medium">{lead.packageName}</TableCell>

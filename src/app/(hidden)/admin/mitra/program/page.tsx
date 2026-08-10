@@ -8,7 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface Program {
     id: string;
@@ -29,6 +31,7 @@ export default function AdminMitraProgramPage() {
     const [participantCodes, setParticipantCodes] = React.useState("");
     const [winnersText, setWinnersText] = React.useState("");
     const [managementSaving, setManagementSaving] = React.useState(false);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
     const [form, setForm] = React.useState({
         name: "",
         descriptionMd: "",
@@ -126,6 +129,14 @@ export default function AdminMitraProgramPage() {
         load();
     };
 
+    const programsTampil = urutkanBaris(programs, urut, (program, kolom) => {
+        if (kolom === "program") return program.name;
+        if (kolom === "periode") return new Date(program.periodStart);
+        if (kolom === "status") return program.status;
+        if (kolom === "params") return program.params?.length || 0;
+        return "";
+    });
+
     return (
         <div className="space-y-6">
             <div>
@@ -186,17 +197,17 @@ export default function AdminMitraProgramPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Program</TableHead>
-                                <TableHead>Periode</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Params</TableHead>
+                                <TableHead><TombolUrut kolom="program" label="Program" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="periode" label="Periode" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="params" label="Params" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
-                            ) : programs.length ? programs.map((program) => (
+                            ) : programsTampil.length ? programsTampil.map((program) => (
                                 <TableRow key={program.id}>
                                     <TableCell><p className="font-semibold">{program.name}</p><p className="text-xs text-muted-foreground">/mitra/program/{program.slug}</p></TableCell>
                                     <TableCell className="text-sm">{new Date(program.periodStart).toLocaleDateString("id-ID")} - {new Date(program.periodEnd).toLocaleDateString("id-ID")}</TableCell>

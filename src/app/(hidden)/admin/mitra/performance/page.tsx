@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface MetricDef {
     id: string;
@@ -40,6 +42,7 @@ export default function AdminMitraPerformancePage() {
     const [loading, setLoading] = React.useState(true);
     const [defForm, setDefForm] = React.useState({ key: "", label: "", unit: "", isPublic: false });
     const [metricForm, setMetricForm] = React.useState({ outletId: "", metricDefId: "", periodYm: new Date().toISOString().slice(0, 7), value: "" });
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -80,6 +83,14 @@ export default function AdminMitraPerformancePage() {
             load();
         }
     };
+
+    const metricsTampil = urutkanBaris(metrics, urut, (metric, kolom) => {
+        if (kolom === "outlet") return metric.outletName;
+        if (kolom === "metric") return defs.find((item) => item.id === metric.metricDefId)?.label || metric.metricDefId;
+        if (kolom === "periode") return metric.periodYm;
+        if (kolom === "nilai") return Number(metric.value);
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -153,16 +164,16 @@ export default function AdminMitraPerformancePage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Outlet</TableHead>
-                                <TableHead>Metric</TableHead>
-                                <TableHead>Periode</TableHead>
-                                <TableHead className="text-right">Nilai</TableHead>
+                                <TableHead><TombolUrut kolom="outlet" label="Outlet" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="metric" label="Metric" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="periode" label="Periode" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead className="text-right"><TombolUrut kolom="nilai" label="Nilai" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
-                            ) : metrics.length ? metrics.map((metric) => {
+                            ) : metricsTampil.length ? metricsTampil.map((metric) => {
                                 const def = defs.find((item) => item.id === metric.metricDefId);
                                 return (
                                     <TableRow key={metric.id}>

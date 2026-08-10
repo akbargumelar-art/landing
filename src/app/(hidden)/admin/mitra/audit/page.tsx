@@ -7,7 +7,9 @@ import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface AuditLog {
     id: string;
@@ -25,6 +27,7 @@ export default function AdminMitraAuditPage() {
     const [logs, setLogs] = React.useState<AuditLog[]>([]);
     const [q, setQ] = React.useState("");
     const [loading, setLoading] = React.useState(true);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -35,6 +38,14 @@ export default function AdminMitraAuditPage() {
     }, [q]);
 
     React.useEffect(() => { load(); }, [load]);
+
+    const logsTampil = urutkanBaris(logs, urut, (log, kolom) => {
+        if (kolom === "waktu") return new Date(log.createdAt);
+        if (kolom === "aktor") return log.userName || log.userEmail || "";
+        if (kolom === "aksi") return log.action;
+        if (kolom === "entity") return log.entity;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -56,17 +67,17 @@ export default function AdminMitraAuditPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Waktu</TableHead>
-                                <TableHead>Aktor</TableHead>
-                                <TableHead>Aksi</TableHead>
-                                <TableHead>Entity</TableHead>
+                                <TableHead><TombolUrut kolom="waktu" label="Waktu" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="aktor" label="Aktor" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="aksi" label="Aksi" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="entity" label="Entity" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead>Diff</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
-                            ) : logs.length ? logs.map((log) => (
+                            ) : logsTampil.length ? logsTampil.map((log) => (
                                 <TableRow key={log.id}>
                                     <TableCell className="text-xs">{new Date(log.createdAt).toLocaleString("id-ID")}</TableCell>
                                     <TableCell><p className="text-sm font-semibold">{log.userName || "-"}</p><p className="text-xs text-muted-foreground">{log.userEmail || log.ip || ""}</p></TableCell>

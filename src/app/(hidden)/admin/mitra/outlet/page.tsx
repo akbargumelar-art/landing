@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 import {
     DEFAULT_OUTLET_BRANDING,
     DEFAULT_OUTLET_CATEGORY,
@@ -62,6 +64,7 @@ export default function AdminMitraOutletPage() {
     const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
     const editRef = React.useRef<HTMLDivElement>(null);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
     const [deleting, setDeleting] = React.useState(false);
     const [form, setForm] = React.useState({
         outletCode: "",
@@ -212,6 +215,14 @@ export default function AdminMitraOutletPage() {
         setEditOutlet(null);
         load();
     };
+
+    const outletsTampil = urutkanBaris(outlets, urut, (outlet, kolom) => {
+        if (kolom === "outlet") return outlet.name;
+        if (kolom === "wilayah") return outlet.kecamatan;
+        if (kolom === "owner") return outlet.ownerName;
+        if (kolom === "status") return outlet.status;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -474,17 +485,17 @@ export default function AdminMitraOutletPage() {
                                         onChange={(event) => setSelectedIds(event.target.checked ? outlets.map((outlet) => outlet.id) : [])}
                                     />
                                 </TableHead>
-                                <TableHead>Outlet</TableHead>
-                                <TableHead>Wilayah</TableHead>
-                                <TableHead>Owner</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead><TombolUrut kolom="outlet" label="Outlet" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="wilayah" label="Wilayah" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="owner" label="Owner" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                            ) : outlets.length ? outlets.map((outlet) => (
+                            ) : outletsTampil.length ? outletsTampil.map((outlet) => (
                                 <TableRow key={outlet.id}>
                                     <TableCell>
                                         <input

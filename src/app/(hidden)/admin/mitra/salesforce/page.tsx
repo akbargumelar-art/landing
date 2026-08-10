@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface Salesforce {
     id: string;
@@ -33,6 +35,7 @@ export default function AdminMitraSalesforcePage() {
     // Form edit berada di atas tabel, jadi menekan Edit pada baris yang jauh di bawah
     // tampak seperti tidak terjadi apa-apa. Halaman digulirkan ke formulirnya.
     const formRef = React.useRef<HTMLDivElement>(null);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -103,6 +106,15 @@ export default function AdminMitraSalesforcePage() {
             isActive: row.isActive,
         });
     };
+
+    const rowsTampil = urutkanBaris(rows, urut, (row, kolom) => {
+        if (kolom === "salesforce") return row.name;
+        if (kolom === "tap") return row.tap;
+        if (kolom === "whatsapp") return row.phone || "";
+        if (kolom === "outlet") return row.outletCount;
+        if (kolom === "status") return row.isActive ? 1 : 0;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -192,18 +204,18 @@ export default function AdminMitraSalesforcePage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Salesforce</TableHead>
-                                <TableHead>TAP</TableHead>
-                                <TableHead>WhatsApp</TableHead>
-                                <TableHead className="text-right">Outlet</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead><TombolUrut kolom="salesforce" label="Salesforce" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="tap" label="TAP" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="whatsapp" label="WhatsApp" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead className="text-right"><TombolUrut kolom="outlet" label="Outlet" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                            ) : rows.length ? rows.map((row) => (
+                            ) : rowsTampil.length ? rowsTampil.map((row) => (
                                 <TableRow key={row.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">

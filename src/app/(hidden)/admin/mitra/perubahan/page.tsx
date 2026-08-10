@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface BarisPerubahan {
     id: string;
@@ -42,6 +44,7 @@ export default function AdminPerubahanOutletPage() {
     const [rows, setRows] = React.useState<BarisPerubahan[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [terpotong, setTerpotong] = React.useState(false);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     // Default 30 hari terakhir: rentang terbuka pada tabel yang tumbuh tiap kunjungan
     // membuat halaman ini makin lambat tiap bulan tanpa ada yang mengubah apa pun.
@@ -82,6 +85,15 @@ export default function AdminPerubahanOutletPage() {
         params.set("format", "xlsx");
         window.location.href = `/api/admin/mitra/outlet-edits?${params.toString()}`;
     };
+
+    const rowsTampil = urutkanBaris(rows, urut, (row, kolom) => {
+        if (kolom === "waktu") return new Date(row.createdAt);
+        if (kolom === "outlet") return row.outletName;
+        if (kolom === "salesforce") return row.salesforce;
+        if (kolom === "jenis") return row.jenis;
+        if (kolom === "aktor") return row.aktor;
+        return "";
+    });
 
     return (
         <div className="space-y-6">
@@ -159,12 +171,12 @@ export default function AdminPerubahanOutletPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Waktu</TableHead>
-                                <TableHead>Outlet</TableHead>
-                                <TableHead>Salesforce</TableHead>
-                                <TableHead>Jenis</TableHead>
+                                <TableHead><TombolUrut kolom="waktu" label="Waktu" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="outlet" label="Outlet" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="salesforce" label="Salesforce" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="jenis" label="Jenis" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 <TableHead>Perubahan</TableHead>
-                                <TableHead>Diubah Oleh</TableHead>
+                                <TableHead><TombolUrut kolom="aktor" label="Diubah Oleh" urut={urut} onKlik={gantiUrut} /></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -174,7 +186,7 @@ export default function AdminPerubahanOutletPage() {
                                         <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                                     </TableCell>
                                 </TableRow>
-                            ) : rows.length ? rows.map((row) => (
+                            ) : rowsTampil.length ? rowsTampil.map((row) => (
                                 <TableRow key={row.id}>
                                     <TableCell className="whitespace-nowrap text-xs">
                                         {new Date(row.createdAt).toLocaleString("id-ID")}

@@ -7,7 +7,9 @@ import { Activity, Check, Copy, Search, Trophy } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface MetricRow {
     id: string;
@@ -50,6 +52,7 @@ export default function AdminMitraReferensiPage() {
     const [loading, setLoading] = React.useState(true);
     const [q, setQ] = React.useState("");
     const [disalin, setDisalin] = React.useState<string | null>(null);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     React.useEffect(() => {
         fetch("/api/admin/mitra/reference")
@@ -73,7 +76,16 @@ export default function AdminMitraReferensiPage() {
 
     const cocok = (teks: string) => teks.toLowerCase().includes(q.trim().toLowerCase());
 
-    const metricTampil = q ? metrics.filter((row) => cocok(row.key) || cocok(row.label)) : metrics;
+    const metricTersaring = q ? metrics.filter((row) => cocok(row.key) || cocok(row.label)) : metrics;
+    const metricTampil = urutkanBaris(metricTersaring, urut, (row, kolom) => {
+        if (kolom === "key") return row.key;
+        if (kolom === "label") return row.label;
+        if (kolom === "satuan") return row.unit || "";
+        if (kolom === "agregasi") return row.aggregation;
+        if (kolom === "baris") return row.jumlahBaris;
+        if (kolom === "publik") return row.isPublic ? 1 : 0;
+        return "";
+    });
     const programTampil = q
         ? programs
             .map((program) => ({
@@ -166,12 +178,12 @@ export default function AdminMitraReferensiPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Key</TableHead>
-                                    <TableHead>Label</TableHead>
-                                    <TableHead>Satuan</TableHead>
-                                    <TableHead>Agregasi</TableHead>
-                                    <TableHead className="text-right">Baris Data</TableHead>
-                                    <TableHead>Publik</TableHead>
+                                    <TableHead><TombolUrut kolom="key" label="Key" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead><TombolUrut kolom="label" label="Label" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead><TombolUrut kolom="satuan" label="Satuan" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead><TombolUrut kolom="agregasi" label="Agregasi" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead className="text-right"><TombolUrut kolom="baris" label="Baris Data" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                    <TableHead><TombolUrut kolom="publik" label="Publik" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
