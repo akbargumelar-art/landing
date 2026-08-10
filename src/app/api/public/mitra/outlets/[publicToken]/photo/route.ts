@@ -40,9 +40,14 @@ export async function POST(
 
     // Batas 5 MB dan tanpa SVG: unggahan ini terbuka untuk siapa pun yang lolos OTP,
     // jauh lebih luas daripada jalur admin.
+    //
+    // Foto langsung diperkecil ke 1600 px. Foto kamera ponsel berukuran 4-5 MB gagal
+    // ditampilkan WhatsApp saat diteruskan ke group, dan 1600 px sudah jauh di atas
+    // ukuran tampil terbesarnya di web -- jadi yang hilang cuma berat berkasnya.
     const hasil = await saveUploadedImage(formData.get("file") as File | null, {
         maxBytes: 5 * 1024 * 1024,
         publicUpload: true,
+        maxDimensi: 1600,
     });
 
     if (!hasil.ok) {
