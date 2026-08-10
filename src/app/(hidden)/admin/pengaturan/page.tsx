@@ -8,6 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare, CreditCard } from "lucide-react";
 import { WhitelistOtpSettings } from "@/components/admin/whitelist-otp-settings";
 
+/**
+ * Salinan tampilan dari DEFAULT_VISIT_TEMPLATE di lib/whatsapp.ts, dipakai sebagai
+ * placeholder saja. Sengaja tidak diimpor: modul itu membuka koneksi database, sedangkan
+ * halaman ini berjalan di browser. Yang menentukan isi pesan tetap yang di server.
+ */
+const CONTOH_TEMPLATE_KUNJUNGAN = `*Semangattt pagiii..*
+Berikut update visit abkciraya.cloud/mitra
+
+Salesforce : {salesforce}
+ID Digipos : {digipos}
+Nama Outlet : {outlet}
+Keterangan : Edit long-lat jika terjadi perubahan longlat`;
+
 interface OfficeData {
     city: string;
     label: string;
@@ -351,6 +364,58 @@ export default function PengaturanPage() {
                             Dikirim otomatis ke pendaftar setelah form langganan tersimpan. Placeholder:
                             <code> &#123;nama&#125;</code>, <code>&#123;paket&#125;</code>, <code>&#123;lokasi&#125;</code>, <code>&#123;referensi&#125;</code>.
                         </p>
+                    </div>
+
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-semibold">Notifikasi Kunjungan ke Group</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Mengirim satu pesan ke group setiap salesforce selesai memperbarui foto
+                                    atau titik long-lat outlet. Satu kunjungan (satu sesi OTP) = satu pesan,
+                                    dikirim sekitar 2 menit setelah aktivitas terakhir, dengan satu foto yang
+                                    diundi dari foto yang baru diunggah.
+                                </p>
+                            </div>
+                            <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={settings.wa_visit_enabled === "1"}
+                                    onChange={(e) => updateSetting("wa_visit_enabled", e.target.checked ? "1" : "0")}
+                                />
+                                Aktif
+                            </label>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Chat ID Group WhatsApp</Label>
+                            <Input
+                                value={settings.wa_visit_group_id || ""}
+                                onChange={(e) => updateSetting("wa_visit_group_id", e.target.value)}
+                                placeholder="Contoh: 120363044814127701@g.us"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Ambil dari WAHA lewat <code>GET /api/&#123;session&#125;/groups</code>. Harus diakhiri
+                                <code> @g.us</code>. Dikosongkan berarti notifikasi tidak dikirim.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Template Pesan Kunjungan</Label>
+                            <textarea
+                                className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={settings.wa_visit_template || ""}
+                                onChange={(e) => updateSetting("wa_visit_template", e.target.value)}
+                                placeholder={CONTOH_TEMPLATE_KUNJUNGAN}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Dipakai sebagai caption foto. Placeholder: <code>&#123;salesforce&#125;</code>,
+                                <code> &#123;digipos&#125;</code>, <code>&#123;outlet&#125;</code>, <code>&#123;tap&#125;</code>,
+                                <code> &#123;perubahan&#125;</code>, <code>&#123;tanggal&#125;</code>, <code>&#123;link&#125;</code>.
+                                Dikosongkan berarti memakai template bawaan.
+                            </p>
+                        </div>
                     </div>
 
                     <div className="rounded-lg border bg-gray-50 p-4 space-y-3">

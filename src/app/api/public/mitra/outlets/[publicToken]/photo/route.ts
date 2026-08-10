@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { mitraOutlets } from "@/db/schema";
 import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
 import { findPhotoSlot } from "@/lib/mitra-outlet-photos";
+import { catatAktivitasKunjungan } from "@/lib/mitra-visit-notify";
 import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
 import { saveUploadedImage } from "@/lib/uploads";
 
@@ -64,6 +65,15 @@ export async function POST(
         before: { slot: slot.key, url: sebelum },
         after: { slot: slot.key, label: slot.label, url: hasil.url },
         ip: getClientIp(request),
+    });
+
+    // Notifikasi group tidak dikirim di sini: foto diunggah satu per satu, jadi aktivitasnya
+    // hanya dicatat dan satu pesan menyusul setelah kunjungan selesai. Lihat mitra-visit-notify.
+    await catatAktivitasKunjungan({
+        outletId: akses.outlet.id,
+        sessionId: akses.session.id,
+        actorPhone: akses.session.phoneE164,
+        foto: { slot: slot.key, label: slot.label, url: hasil.url! },
     });
 
     return NextResponse.json({ success: true, slot: slot.key, url: hasil.url, updatedAt: sekarang });

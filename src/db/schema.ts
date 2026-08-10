@@ -800,6 +800,42 @@ export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
     index("mitra_outlet_edit_logs_created_idx").on(table.createdAt),
 ]);
 
+/**
+ * Antrean notifikasi kunjungan ke group WhatsApp.
+ *
+ * Foto outlet diunggah SATU PER SATU (tiap slot terkirim begitu dipilih), jadi mengirim
+ * WA di dalam route unggah akan menghasilkan empat pesan untuk satu kunjungan yang sama.
+ * Baris di tabel ini mewakili satu kunjungan -- dikunci pada `session_id`, yaitu sesi OTP
+ * yang dipegang salesforce -- dan menampung foto-foto yang masuk selama sesi itu sampai
+ * jeda hening berakhir, barulah satu pesan dikirim.
+ *
+ * Statusnya disimpan di database, bukan hanya di memori proses, supaya antrean tidak
+ * hilang saat aplikasi di-restart dan supaya satu kunjungan tidak pernah terkirim dua kali.
+ */
+export const mitraVisitNotifications = mysqlTable("mitra_visit_notifications", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    /**
+     * Sesi OTP = satu kunjungan. Sengaja TANPA foreign key: sesi kedaluwarsa boleh
+     * dibersihkan kapan saja, sedangkan notifikasi yang belum terkirim harus tetap ada.
+     */
+    sessionId: varchar("session_id", { length: 36 }).notNull().unique(),
+    actorPhone: varchar("actor_phone", { length: 50 }),
+    /** Foto yang diunggah pada kunjungan ini: [{ slot, label, url }]. Undian diambil dari sini. */
+    photosJson: json("photos_json").$type<{ slot: string; label: string; url: string }[]>(),
+    locationChanged: boolean("location_changed").notNull().default(false),
+    status: mysqlEnum("status", ["PENDING", "SENDING", "SENT", "FAILED"]).notNull().default("PENDING"),
+    attempts: int("attempts").notNull().default(0),
+    lastError: varchar("last_error", { length: 500 }),
+    /** Penanda jeda hening: pesan baru dikirim setelah kolom ini diam selama ambang debounce. */
+    lastActivityAt: datetime("last_activity_at").notNull(),
+    sentAt: datetime("sent_at"),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_visit_notif_status_idx").on(table.status, table.lastActivityAt),
+    index("mitra_visit_notif_outlet_idx").on(table.outletId),
+]);
+
 export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     // Sama seperti mitra_whitelist_numbers.source_batch_id: nama FK turunan
