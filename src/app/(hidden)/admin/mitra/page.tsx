@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 import { Activity, BadgeCheck, BookText, Camera, ClipboardList, Database, FileSpreadsheet, History, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
@@ -34,6 +35,17 @@ interface HealthStatus {
     };
 }
 
+interface FotoTerbaru {
+    id: string;
+    outletCode: string;
+    outletName: string;
+    photoLabel: string;
+    photoUrl: string;
+    updatedAt: string | null;
+    tap: string;
+    salesforce: string;
+}
+
 const modules = [
     { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Users, text: "Tambah, edit, hapus outlet dan QR satuan." },
     { href: "/admin/mitra/foto", label: "Monitoring Foto", icon: Camera, text: "Foto kosong atau kedaluwarsa per kategori, dengan ekspor Excel." },
@@ -51,6 +63,8 @@ export default function AdminMitraPage() {
     const [summary, setSummary] = React.useState<Summary | null>(null);
     const [territories, setTerritories] = React.useState<Territory[]>([]);
     const [health, setHealth] = React.useState<HealthStatus | null>(null);
+    const [fotoTerbaru, setFotoTerbaru] = React.useState<FotoTerbaru[]>([]);
+    const [memuatFoto, setMemuatFoto] = React.useState(true);
     const [cleaning, setCleaning] = React.useState(false);
     const [territoryForm, setTerritoryForm] = React.useState({ name: "", type: "AREA", parentId: "" });
 
@@ -66,6 +80,12 @@ export default function AdminMitraPage() {
             .then((res) => res.ok ? res.json() : null)
             .then(setHealth)
             .catch(() => setHealth(null));
+        setMemuatFoto(true);
+        fetch("/api/admin/mitra/photo-monitoring?condition=AVAILABLE&sort=latest&pageSize=12")
+            .then((res) => res.ok ? res.json() : { rows: [] })
+            .then((data) => setFotoTerbaru(Array.isArray(data.rows) ? data.rows : []))
+            .catch(() => setFotoTerbaru([]))
+            .finally(() => setMemuatFoto(false));
     }, []);
 
     React.useEffect(() => { load(); }, [load]);
@@ -176,6 +196,74 @@ export default function AdminMitraPage() {
                     </Link>
                 ))}
             </div>
+
+            <Card>
+                <CardContent className="p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="font-bold">Foto Outlet Terbaru</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Dua belas pembaruan foto terakhir dari outlet yang dapat Anda akses.
+                            </p>
+                        </div>
+                        <Link href="/admin/mitra/foto">
+                            <Button variant="outline" size="sm">
+                                <Camera className="h-4 w-4" />
+                                Buka Monitoring Foto
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {memuatFoto ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <div key={index} className="aspect-[4/3] animate-pulse rounded-lg bg-gray-100" />
+                            ))}
+                        </div>
+                    ) : fotoTerbaru.length > 0 ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                            {fotoTerbaru.map((foto) => (
+                                <a
+                                    key={foto.id}
+                                    href={foto.photoUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="group overflow-hidden rounded-lg border bg-white transition hover:border-red-200 hover:shadow-md"
+                                >
+                                    <div className="relative aspect-[4/3] bg-gray-100">
+                                        <Image
+                                            src={foto.photoUrl}
+                                            alt={`${foto.photoLabel} ${foto.outletName}`}
+                                            fill
+                                            sizes="(max-width: 640px) 50vw, 16vw"
+                                            className="object-cover transition-transform duration-200 group-hover:scale-105"
+                                            unoptimized
+                                        />
+                                        <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white">
+                                            {foto.photoLabel}
+                                        </span>
+                                    </div>
+                                    <div className="p-2.5">
+                                        <p className="truncate text-xs font-bold text-gray-950">{foto.outletName}</p>
+                                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                            {foto.outletCode}{foto.tap ? ` · ${foto.tap}` : ""}
+                                        </p>
+                                        <p className="mt-1 text-[10px] text-muted-foreground">
+                                            {foto.updatedAt
+                                                ? new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(foto.updatedAt))
+                                                : "Tanggal belum tersedia"}
+                                        </p>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="mt-4 rounded-lg border border-dashed bg-gray-50 px-4 py-8 text-center text-sm text-muted-foreground">
+                            Belum ada foto outlet yang dapat ditampilkan.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
                 <Card>

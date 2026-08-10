@@ -56,6 +56,7 @@ interface ReportResponse {
 
 const KONDISI = [
     { value: "MISSING", label: "Belum ada foto" },
+    { value: "AVAILABLE", label: "Sudah ada foto" },
     { value: "NEEDS_UPDATE", label: "Belum ada atau kedaluwarsa" },
     { value: "STALE", label: "Kedaluwarsa" },
     { value: "FRESH", label: "Terbaru" },

@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAKS_BARIS_UNDUH = 20_000;
-const KONDISI = ["ALL", "MISSING", "STALE", "FRESH", "NEEDS_UPDATE"] as const;
+const KONDISI = ["ALL", "AVAILABLE", "MISSING", "STALE", "FRESH", "NEEDS_UPDATE"] as const;
 type Kondisi = (typeof KONDISI)[number];
 
 type OutletRow = Awaited<ReturnType<typeof ambilOutletDalamScope>>[number];
@@ -82,6 +82,7 @@ function buatBarisFoto(outlet: OutletRow) {
 
 function cocokKondisi(statusKey: string, kondisi: Kondisi): boolean {
     if (kondisi === "ALL") return true;
+    if (kondisi === "AVAILABLE") return statusKey !== "MISSING";
     if (kondisi === "NEEDS_UPDATE") return statusKey === "MISSING" || statusKey === "STALE";
     return statusKey === kondisi;
 }
@@ -108,6 +109,7 @@ export async function GET(request: Request) {
     const outletCategory = teks(params.get("outletCategory"));
     const tap = teks(params.get("tap"));
     const salesforceId = teks(params.get("salesforceId"));
+    const sort = teks(params.get("sort")).toLowerCase();
     const page = Math.max(Number(params.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(params.get("pageSize") || "50"), 1), 100);
 
@@ -149,6 +151,14 @@ export async function GET(request: Request) {
         if (photoSlot && photoSlot !== "ALL" && row.photoSlot !== photoSlot) return false;
         return cocokKondisi(row.statusKey, condition);
     });
+
+    if (sort === "latest") {
+        barisTersaring.sort((a, b) => {
+            const waktuA = a.updatedAt?.getTime() || 0;
+            const waktuB = b.updatedAt?.getTime() || 0;
+            return waktuB - waktuA;
+        });
+    }
 
     if (format === "xlsx") {
         const exportRows = barisTersaring.slice(0, MAKS_BARIS_UNDUH).map((row) => ({

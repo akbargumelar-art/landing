@@ -810,3 +810,19 @@ halaman detail outlet setelah OTP karena keduanya memakai komponen yang sama.
 
 Verifikasi: `npx tsc --noEmit`, ESLint khusus `outlet-photo-card.tsx`, dan `npm run build` lulus.
 Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.
+
+## Galeri foto di dashboard Mitra - 10 Agustus 2026
+
+Dashboard `/admin/mitra` sekarang menampilkan galeri **Foto Outlet Terbaru** berisi maksimal 12
+foto yang benar-benar tersedia, diurutkan dari waktu pembaruan paling baru. Setiap thumbnail
+menampilkan kategori foto, nama/ID outlet, TAP, dan tanggal pembaruan; klik thumbnail membuka
+foto penuh di tab baru, sedangkan tombol Monitoring Foto membuka laporan lengkap.
+
+Galeri memakai endpoint monitoring yang sama dengan tambahan kondisi `AVAILABLE` dan urutan
+`latest`, sehingga RBAC dan pembatasan territory untuk SUPERVISOR/SALESFORCE tetap berlaku sebelum
+foto dipilih. Filter “Sudah ada foto” juga ditambahkan pada halaman `/admin/mitra/foto`. Tidak ada
+perubahan database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Build hanya menampilkan
+dua warning `<img>` lama di halaman pengaturan yang tidak terkait. Isi galeri dengan sesi admin
+dan database hidup belum diuji pada sesi ini.
