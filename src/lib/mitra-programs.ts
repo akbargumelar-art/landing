@@ -275,12 +275,16 @@ export async function findParticipantsBulk(
  * peserta per parameter, sesuai mode agregasi parameter itu (SUM/AVG/LAST).
  *
  * Digabung di JavaScript, bukan lewat SQL, karena LAST berarti "ambil tanggal terbaru" --
- * tidak ada satu fungsi agregat SQL yang mewakilinya. `points` tiap baris sudah berbobot
- * sejak disimpan, jadi weight tidak dikalikan lagi di sini.
+ * tidak ada satu fungsi agregat SQL yang mewakilinya.
+ *
+ * Poin dihitung di sini dari nilai mentah x bobot yang BERLAKU SEKARANG, bukan dibaca dari
+ * kolom points hasil unggahan. Bobot dan status "informasi" bisa diubah admin kapan saja;
+ * kalau poin lama yang dipakai, mengubah bobot tidak akan berpengaruh apa-apa sampai
+ * seluruh berkas diunggah ulang.
  */
 export async function computeParticipantParamAggregates(
     programId: string,
-    params: { id: string; aggregation: "SUM" | "AVG" | "LAST" }[],
+    params: { id: string; aggregation: "SUM" | "AVG" | "LAST"; weight: string; isScored: boolean }[],
     participantKeys: string[]
 ) {
     const skorRows = participantKeys.length > 0 && params.length > 0
@@ -290,7 +294,6 @@ export async function computeParticipantParamAggregates(
                 paramId: mitraProgramScores.paramId,
                 achievementDate: mitraProgramScores.achievementDate,
                 rawValue: mitraProgramScores.rawValue,
-                points: mitraProgramScores.points,
             })
             .from(mitraProgramScores)
             .where(and(
@@ -300,25 +303,23 @@ export async function computeParticipantParamAggregates(
         : [];
 
     const paramById = new Map(params.map((param) => [param.id, param]));
-    const kumpulan = new Map<string, { raw: number[]; points: number[]; tanggalTerakhir: string }>();
+    const kumpulan = new Map<string, { raw: number[]; tanggalTerakhir: string }>();
 
     for (const skor of skorRows) {
         const param = paramById.get(skor.paramId);
         if (!param) continue;
 
         const kunci = `${skor.participantKey}::${skor.paramId}`;
-        const bucket = kumpulan.get(kunci) || { raw: [], points: [], tanggalTerakhir: "" };
+        const bucket = kumpulan.get(kunci) || { raw: [], tanggalTerakhir: "" };
 
         if (param.aggregation === "LAST") {
             // Tanggal disimpan sebagai teks ISO, jadi perbandingan teks sudah urut benar.
             if (skor.achievementDate > bucket.tanggalTerakhir) {
                 bucket.tanggalTerakhir = skor.achievementDate;
                 bucket.raw = [Number(skor.rawValue)];
-                bucket.points = [Number(skor.points)];
             }
         } else {
             bucket.raw.push(Number(skor.rawValue));
-            bucket.points.push(Number(skor.points));
             if (skor.achievementDate > bucket.tanggalTerakhir) bucket.tanggalTerakhir = skor.achievementDate;
         }
 
@@ -335,11 +336,11 @@ export async function computeParticipantParamAggregates(
     return {
         get(participantKey: string, paramId: string) {
             const bucket = kumpulan.get(`${participantKey}::${paramId}`);
-            const mode = paramById.get(paramId)?.aggregation || "SUM";
-            return {
-                raw: ringkas(bucket?.raw || [], mode),
-                points: ringkas(bucket?.points || [], mode),
-            };
+            const param = paramById.get(paramId);
+            const raw = ringkas(bucket?.raw || [], param?.aggregation || "SUM");
+            // Parameter informasi tidak pernah berpoin, berapa pun bobot yang tersimpan.
+            const bobot = param && param.isScored ? Number(param.weight) || 0 : 0;
+            return { raw, points: raw * bobot };
         },
     };
 }
@@ -377,10 +378,13 @@ export async function recomputeProgramLeaderboard(programId: string) {
      * Dengan begitu program yang dibagi per TAP menghasilkan juara 1 di setiap TAP, dan
      * aturan hadiah berbasis peringkat langsung berlaku per wilayah tanpa aturan terpisah.
      */
+    // Parameter bertanda informasi ikut ditampilkan di tabel tetapi tidak menambah poin.
+    const paramsDinilai = params.filter((param) => param.isScored);
+
     const perGroup = new Map<string, { info: ProgramParticipantInfo; totalPoints: number }[]>();
     for (const peserta of participants) {
         const groupKey = groupValueOf(peserta, groupBy);
-        const totalPoints = params.reduce((total, param) => total + aggregates.get(peserta.participantKey, param.id).points, 0);
+        const totalPoints = paramsDinilai.reduce((total, param) => total + aggregates.get(peserta.participantKey, param.id).points, 0);
         const daftar = perGroup.get(groupKey) || [];
         daftar.push({ info: peserta, totalPoints });
         perGroup.set(groupKey, daftar);

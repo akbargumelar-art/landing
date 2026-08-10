@@ -101,8 +101,9 @@ export async function GET(
                 paramKey: param.key,
                 Parameter: param.label,
                 Satuan: param.unit || "",
-                Bobot: param.weight,
+                Bobot: param.isScored ? param.weight : "-",
                 Agregasi: param.aggregation,
+                Dinilai: param.isScored ? "Ya" : "Tidak (informasi saja)",
             }))
         ), "Parameter");
     }
@@ -193,7 +194,9 @@ export async function POST(
             participantKey: info.participantKey,
             participantId: info.id,
             paramId: param.id,
-            weight: Number(param.weight) || 1,
+            // Parameter informasi tidak berpoin: nilainya tetap tersimpan dan tampil di
+            // tabel, tetapi tidak boleh menggeser peringkat siapa pun.
+            weight: param.isScored ? (Number(param.weight) || 1) : 0,
             rawValue: parseNumber(row.rawValue ?? row.nilai ?? row.value),
             achievementDate,
         });

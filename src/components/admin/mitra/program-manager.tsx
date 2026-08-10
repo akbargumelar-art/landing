@@ -35,6 +35,7 @@ interface ProgramParam {
     unit: string | null;
     weight: string;
     aggregation: "SUM" | "AVG" | "LAST";
+    isScored: boolean;
 }
 
 interface RewardRule {
@@ -96,6 +97,37 @@ interface UploadResult {
     errors?: { row: number; message: string }[];
 }
 
+/**
+ * Satu baris = satu parameter: `key, label, bobot, agregasi`. Menuliskan INFO di salah
+ * satu kolom menandai parameter itu hanya untuk ditampilkan -- angkanya tetap diunggah
+ * dan muncul di tabel, tetapi tidak ikut menentukan peringkat. Dipakai untuk menunjukkan
+ * tahapan sebuah alur ketika yang diadu hanya hasil akhirnya.
+ */
+function parseParams(text: string) {
+    return text.split("\n").map((line) => {
+        const parts = line.split(",").map((part) => part.trim());
+        const isScored = !parts.some((part) => part.toUpperCase() === "INFO");
+        const [key, label, weight, aggregation] = parts.filter((part) => part.toUpperCase() !== "INFO");
+        return {
+            key,
+            label: label || key,
+            weight: weight || "1",
+            aggregation: (aggregation || "SUM").toUpperCase(),
+            isScored,
+        };
+    }).filter((param) => param.key);
+}
+
+function formatParams(params: ProgramParam[]) {
+    return params.map((param) => [
+        param.key,
+        param.label,
+        param.weight,
+        param.aggregation,
+        param.isScored ? "" : "INFO",
+    ].filter(Boolean).join(",")).join("\n");
+}
+
 /** Racing: "1,1,Motor". Reward: "omzet,>=,5000000,Voucher" (parameter kosong = total poin). */
 function parseRewardRules(text: string, mechanismType: MechanismType) {
     return text.split("\n").map((line) => {
@@ -153,6 +185,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const [selected, setSelected] = React.useState<Program | null>(null);
     const [participants, setParticipants] = React.useState<Participant[]>([]);
     const [selectedParams, setSelectedParams] = React.useState<ProgramParam[]>([]);
+    const [paramsText, setParamsText] = React.useState("");
     const [rewardRulesText, setRewardRulesText] = React.useState("");
     const [winnersText, setWinnersText] = React.useState("");
     const [editStatus, setEditStatus] = React.useState("DRAFT");
@@ -250,10 +283,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const simpanProgram = async (event: React.FormEvent) => {
         event.preventDefault();
         setSaving(true);
-        const params = form.paramsText.split("\n").map((line) => {
-            const [key, label, weight, aggregation] = line.split(",").map((part) => part?.trim());
-            return { key, label: label || key, weight: weight || "1", aggregation: aggregation || "SUM" };
-        }).filter((param) => param.key);
+        const params = parseParams(form.paramsText);
 
         const res = await fetch("/api/admin/mitra/programs", {
             method: "POST",
@@ -283,6 +313,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
 
         setSelected(data.program);
         setSelectedParams(data.params || []);
+        setParamsText(formatParams(data.params || []));
         setParticipants(data.participants || []);
         setRewardRulesText(formatRewardRules(data.rewardRules || [], data.program.mechanismType));
         setWinnersText((data.winners || []).map((w: { code: string; rank: number; prizeLabel?: string | null }) => `${w.code},${w.rank},${w.prizeLabel || ""}`).join("\n"));
@@ -486,6 +517,11 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 <p className="text-xs text-muted-foreground">
                                     Bobot otomatis dikalikan ke setiap pencapaian yang diunggah. Agregasi: SUM (dijumlah),
                                     AVG (rata-rata), LAST (ambil tanggal terbaru) — kosongkan untuk SUM.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Tambahkan <code>INFO</code> di akhir baris untuk parameter yang hanya ditampilkan di
+                                    tabel tanpa ikut dihitung — mis. <code>beli_mitra,Pembelian via Mitra,,,INFO</code>.
+                                    Berguna untuk memperlihatkan tahapan alur ketika yang diadu hanya hasil akhirnya.
                                 </p>
                             </div>
                             <div className="space-y-2 lg:col-span-2">
@@ -869,6 +905,42 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                         </div>
 
                         <div className="grid gap-5 lg:grid-cols-2">
+                            <div className="space-y-3">
+                                <div>
+                                    <h3 className="font-bold">Parameter Penilaian</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        Format: key, label, bobot, agregasi. Tambahkan <code>INFO</code> agar parameter
+                                        hanya tampil di tabel tanpa ikut dihitung.
+                                    </p>
+                                </div>
+                                <Textarea rows={5} value={paramsText} onChange={(e) => setParamsText(e.target.value)} />
+                                <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
+                                    const baru = parseParams(paramsText);
+                                    const keyBaru = new Set(baru.map((param) => param.key));
+                                    const hilang = selectedParams.filter((param) => !keyBaru.has(param.key));
+                                    if (hilang.length > 0 && !confirm(
+                                        `Parameter berikut dihapus dari daftar: ${hilang.map((p) => p.label).join(", ")}.\n\n`
+                                        + "Seluruh nilai pencapaian yang sudah diunggah untuk parameter itu ikut terhapus "
+                                        + "dan tidak bisa dikembalikan. Lanjutkan?"
+                                    )) return;
+
+                                    // Mengubah bobot atau status INFO mengubah nilai poin tiap baris skor,
+                                    // jadi papan skor langsung dihitung ulang -- kalau tidak, peringkat lama
+                                    // tetap tampil seolah masih memakai aturan yang baru.
+                                    if (await kirimKelola({ params: baru }, "")) {
+                                        await fetch("/api/admin/mitra/programs", {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ action: "recompute", programId: selected.id }),
+                                        });
+                                        alert("Parameter tersimpan dan papan skor dihitung ulang.");
+                                        bukaKelola(selected.id);
+                                    }
+                                }}>
+                                    <Save className="h-4 w-4" /> Simpan Parameter
+                                </Button>
+                            </div>
+
                             <div className="space-y-3">
                                 <div>
                                     <h3 className="font-bold">{MECHANISM_COPY[selected.mechanismType].aturan}</h3>

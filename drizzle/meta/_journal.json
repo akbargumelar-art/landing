@@ -225,6 +225,13 @@
       "when": 1786395648385,
       "tag": "0031_program_grouping_and_thumbnail",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1786396695241,
+      "tag": "0032_program_param_info_only",
+      "breakpoints": true
     }
   ]
 }

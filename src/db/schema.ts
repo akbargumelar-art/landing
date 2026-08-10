@@ -884,6 +884,12 @@ export const mitraProgramParams = mysqlTable("mitra_program_params", {
     unit: varchar("unit", { length: 50 }),
     weight: decimal("weight", { precision: 10, scale: 4 }).notNull().default("1.0000"),
     aggregation: mysqlEnum("aggregation", ["SUM", "AVG", "LAST"]).notNull().default("SUM"),
+    /**
+     * Parameter bertanda false tetap diunggah dan ditampilkan di tabel, tetapi tidak ikut
+     * menentukan peringkat. Dipakai untuk memperlihatkan tahapan sebuah alur -- pembelian
+     * dan pencatatan, misalnya -- ketika yang benar-benar diadu hanya hasil akhirnya.
+     */
+    isScored: boolean("is_scored").notNull().default(true),
     sortOrder: int("sort_order").notNull().default(0),
 }, (table) => [
     uniqueIndex("mitra_program_params_unique_idx").on(table.programId, table.key),

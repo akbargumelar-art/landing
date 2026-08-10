@@ -91,6 +91,7 @@ export async function POST(request: Request) {
                 unit: param.unit ? String(param.unit) : null,
                 weight: String(param.weight || "1"),
                 aggregation: param.aggregation || "SUM",
+                isScored: param.isScored !== false,
                 sortOrder: index,
             }))
         );

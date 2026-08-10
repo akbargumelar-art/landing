@@ -192,22 +192,43 @@ export async function PUT(
     }).where(eq(mitraPrograms.id, id));
 
     if (Array.isArray(body.params)) {
+        /**
+         * Dicocokkan berdasarkan `key`, bukan id: key adalah identitas yang juga dipakai
+         * berkas unggahan, dan editor parameter di admin berbentuk teks yang tidak membawa
+         * id. Mencocokkan lewat id akan membuat setiap penyimpanan mencoba menyisipkan
+         * parameter baru dengan key yang sudah ada, dan ditolak unique index.
+         */
+        const existingParams = await db.select().from(mitraProgramParams).where(eq(mitraProgramParams.programId, id));
+        const byKey = new Map(existingParams.map((param) => [param.key, param]));
+        const keyDikirim = new Set<string>();
+
         for (const [index, param] of body.params.entries()) {
-            const paramId = String(param.id || "");
+            const key = String(param.key || slugify(String(param.label || `param-${index + 1}`))).replace(/-/g, "_");
+            keyDikirim.add(key);
             const values = {
-                key: String(param.key || slugify(String(param.label || `param-${index + 1}`))).replace(/-/g, "_"),
+                key,
                 label: String(param.label || `Parameter ${index + 1}`),
                 unit: param.unit ? String(param.unit) : null,
                 weight: String(param.weight || "1"),
                 aggregation: param.aggregation || "SUM",
+                isScored: param.isScored !== false,
                 sortOrder: index,
             };
 
-            if (paramId) {
-                await db.update(mitraProgramParams).set(values).where(eq(mitraProgramParams.id, paramId));
+            const lama = byKey.get(key);
+            if (lama) {
+                await db.update(mitraProgramParams).set(values).where(eq(mitraProgramParams.id, lama.id));
             } else {
                 await db.insert(mitraProgramParams).values({ id: uuid(), programId: id, ...values });
             }
+        }
+
+        // Parameter yang hilang dari daftar ikut dihapus beserta seluruh nilai pencapaiannya
+        // (lewat cascade). Halaman admin meminta konfirmasi lebih dulu, sehingga penghapusan
+        // ini selalu merupakan pilihan sadar, bukan efek samping menyunting teks.
+        const dihapus = existingParams.filter((param) => !keyDikirim.has(param.key));
+        for (const param of dihapus) {
+            await db.delete(mitraProgramParams).where(eq(mitraProgramParams.id, param.id));
         }
     }
 

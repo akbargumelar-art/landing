@@ -50,6 +50,7 @@ interface ProgramParam {
     label: string;
     unit?: string | null;
     weight: string;
+    isScored?: boolean;
 }
 
 interface ProgramDetail {
@@ -366,9 +367,17 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                                     <span key={param.id} className="inline-flex items-center gap-2 rounded-full border bg-gray-50 px-3 py-1.5 text-xs">
                                         <span className="font-semibold text-gray-950">{param.label}</span>
                                         {param.unit && <span className="text-muted-foreground">({param.unit})</span>}
-                                        <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">
-                                            bobot {Number(param.weight).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
-                                        </span>
+                                        {/* Parameter informasi tidak punya bobot -- menampilkan "bobot 0"
+                                            akan terbaca seolah nilainya dihitung tapi tidak berarti. */}
+                                        {param.isScored === false ? (
+                                            <span className="rounded-full bg-gray-200 px-2 py-0.5 font-bold text-gray-600">
+                                                informasi
+                                            </span>
+                                        ) : (
+                                            <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">
+                                                bobot {Number(param.weight).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                            </span>
+                                        )}
                                     </span>
                                 ))}
                             </div>
@@ -401,6 +410,9 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                                     {programParams.map((param) => (
                                         <th key={param.id} className="px-4 py-3 text-right">
                                             {param.label}{param.unit ? ` (${param.unit})` : ""}
+                                            {param.isScored === false && (
+                                                <span className="ml-1 font-normal normal-case text-gray-400">(info)</span>
+                                            )}
                                         </th>
                                     ))}
                                     <th className="px-4 py-3 text-right">Total Poin</th>
