@@ -156,6 +156,84 @@ export async function resolveParticipantCodes(targetType: ProgramTargetType, cod
     return new Map(rows.map((row) => [row.code, { id: row.id, name: row.name }]));
 }
 
+export interface ParticipantFilter {
+    /** Daftar kode/nama yang ditempel admin. Kalau diisi, filter wilayah diabaikan. */
+    codes?: string[];
+    tap?: string;
+    kabupaten?: string;
+    kecamatan?: string;
+    category?: string;
+}
+
+/**
+ * Mencari calon peserta dalam jumlah besar sekaligus -- baik dari daftar kode yang
+ * ditempel maupun dari filter wilayah. Dipakai untuk menambahkan peserta massal tanpa
+ * harus mengetikkan satu per satu di kotak pencarian.
+ *
+ * Mengembalikan juga `unknown`: kode yang tidak cocok dengan data mana pun dilaporkan
+ * balik, bukan dibuang diam-diam, supaya admin tahu ada baris yang tidak masuk.
+ */
+export async function findParticipantsBulk(
+    targetType: ProgramTargetType,
+    filter: ParticipantFilter
+): Promise<{ candidates: Omit<ProgramParticipantInfo, "participantKey">[]; unknown: string[] }> {
+    const codes = Array.from(new Set((filter.codes || []).map((code) => code.trim()).filter(Boolean)));
+    const pakaiKode = codes.length > 0;
+
+    if (targetType === "SALESFORCE") {
+        const syarat = [eq(mitraSalesforces.isActive, true)];
+        if (pakaiKode) syarat.push(inArray(mitraSalesforces.name, codes));
+        else if (filter.tap) syarat.push(eq(mitraSalesforces.tap, filter.tap));
+
+        const rows = await db
+            .select({ id: mitraSalesforces.id, name: mitraSalesforces.name, tap: mitraSalesforces.tap })
+            .from(mitraSalesforces)
+            .where(and(...syarat))
+            .orderBy(asc(mitraSalesforces.name))
+            .limit(2000);
+
+        const ketemu = new Set(rows.map((row) => row.name));
+        return {
+            candidates: rows.map((row) => ({ id: row.id, code: row.name, name: row.name, area: row.tap || "" })),
+            unknown: pakaiKode ? codes.filter((code) => !ketemu.has(code)) : [],
+        };
+    }
+
+    const syarat = [eq(mitraOutlets.status, "ACTIVE" as const)];
+    if (pakaiKode) {
+        syarat.push(inArray(mitraOutlets.outletCode, codes));
+    } else {
+        if (filter.tap) syarat.push(eq(mitraOutlets.tap, filter.tap));
+        if (filter.kabupaten) syarat.push(eq(mitraOutlets.kabupaten, filter.kabupaten));
+        if (filter.kecamatan) syarat.push(eq(mitraOutlets.kecamatan, filter.kecamatan));
+        if (filter.category) syarat.push(eq(mitraOutlets.category, filter.category as "FISIK"));
+    }
+
+    const rows = await db
+        .select({
+            id: mitraOutlets.id,
+            code: mitraOutlets.outletCode,
+            name: mitraOutlets.name,
+            kabupaten: mitraOutlets.kabupaten,
+            kecamatan: mitraOutlets.kecamatan,
+        })
+        .from(mitraOutlets)
+        .where(and(...syarat))
+        .orderBy(asc(mitraOutlets.name))
+        .limit(5000);
+
+    const ketemu = new Set(rows.map((row) => row.code));
+    return {
+        candidates: rows.map((row) => ({
+            id: row.id,
+            code: row.code,
+            name: row.name,
+            area: [row.kecamatan, row.kabupaten].filter(Boolean).join(", "),
+        })),
+        unknown: pakaiKode ? codes.filter((code) => !ketemu.has(code)) : [],
+    };
+}
+
 /**
  * Menggabungkan baris skor (satu baris per peserta/parameter/hari) jadi satu nilai per
  * peserta per parameter, sesuai mode agregasi parameter itu (SUM/AVG/LAST).

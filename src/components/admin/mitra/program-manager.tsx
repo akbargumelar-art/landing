@@ -13,6 +13,7 @@ import {
     Sparkles,
     Trash2,
     Upload,
+    Users,
     X,
 } from "lucide-react";
 
@@ -76,6 +77,11 @@ interface RewardPreviewRow {
     rank: number | null;
     rewardLabel: string;
     ruleId: string;
+}
+
+interface MasterOption {
+    id: string;
+    name: string;
 }
 
 interface UploadResult {
@@ -153,6 +159,15 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const [candidates, setCandidates] = React.useState<Participant[]>([]);
     const [searching, setSearching] = React.useState(false);
 
+    const [bulkOpen, setBulkOpen] = React.useState(false);
+    const [bulkCodes, setBulkCodes] = React.useState("");
+    const [bulkFilter, setBulkFilter] = React.useState({ tap: "", kabupaten: "", kecamatan: "" });
+    const [bulkBusy, setBulkBusy] = React.useState(false);
+    const [bulkInfo, setBulkInfo] = React.useState<{ added: number; skipped: number; unknown: string[] } | null>(null);
+    const [master, setMaster] = React.useState<{ tap: MasterOption[]; kabupaten: MasterOption[]; kecamatan: MasterOption[] }>({
+        tap: [], kabupaten: [], kecamatan: [],
+    });
+
     const [file, setFile] = React.useState<File | null>(null);
     const [uploadResult, setUploadResult] = React.useState<UploadResult | null>(null);
     const [uploading, setUploading] = React.useState(false);
@@ -185,6 +200,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     React.useEffect(() => {
         setForm((prev) => ({ ...prev, rewardRulesText: MECHANISM_COPY[tab].contoh }));
     }, [tab]);
+
+    // Daftar wilayah untuk filter tambah massal; dipakai bersama outlet dan salesforce.
+    React.useEffect(() => {
+        fetch("/api/admin/mitra/master")
+            .then((res) => res.json())
+            .then((data) => setMaster({ tap: data.tap || [], kabupaten: data.kabupaten || [], kecamatan: data.kecamatan || [] }))
+            .catch(() => undefined);
+    }, []);
 
     React.useEffect(() => {
         if (!query.trim()) { setCandidates([]); return; }
@@ -264,6 +287,42 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         if (!res.ok) { alert(data.error || "Gagal menyimpan"); return null; }
         if (sukses) alert(sukses);
         return data;
+    };
+
+    /**
+     * Menambahkan banyak peserta sekaligus, dari daftar kode yang ditempel atau dari filter
+     * wilayah. Hasilnya digabung ke daftar yang sedang tampil (peserta yang sudah ada
+     * dilewati, bukan digandakan) dan baru tersimpan setelah admin menekan Simpan Peserta.
+     */
+    const tambahMassal = async (payload: Record<string, unknown>) => {
+        if (!selected) return;
+        setBulkBusy(true);
+        setBulkInfo(null);
+        const res = await fetch(`/api/admin/mitra/programs/${selected.id}/participants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        setBulkBusy(false);
+        if (!res.ok) return alert(data.error || "Gagal mencari peserta");
+
+        const kandidat: Omit<Participant, "participantKey">[] = data.candidates || [];
+        let ditambah = 0;
+        let dilewati = 0;
+        setParticipants((prev) => {
+            const sudahAda = new Set(prev.map((item) => item.id));
+            const baru = kandidat
+                .filter((item) => {
+                    if (sudahAda.has(item.id)) { dilewati += 1; return false; }
+                    sudahAda.add(item.id);
+                    ditambah += 1;
+                    return true;
+                })
+                .map((item) => ({ ...item, participantKey: `${isSalesforce ? "sf" : "outlet"}:${item.id}` }));
+            return [...prev, ...baru];
+        });
+        setBulkInfo({ added: ditambah, skipped: dilewati, unknown: data.unknown || [] });
     };
 
     const unggahPencapaian = async (mode: "preview" | "commit") => {
@@ -517,9 +576,112 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                         </div>
                                     )}
                                 </div>
+                                <div className="rounded-md border">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBulkOpen((prev) => !prev)}
+                                        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold hover:bg-muted"
+                                    >
+                                        <span className="inline-flex items-center gap-2">
+                                            <Users className="h-4 w-4" /> Tambah Massal
+                                        </span>
+                                        <span className="text-xs font-normal text-muted-foreground">{bulkOpen ? "Tutup" : "Buka"}</span>
+                                    </button>
+
+                                    {bulkOpen && (
+                                        <div className="space-y-4 border-t p-3">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">
+                                                    Tempel {isSalesforce ? "nama salesforce" : "kode outlet"} — satu per baris atau dipisah koma
+                                                </Label>
+                                                <Textarea
+                                                    rows={4}
+                                                    value={bulkCodes}
+                                                    onChange={(e) => setBulkCodes(e.target.value)}
+                                                    placeholder={isSalesforce ? "Budi Santoso\nSiti Aminah" : "2201055482\n2201043676"}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={bulkBusy || !bulkCodes.trim()}
+                                                    onClick={() => tambahMassal({ codes: bulkCodes })}
+                                                >
+                                                    {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Tambah dari Daftar
+                                                </Button>
+                                            </div>
+
+                                            <div className="space-y-2 border-t pt-3">
+                                                <Label className="text-xs">Atau tambah semua yang cocok dengan wilayah</Label>
+                                                <div className="grid gap-2 sm:grid-cols-3">
+                                                    <select
+                                                        value={bulkFilter.tap}
+                                                        onChange={(e) => setBulkFilter((p) => ({ ...p, tap: e.target.value }))}
+                                                        className="h-9 rounded-md border px-2 text-sm"
+                                                    >
+                                                        <option value="">Semua TAP</option>
+                                                        {master.tap.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                                                    </select>
+                                                    {!isSalesforce && (
+                                                        <>
+                                                            <select
+                                                                value={bulkFilter.kabupaten}
+                                                                onChange={(e) => setBulkFilter((p) => ({ ...p, kabupaten: e.target.value }))}
+                                                                className="h-9 rounded-md border px-2 text-sm"
+                                                            >
+                                                                <option value="">Semua Kabupaten</option>
+                                                                {master.kabupaten.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                                                            </select>
+                                                            <select
+                                                                value={bulkFilter.kecamatan}
+                                                                onChange={(e) => setBulkFilter((p) => ({ ...p, kecamatan: e.target.value }))}
+                                                                className="h-9 rounded-md border px-2 text-sm"
+                                                            >
+                                                                <option value="">Semua Kecamatan</option>
+                                                                {master.kecamatan.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                                                            </select>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={bulkBusy}
+                                                    onClick={() => tambahMassal(bulkFilter)}
+                                                >
+                                                    {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                                    Tambah Semua {istilahPeserta} yang Cocok
+                                                </Button>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Tanpa memilih filter apa pun, tombol ini menambahkan seluruh {istilahPeserta.toLowerCase()} aktif.
+                                                </p>
+                                            </div>
+
+                                            {bulkInfo && (
+                                                <div className="rounded bg-muted/60 p-2 text-xs">
+                                                    <p className="font-semibold">
+                                                        {bulkInfo.added} ditambahkan
+                                                        {bulkInfo.skipped > 0 ? `, ${bulkInfo.skipped} sudah ada` : ""}.
+                                                        Tekan Simpan Peserta untuk menyimpannya.
+                                                    </p>
+                                                    {bulkInfo.unknown.length > 0 && (
+                                                        <p className="mt-1 text-red-700">
+                                                            Tidak ditemukan: {bulkInfo.unknown.slice(0, 20).join(", ")}
+                                                            {bulkInfo.unknown.length > 20 ? ` dan ${bulkInfo.unknown.length - 20} lainnya` : ""}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
                                     {participants.length === 0 && <p className="p-2 text-sm text-muted-foreground">Belum ada peserta.</p>}
-                                    {participants.map((row) => (
+                                    {/* Daftar panjang dipotong di layar: seribu baris DOM membuat panel
+                                        tersendat, sedangkan yang perlu dipastikan admin cuma jumlahnya. */}
+                                    {participants.slice(0, 100).map((row) => (
                                         <div key={row.id} className="flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-muted">
                                             <div>
                                                 <p className="font-medium">{row.name}</p>
@@ -530,13 +692,35 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                             </button>
                                         </div>
                                     ))}
+                                    {participants.length > 100 && (
+                                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                            dan {participants.length - 100} peserta lain (tidak ditampilkan agar panel tetap ringan).
+                                        </p>
+                                    )}
                                 </div>
-                                <Button variant="outline" size="sm" disabled={busy} onClick={() => kirimKelola(
-                                    { action: "configure_participants", codes: participants.map((p) => p.code) },
-                                    "Peserta tersimpan."
-                                )}>
-                                    <Save className="h-4 w-4" /> Simpan Peserta ({participants.length})
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" disabled={busy} onClick={() => kirimKelola(
+                                        { action: "configure_participants", codes: participants.map((p) => p.code) },
+                                        "Peserta tersimpan."
+                                    )}>
+                                        <Save className="h-4 w-4" /> Simpan Peserta ({participants.length})
+                                    </Button>
+                                    {participants.length > 0 && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-red-600 hover:text-red-700"
+                                            onClick={() => {
+                                                if (confirm(`Kosongkan daftar ${participants.length} peserta? Tekan Simpan Peserta setelahnya agar perubahan tersimpan.`)) {
+                                                    setParticipants([]);
+                                                    setBulkInfo(null);
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" /> Kosongkan
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="space-y-3">
