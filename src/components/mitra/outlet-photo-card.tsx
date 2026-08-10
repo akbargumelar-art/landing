@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import React from "react";
-import { Camera, ImageIcon, Images, Loader2, TriangleAlert } from "lucide-react";
+import { Camera, ImageIcon, Images, Loader2, TriangleAlert, X } from "lucide-react";
 
 import {
     BATAS_SEGAR_HARI,
@@ -21,6 +21,64 @@ type SumberFoto = Record<string, unknown>;
 
 function bacaTeks(nilai: unknown): string | null {
     return typeof nilai === "string" && nilai.length > 0 ? nilai : null;
+}
+
+interface FotoTerbuka {
+    url: string;
+    label: string;
+}
+
+/**
+ * Penampil foto ukuran penuh.
+ *
+ * Kartunya memotong foto jadi petak 144 px (object-cover), jadi POP material dan papan
+ * nama yang justru ingin diperiksa sering terpotong. Di sini foto ditampilkan utuh dengan
+ * object-contain -- diperbesar sebesar layar, bukan sekadar diperlebar.
+ */
+function PopupFoto({ foto, onTutup }: { foto: FotoTerbuka; onTutup: () => void }) {
+    React.useEffect(() => {
+        const tekan = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onTutup();
+        };
+        window.addEventListener("keydown", tekan);
+
+        // Halaman di belakangnya dikunci supaya gulir jari di ponsel tidak menggeser
+        // daftar outlet sementara fotonya menutupi layar.
+        const gulirSemula = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            window.removeEventListener("keydown", tekan);
+            document.body.style.overflow = gulirSemula;
+        };
+    }, [onTutup]);
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={foto.label}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/90 p-4"
+            onClick={onTutup}
+        >
+            <button
+                type="button"
+                aria-label="Tutup"
+                className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+                onClick={onTutup}
+            >
+                <X className="h-5 w-5" />
+            </button>
+
+            {/* Klik pada fotonya sendiri tidak menutup: yang menutup adalah area gelap di
+                sekelilingnya, supaya pengguna bisa menahan foto untuk menyimpannya. */}
+            <div className="relative h-[80vh] w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+                <Image src={foto.url} alt={foto.label} fill sizes="100vw" className="object-contain" unoptimized />
+            </div>
+
+            <p className="text-sm font-semibold text-white">{foto.label}</p>
+        </div>
+    );
 }
 
 /**
@@ -87,6 +145,9 @@ export function OutletPhotoCard({
         (slot) => statusFoto(bacaTeks(outlet[slot.atColumn])).perluDiperbarui
     ).length;
 
+    const [fotoTerbuka, setFotoTerbuka] = React.useState<FotoTerbuka | null>(null);
+    const tutupFoto = React.useCallback(() => setFotoTerbuka(null), []);
+
     return (
         <div className="rounded-lg border bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -114,7 +175,17 @@ export function OutletPhotoCard({
                         <div key={slot.key} className="overflow-hidden rounded-lg border">
                             <div className="relative h-36 w-full bg-gray-100">
                                 {url ? (
-                                    <Image src={url} alt={slot.label} fill sizes="(max-width: 640px) 100vw, 25vw" className="object-cover" unoptimized />
+                                    // Tombol, bukan div ber-onClick: petak ini membuka dialog, jadi
+                                    // harus bisa dicapai lewat Tab dan dipicu dengan Enter juga.
+                                    <button
+                                        type="button"
+                                        aria-label={`Perbesar foto ${slot.label}`}
+                                        className="group absolute inset-0 cursor-zoom-in"
+                                        onClick={() => setFotoTerbuka({ url, label: slot.label })}
+                                    >
+                                        <Image src={url} alt={slot.label} fill sizes="(max-width: 640px) 100vw, 25vw" className="object-cover" unoptimized />
+                                        <span className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/20" />
+                                    </button>
                                 ) : (
                                     <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
                                         <ImageIcon className="h-7 w-7" />
@@ -122,7 +193,9 @@ export function OutletPhotoCard({
                                     </div>
                                 )}
                                 {slot.utama && (
-                                    <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                    // pointer-events-none: label ini menumpuk di atas tombol perbesar,
+                                    // dan tanpanya sudut kiri-atas foto jadi mati saat diklik.
+                                    <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                                         Foto utama
                                     </span>
                                 )}
@@ -169,8 +242,12 @@ export function OutletPhotoCard({
             </div>
 
             {bisaUnggah && (
-                <p className="mt-3 text-xs text-muted-foreground">Format JPG, PNG, atau WebP. Maksimal 5 MB per foto.</p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                    Format JPG, PNG, atau WebP. Maksimal 5 MB per foto. Klik foto untuk memperbesar.
+                </p>
             )}
+
+            {fotoTerbuka && <PopupFoto foto={fotoTerbuka} onTutup={tutupFoto} />}
         </div>
     );
 }
