@@ -22,7 +22,13 @@ export default function AdminMitraImportPage() {
     const [type, setType] = React.useState("whitelist");
     const [file, setFile] = React.useState<File | null>(null);
     const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<{ rows?: unknown[]; errors?: { row: number; message: string }[]; rowCount?: number; imported?: number } | null>(null);
+    const [result, setResult] = React.useState<{
+        rows?: unknown[];
+        errors?: { row: number; message: string }[];
+        rowCount?: number;
+        imported?: number;
+        ringkasan?: { tambah: number; perbarui: number } | null;
+    } | null>(null);
     const [batches, setBatches] = React.useState<Batch[]>([]);
 
     const load = React.useCallback(() => {
@@ -64,7 +70,16 @@ export default function AdminMitraImportPage() {
 
             <div>
                 <h1 className="text-2xl font-bold">Import Data Mitra</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Preview dan validasi import whitelist, performance, program score, penambahan outlet baru, dan detail outlet (Sellthru Digipos, Sellthru Nota, Recharge Digipos). Unduh contoh file untuk melihat format kolom yang benar.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Preview dan validasi import whitelist, performance, program score, outlet, dan detail
+                    outlet (Sellthru Digipos, Sellthru Nota, Recharge Digipos). Unduh contoh file untuk
+                    melihat format kolom yang benar.
+                </p>
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <strong>Data yang sudah ada akan diperbarui, bukan digandakan.</strong> Baris yang cocok
+                    dengan data lama menimpa isinya; yang belum ada ditambahkan. Kolom yang dikosongkan
+                    dibiarkan apa adanya — mengosongkan sel tidak menghapus isi di database.
+                </p>
             </div>
 
             <Card>
@@ -75,7 +90,7 @@ export default function AdminMitraImportPage() {
                             <option value="whitelist">Whitelist</option>
                             <option value="performance">Performance</option>
                             <option value="program_score">Program Score</option>
-                            <option value="outlet">Outlet Baru</option>
+                            <option value="outlet">Outlet (Tambah &amp; Update)</option>
                             <option value="outlet_detail">Detail Outlet (Sellthru & Recharge)</option>
                         </select>
                         <Button
@@ -108,6 +123,14 @@ export default function AdminMitraImportPage() {
                     <CardContent className="p-5">
                         <h2 className="font-bold">Hasil Validasi</h2>
                         <p className="mt-1 text-sm text-muted-foreground">Rows: {result.rowCount ?? "-"} | Imported: {result.imported ?? 0} | Errors: {result.errors?.length || 0}</p>
+                        {result.ringkasan && (
+                            <p className="mt-2 text-sm font-semibold">
+                                {result.ringkasan.tambah} outlet baru ditambahkan,{" "}
+                                <span className={result.ringkasan.perbarui > 0 ? "text-amber-700" : undefined}>
+                                    {result.ringkasan.perbarui} outlet lama diperbarui
+                                </span>
+                            </p>
+                        )}
                         {result.errors && result.errors.length > 0 && (
                             <div className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
                                 {result.errors.slice(0, 20).map((error) => <p key={`${error.row}-${error.message}`}>Baris {error.row}: {error.message}</p>)}
