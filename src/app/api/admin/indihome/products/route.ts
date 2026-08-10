@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
@@ -14,10 +14,12 @@ export async function GET() {
     if (auth.error) return auth.error;
 
     try {
+        // Urutan disamakan dengan halaman publik supaya daftar di admin memperlihatkan
+        // susunan yang benar-benar dilihat pengunjung.
         const products = await db
             .select()
             .from(indihomeProducts)
-            .orderBy(asc(indihomeProducts.sortOrder), asc(indihomeProducts.speedMbps));
+            .orderBy(desc(indihomeProducts.isFeatured), asc(indihomeProducts.sortOrder), asc(indihomeProducts.speedMbps));
         return NextResponse.json({ products });
     } catch (error) {
         console.error("Indihome products GET error:", error);
