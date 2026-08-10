@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getPublicMitraProgramDetail } from "@/lib/mitra-data";
+import { getPublicProgramDetail, normalizeTargetType } from "@/lib/mitra-programs";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +9,9 @@ export async function GET(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     const { slug } = await params;
-    const search = new URL(request.url).searchParams.get("q") || "";
-    const data = await getPublicMitraProgramDetail(slug, search);
+    const url = new URL(request.url);
+    const targetType = normalizeTargetType(url.searchParams.get("targetType"));
+    const data = await getPublicProgramDetail(slug, targetType, url.searchParams.get("q") || "");
 
     if (!data) {
         return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });

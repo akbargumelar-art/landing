@@ -10,13 +10,9 @@ import {
     mitraOutletDetails,
     mitraOutletMetrics,
     mitraOutlets,
-    mitraProgramParams,
-    mitraProgramScores,
-    mitraPrograms,
     mitraWhitelistNumbers,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
-import { recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
 import { getClientIp, normalizePhoneE164, toDecimalString } from "@/lib/mitra-utils";
 import { normalizeSalesforceName, resolveSalesforceIds } from "@/lib/mitra-salesforce";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
@@ -31,7 +27,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ImportType = "whitelist" | "performance" | "program_score" | "outlet" | "outlet_detail";
+type ImportType = "whitelist" | "performance" | "outlet" | "outlet_detail";
 // select dan update ikut dipakai jalur outlet_detail, yang menggabungkan nilai baru
 // dengan yang sudah tersimpan alih-alih menimpanya.
 type ImportExecutor = Pick<typeof db, "insert" | "select" | "update">;
@@ -56,7 +52,7 @@ export async function POST(request: Request) {
     // Daftar ini diturunkan dari ImportType, bukan ditulis ulang sebagai literal: versi
     // sebelumnya kelewat mencantumkan "outlet_detail", sehingga pilihan "Detail Outlet" di
     // layar Upload Data selalu ditolak 400 padahal validasi dan commit-nya sudah ada.
-    const TIPE_DIDUKUNG: ImportType[] = ["whitelist", "performance", "program_score", "outlet", "outlet_detail"];
+    const TIPE_DIDUKUNG: ImportType[] = ["whitelist", "performance", "outlet", "outlet_detail"];
 
     if (!file || !TIPE_DIDUKUNG.includes(type)) {
         return NextResponse.json({ error: "File dan tipe import wajib dipilih" }, { status: 400 });
@@ -93,7 +89,6 @@ export async function POST(request: Request) {
         createdAt: new Date(),
     });
 
-    let touchedProgramIds: string[] = [];
     try {
         await db.transaction(async (tx) => {
             if (type === "whitelist") {
@@ -101,9 +96,6 @@ export async function POST(request: Request) {
             }
             if (type === "performance") {
                 await commitPerformanceRows(tx, batchId, validation.validRows);
-            }
-            if (type === "program_score") {
-                touchedProgramIds = await commitProgramScoreRows(tx, batchId, validation.validRows);
             }
             if (type === "outlet") {
                 await commitOutletRows(tx, validation.validRows);
@@ -113,9 +105,6 @@ export async function POST(request: Request) {
             }
         });
 
-        for (const programId of touchedProgramIds) {
-            await recomputeMitraProgramLeaderboard(programId);
-        }
     } catch (error) {
         const message = error instanceof Error ? error.message : "Import gagal tanpa detail";
         await db.update(mitraImportBatches).set({
@@ -190,22 +179,13 @@ function angkaKolom(nilai: unknown): number | null {
     return Number.isFinite(angka) ? angka : null;
 }
 
-function toDateOnly(nilai: Date | string): string {
-    const tanggal = nilai instanceof Date ? nilai : new Date(nilai);
-    return tanggal.toISOString().slice(0, 10);
-}
-
 async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
     const outlets = await db.select().from(mitraOutlets);
     const metricDefs = await db.select().from(mitraMetricDefs);
-    const programs = await db.select().from(mitraPrograms);
-    const params = await db.select().from(mitraProgramParams);
 
     const outletByCode = new Map(outlets.map((outlet) => [outlet.outletCode, outlet]));
     const tapTersedia = new Set(outlets.map((outlet) => (outlet.tap || "").trim().toLowerCase()).filter(Boolean));
     const metricByKey = new Map(metricDefs.map((metric) => [metric.key, metric]));
-    const programBySlug = new Map(programs.map((program) => [program.slug, program]));
-    const paramByProgramKey = new Map(params.map((param) => [`${param.programId}:${param.key}`, param]));
 
     const errors: { row: number; message: string }[] = [];
     const validRows: Record<string, unknown>[] = [];
@@ -254,31 +234,6 @@ async function validateRows(type: ImportType, rows: Record<string, unknown>[]) {
             else if (!metric) errors.push({ row: rowNum, message: "Metric tidak ditemukan" });
             else if (!/^\d{4}-\d{2}$/.test(periodYm)) errors.push({ row: rowNum, message: "Periode harus YYYY-MM" });
             else validRows.push({ ...row, outletId: outlet.id, metricDefId: metric.id, periodYm });
-        }
-
-        if (type === "program_score") {
-            const outlet = outletByCode.get(String(row.outletCode || row.kodeOutlet || ""));
-            const program = programBySlug.get(String(row.programSlug || row.program || ""));
-            const param = program ? paramByProgramKey.get(`${program.id}:${String(row.paramKey || row.parameter || "")}`) : null;
-            const achievementDate = String(row.achievementDate || row.tanggal || row.periodeHarian || "");
-            const tanggalValid = /^\d{4}-\d{2}-\d{2}$/.test(achievementDate) && !Number.isNaN(new Date(achievementDate).getTime());
-
-            if (!outlet) errors.push({ row: rowNum, message: "Outlet tidak ditemukan" });
-            else if (!program) errors.push({ row: rowNum, message: "Program tidak ditemukan" });
-            else if (!param) errors.push({ row: rowNum, message: "Parameter program tidak ditemukan" });
-            else if (!tanggalValid) errors.push({ row: rowNum, message: "Tanggal pencapaian harus YYYY-MM-DD" });
-            else if (achievementDate < toDateOnly(program.periodStart) || achievementDate > toDateOnly(program.periodEnd)) {
-                errors.push({ row: rowNum, message: "Tanggal pencapaian di luar rentang periode program" });
-            } else {
-                validRows.push({
-                    ...row,
-                    outletId: outlet.id,
-                    programId: program.id,
-                    paramId: param.id,
-                    paramWeight: param.weight,
-                    achievementDate,
-                });
-            }
         }
 
         if (type === "outlet_detail") {
@@ -452,40 +407,6 @@ async function commitPerformanceRows(executor: ImportExecutor, batchId: string, 
             },
         });
     }
-}
-
-async function commitProgramScoreRows(executor: ImportExecutor, batchId: string, rows: Record<string, unknown>[]) {
-    const touchedProgramIds = new Set<string>();
-
-    for (const row of rows) {
-        const programId = String(row.programId);
-        touchedProgramIds.add(programId);
-
-        // Poin selalu dihitung server-side dari nilai mentah x weight parameter -- admin
-        // cukup upload angka pencapaian apa adanya, tidak perlu menghitung poin sendiri.
-        const rawValue = angkaKolom(row.rawValue ?? row.value) || 0;
-        const weight = Number(row.paramWeight) || 1;
-        const points = rawValue * weight;
-
-        await executor.insert(mitraProgramScores).values({
-            id: uuid(),
-            programId,
-            outletId: String(row.outletId),
-            paramId: String(row.paramId),
-            rawValue: toDecimalString(rawValue),
-            points: toDecimalString(points),
-            achievementDate: String(row.achievementDate),
-            batchId,
-        }).onDuplicateKeyUpdate({
-            set: {
-                rawValue: toDecimalString(rawValue),
-                points: toDecimalString(points),
-                batchId,
-            },
-        });
-    }
-
-    return Array.from(touchedProgramIds);
 }
 
 /**

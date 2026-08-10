@@ -204,6 +204,20 @@
       "when": 1786371153386,
       "tag": "0028_mitra_program_reward_engine_step2",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1786392061958,
+      "tag": "0029_drop_old_program_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1786392096097,
+      "tag": "0030_create_program_engine_and_masters",
+      "breakpoints": true
     }
   ]
 }

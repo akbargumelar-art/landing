@@ -3,7 +3,6 @@
 import React from "react";
 import { Download, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { OperatorShareChart } from "@/components/mitra/operator-share-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,7 +38,7 @@ const KOSONG = {
     ...Object.fromEntries(MITRA_MARKET_SHARE_FIELDS.map((field) => [field.key, ""])),
 } as unknown as MarketShareRow;
 
-export default function AdminMitraMarketSharePage() {
+export function MarketSharePanel() {
     const [rows, setRows] = React.useState<MarketShareRow[]>([]);
     const [areas, setAreas] = React.useState<Area[]>([]);
     const [q, setQ] = React.useState("");
@@ -195,10 +194,9 @@ export default function AdminMitraMarketSharePage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div>
-                <h1 className="text-2xl font-bold">Market Share Kecamatan</h1>
+                
                 <p className="mt-1 text-sm text-muted-foreground">
                     Persentase pangsa pasar operator per kecamatan. Tampil di halaman detail outlet setelah OTP terverifikasi.
                 </p>

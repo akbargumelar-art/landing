@@ -4,7 +4,6 @@ import Image from "next/image";
 import React from "react";
 import { Camera, ChevronDown, ChevronUp, Download, ExternalLink, Loader2, Search } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -92,7 +91,7 @@ function persenClass(percentage: number): string {
     return "text-red-600";
 }
 
-export default function MonitoringFotoOutletPage() {
+export function FotoPanel() {
     const [data, setData] = React.useState<ReportResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
@@ -200,11 +199,10 @@ export default function MonitoringFotoOutletPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">Monitoring Foto Outlet</h1>
+                    
                     <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                         Satu baris mewakili satu kategori foto pada satu outlet. Gunakan filter untuk menemukan foto
                         yang belum ada atau belum diperbarui sesuai jadwal kunjungan. Persentase pada kartu ringkasan

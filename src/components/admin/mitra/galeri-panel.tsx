@@ -4,7 +4,6 @@ import Image from "next/image";
 import React from "react";
 import { ExternalLink, Images } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -51,7 +50,7 @@ function formatWaktu(value: string | null): string {
     }).format(new Date(value));
 }
 
-export default function GaleriFotoOutletPage() {
+export function GaleriPanel() {
     const [data, setData] = React.useState<GalleryResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
@@ -108,10 +107,9 @@ export default function GaleriFotoOutletPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div>
-                <h1 className="flex items-center gap-2 text-2xl font-bold"><Images className="h-6 w-6" /> Galeri Foto Outlet</h1>
+                
                 <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                     Semua foto outlet dalam bentuk galeri, tanpa status kepatuhan -- untuk itu buka Monitoring Foto.
                     Gunakan filter untuk menelusuri foto berdasarkan tanggal unggah, TAP, jadwal PJP, salesforce,

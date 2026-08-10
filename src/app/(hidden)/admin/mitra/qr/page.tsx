@@ -47,7 +47,7 @@ export default function AdminMitraQrPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
+            <BackLink href="/admin/mitra/outlet" label="Kembali ke Database Outlet" />
 
             <div>
                 <h1 className="text-2xl font-bold">QR Mitra Outlet</h1>

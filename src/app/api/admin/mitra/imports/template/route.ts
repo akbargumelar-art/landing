@@ -13,7 +13,7 @@ import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type TemplateType = "whitelist" | "performance" | "program_score" | "outlet" | "outlet_detail";
+type TemplateType = "whitelist" | "performance" | "outlet" | "outlet_detail";
 
 // Contoh baris data untuk setiap tipe import. Baris ini menjadi panduan kolom
 // yang wajib diisi beserta format nilai yang benar.
@@ -53,15 +53,6 @@ const TEMPLATES: Record<TemplateType, Record<string, string | number>[]> = {
             metricKey: "sellthru_digipos",
             periodYm: "2026-08",
             value: 1500000,
-        },
-    ],
-    program_score: [
-        {
-            outletCode: "OUT-001",
-            programSlug: "program-agustus-2026",
-            paramKey: "recharge",
-            achievementDate: "2026-08-01",
-            rawValue: 500000,
         },
     ],
     /**

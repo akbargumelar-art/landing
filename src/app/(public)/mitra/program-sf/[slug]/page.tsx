@@ -2,10 +2,10 @@ import { Suspense } from "react";
 
 import { ProgramPublicView } from "@/components/mitra/program-public-view";
 
-export default function MitraProgramOutletDetailPage() {
+export default function MitraProgramSalesforceDetailPage() {
     return (
         <Suspense>
-            <ProgramPublicView targetType="OUTLET" />
+            <ProgramPublicView targetType="SALESFORCE" />
         </Suspense>
     );
 }

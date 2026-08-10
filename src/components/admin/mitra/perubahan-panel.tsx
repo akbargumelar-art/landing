@@ -3,7 +3,6 @@
 import React from "react";
 import { Download, History, Loader2, Search } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +39,7 @@ function tanggalLokal(geser = 0): string {
     return `${hari.getFullYear()}-${String(hari.getMonth() + 1).padStart(2, "0")}-${String(hari.getDate()).padStart(2, "0")}`;
 }
 
-export default function AdminPerubahanOutletPage() {
+export function PerubahanPanel() {
     const [rows, setRows] = React.useState<BarisPerubahan[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [terpotong, setTerpotong] = React.useState(false);
@@ -97,10 +96,9 @@ export default function AdminPerubahanOutletPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div>
-                <h1 className="text-2xl font-bold">Perubahan Data Outlet</h1>
+                
                 <p className="mt-1 text-sm text-muted-foreground">
                     Foto, titik long-lat, dan branding yang diubah dari Portal Mitra. Dipakai untuk
                     memeriksa kunjungan salesforce dan mengunduh rekapnya.

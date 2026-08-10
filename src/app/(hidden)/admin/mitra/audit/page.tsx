@@ -3,7 +3,6 @@
 import React from "react";
 import { ClipboardList, Loader2, Search } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,7 +48,6 @@ export default function AdminMitraAuditPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div>
                 <h1 className="text-2xl font-bold">Audit Mitra</h1>

@@ -3,7 +3,6 @@
 import React from "react";
 import { Activity, Loader2, Plus } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,7 @@ interface Outlet {
     outletCode: string;
 }
 
-export default function AdminMitraPerformancePage() {
+export function PerformancePanel() {
     const [defs, setDefs] = React.useState<MetricDef[]>([]);
     const [metrics, setMetrics] = React.useState<MetricRow[]>([]);
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
@@ -94,10 +93,9 @@ export default function AdminMitraPerformancePage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
 
             <div>
-                <h1 className="text-2xl font-bold">Performance Mitra</h1>
+                
                 <p className="mt-1 text-sm text-muted-foreground">Definisikan metric dan input performansi outlet per periode.</p>
             </div>
 

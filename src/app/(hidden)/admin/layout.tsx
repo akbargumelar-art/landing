@@ -20,7 +20,11 @@ import {
     Ticket,
     Inbox,
     Calculator,
+    ClipboardList,
     Store,
+    BadgeCheck,
+    Gift,
+    Route,
     Wifi,
     UserCog,
     Trophy,
@@ -37,12 +41,17 @@ const sidebarGroups = [
             { href: "/admin/beranda", label: "Kelola Beranda", icon: Image, roles: ["SUPER_ADMIN"] as AdminRole[] },
             { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings, roles: ["SUPER_ADMIN"] as AdminRole[] },
             { href: "/admin/users", label: "Kelola User", icon: UserCog, roles: ["SUPER_ADMIN"] as AdminRole[] },
+            { href: "/admin/mitra/audit", label: "Audit Log", icon: ClipboardList, roles: ["SUPER_ADMIN"] as AdminRole[] },
         ]
     },
     {
         title: "Layanan & Portal",
         links: [
-            { href: "/admin/mitra", label: "Database Mitra Outlet", icon: Store },
+            { href: "/admin/mitra/salesforce", label: "Database Salesforce", icon: BadgeCheck },
+            { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Store },
+            { href: "/admin/mitra/monitoring", label: "Monitoring Visit", icon: Route },
+            { href: "/admin/mitra/program", label: "Program Outlet", icon: Trophy },
+            { href: "/admin/mitra/program-salesforce", label: "Program Salesforce", icon: Gift },
             { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
             { href: "/admin/cuan", label: "Kalkulator Cuan", icon: Calculator },
         ]
@@ -56,10 +65,11 @@ const sidebarGroups = [
         ]
     },
     {
+        // Khusus program pelanggan. Program mitra outlet dan salesforce ada di grup
+        // Layanan & Portal bersama data yang dinilainya.
         title: "Event & Form",
         links: [
             { href: "/admin/program", label: "Program Undian", icon: FileText },
-            { href: "/admin/mitra/program", label: "Program Mitra Outlet", icon: Trophy },
             { href: "/admin/form-builder", label: "Form Pengajuan", icon: FormInput },
             { href: "/admin/peserta", label: "Data Peserta", icon: Users },
             { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },

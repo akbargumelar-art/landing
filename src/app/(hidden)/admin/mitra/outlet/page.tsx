@@ -4,7 +4,7 @@ import Link from "next/link";
 import React from "react";
 import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
 
-import { BackLink } from "@/components/back-link";
+import { ImportPanel } from "@/components/admin/mitra/import-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,11 @@ import {
     PJP_TYPES,
     buildOutletMapsUrl,
 } from "@/lib/mitra-outlet-options";
+
+interface MasterOption {
+    id: string;
+    name: string;
+}
 
 interface Outlet {
     id: string;
@@ -71,6 +76,7 @@ export default function AdminMitraOutletPage() {
         name: "",
         ownerName: "",
         ownerPhone: "",
+        tap: "",
         kabupaten: "",
         kecamatan: "",
         category: String(DEFAULT_OUTLET_CATEGORY),
@@ -79,6 +85,23 @@ export default function AdminMitraOutletPage() {
         branding: String(DEFAULT_OUTLET_BRANDING),
         salesforceId: "",
     });
+    const [master, setMaster] = React.useState<{ tap: MasterOption[]; kabupaten: MasterOption[]; kecamatan: MasterOption[] }>({
+        tap: [], kabupaten: [], kecamatan: [],
+    });
+
+    // Daftar wilayah dimuat sekali dan dipakai untuk seluruh dropdown di halaman ini,
+    // menggantikan input teks bebas yang sebelumnya membuat satu wilayah tertulis
+    // bermacam-macam ejaan.
+    React.useEffect(() => {
+        fetch("/api/admin/mitra/master")
+            .then((res) => res.json())
+            .then((data) => setMaster({
+                tap: data.tap || [],
+                kabupaten: data.kabupaten || [],
+                kecamatan: data.kecamatan || [],
+            }))
+            .catch(() => undefined);
+    }, []);
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -153,7 +176,7 @@ export default function AdminMitraOutletPage() {
         });
         if (res.ok) {
             setForm({
-                outletCode: "", name: "", ownerName: "", ownerPhone: "", kabupaten: "", kecamatan: "",
+                outletCode: "", name: "", ownerName: "", ownerPhone: "", tap: "", kabupaten: "", kecamatan: "",
                 category: String(DEFAULT_OUTLET_CATEGORY), pjpDay: String(DEFAULT_PJP_DAY),
                 pjpType: String(DEFAULT_PJP_TYPE), branding: String(DEFAULT_OUTLET_BRANDING),
                 salesforceId: "",
@@ -226,12 +249,24 @@ export default function AdminMitraOutletPage() {
 
     return (
         <div className="space-y-6">
-            <BackLink href="/admin/mitra" label="Kembali ke Database Mitra Outlet" />
-
-            <div>
-                <h1 className="text-2xl font-bold">Outlet Mitra</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Kelola data outlet dan token QR publik.</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold">Database Outlet</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">Kelola data outlet mitra, unggah massal, dan token QR publik.</p>
+                </div>
+                <Link href="/admin/mitra/qr">
+                    <Button variant="outline">
+                        <QrCode className="h-4 w-4" /> Cetak QR Massal
+                    </Button>
+                </Link>
             </div>
+
+            <ImportPanel
+                type="outlet"
+                title="Unggah Outlet Massal"
+                description="Tambah outlet baru sekaligus memperbarui yang sudah ada. Baris dengan kode outlet yang sudah terdaftar akan diperbarui, sisanya ditambahkan."
+                onCommitted={load}
+            />
 
             <Card>
                 <CardContent className="p-5">
@@ -240,8 +275,9 @@ export default function AdminMitraOutletPage() {
                         <Field label="Nama Outlet" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
                         <Field label="Owner" value={form.ownerName} onChange={(value) => setForm((prev) => ({ ...prev, ownerName: value }))} />
                         <Field label="WA Owner" value={form.ownerPhone} onChange={(value) => setForm((prev) => ({ ...prev, ownerPhone: value }))} />
-                        <Field label="Kabupaten" value={form.kabupaten} onChange={(value) => setForm((prev) => ({ ...prev, kabupaten: value }))} />
-                        <Field label="Kecamatan" value={form.kecamatan} onChange={(value) => setForm((prev) => ({ ...prev, kecamatan: value }))} />
+                        <MasterField label="TAP" options={master.tap} value={form.tap} onChange={(value) => setForm((prev) => ({ ...prev, tap: value }))} />
+                        <MasterField label="Kabupaten" options={master.kabupaten} value={form.kabupaten} onChange={(value) => setForm((prev) => ({ ...prev, kabupaten: value }))} />
+                        <MasterField label="Kecamatan" options={master.kecamatan} value={form.kecamatan} onChange={(value) => setForm((prev) => ({ ...prev, kecamatan: value }))} />
                         <div className="space-y-2">
                             <Label>Kategori Outlet</Label>
                             <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm">
@@ -549,6 +585,40 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
         <div className="space-y-2">
             <Label>{label}</Label>
             <Input value={value} onChange={(event) => onChange(event.target.value)} />
+        </div>
+    );
+}
+
+/**
+ * Pilihan wilayah dari daftar master. Nilai yang sudah tersimpan tapi tidak ada di master
+ * tetap ditampilkan sebagai opsi tambahan -- tanpa itu, membuka outlet lama akan terlihat
+ * seolah wilayahnya kosong dan menyimpan ulang akan menghapusnya diam-diam.
+ */
+function MasterField({
+    label,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    options: MasterOption[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const adaDiMaster = options.some((option) => option.name === value);
+
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-10 w-full rounded-md border px-3 text-sm"
+            >
+                <option value="">Pilih {label}</option>
+                {!adaDiMaster && value && <option value={value}>{value} (di luar daftar)</option>}
+                {options.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
+            </select>
         </div>
     );
 }

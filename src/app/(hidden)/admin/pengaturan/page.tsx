@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Loader2, Upload, Globe, MapPin, Phone, Plus, Trash2, MessageSquare, CreditCard } from "lucide-react";
+import { Save, Loader2, Upload, Globe, MapPin, MessageCircle, Phone, Plus, ShieldCheck, Trash2, MessageSquare, CreditCard } from "lucide-react";
+import { ImportPanel } from "@/components/admin/mitra/import-panel";
 import { WhitelistOtpSettings } from "@/components/admin/whitelist-otp-settings";
 
 /**
@@ -68,6 +69,7 @@ export default function PengaturanPage() {
     const [message, setMessage] = useState("");
     const [origin, setOrigin] = useState("");
     const [wahaTestPhone, setWahaTestPhone] = useState("");
+    const [tab, setTab] = useState<"website" | "whatsapp" | "payment" | "whitelist">("website");
     const [wahaTesting, setWahaTesting] = useState(false);
     const [wahaResult, setWahaResult] = useState<{ ok: boolean; lines: string[] } | null>(null);
 
@@ -189,16 +191,44 @@ export default function PengaturanPage() {
         setTimeout(() => setMessage(""), 3000);
     };
 
+    const TABS = [
+        { key: "website" as const, label: "Website", icon: Globe },
+        { key: "whatsapp" as const, label: "WhatsApp Gateway", icon: MessageCircle },
+        { key: "payment" as const, label: "Payment Gateway", icon: CreditCard },
+        { key: "whitelist" as const, label: "Whitelist OTP", icon: ShieldCheck },
+    ];
+
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
     return (
         <div className="max-w-4xl space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Pengaturan Website</h2>
-                <Button onClick={handleSave} disabled={saving} className="cursor-pointer">
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Simpan
-                </Button>
+                <h2 className="text-2xl font-bold">Pengaturan</h2>
+                {/* Tombol simpan tetap satu untuk semua tab: seluruh tab menulis ke
+                    endpoint pengaturan yang sama, jadi memecahnya per tab justru membuat
+                    perubahan di tab lain diam-diam ikut tersimpan atau malah tertinggal. */}
+                {tab !== "whitelist" && (
+                    <Button onClick={handleSave} disabled={saving} className="cursor-pointer">
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Simpan
+                    </Button>
+                )}
+            </div>
+
+            <div className="inline-flex flex-wrap rounded-lg border bg-white p-1">
+                {TABS.map((item) => (
+                    <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setTab(item.key)}
+                        className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
+                            tab === item.key ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"
+                        }`}
+                    >
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                    </button>
+                ))}
             </div>
 
             {message && (
@@ -207,6 +237,7 @@ export default function PengaturanPage() {
                 </div>
             )}
 
+            {tab === "website" && (<>
             {/* Logo & Favicon */}
             <Card>
                 <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Globe className="h-5 w-5" /> Branding</CardTitle></CardHeader>
@@ -297,6 +328,9 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
+            </>)}
+
+            {tab === "whatsapp" && (<>
             {/* WhatsApp Integration */}
             <Card>
                 <CardHeader>
@@ -451,8 +485,20 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
-            <WhitelistOtpSettings />
+            </>)}
 
+            {tab === "whitelist" && (
+                <div className="space-y-6">
+                    <ImportPanel
+                        type="whitelist"
+                        title="Unggah Whitelist Massal"
+                        description="Berkas berisi nomor, nama, keterangan, scope (ALL/OUTLET/TAP), dan sasarannya. Untuk beberapa nomor saja, gunakan mode tempel di bawah."
+                    />
+                    <WhitelistOtpSettings />
+                </div>
+            )}
+
+            {tab === "payment" && (<>
             {/* Active Payment Gateway Selector */}
             <Card>
                 <CardHeader>
@@ -609,6 +655,9 @@ export default function PengaturanPage() {
                 </CardContent>
             </Card>
 
+            </>)}
+
+            {tab === "website" && (<>
             {/* Offices - Dynamic */}
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -658,6 +707,7 @@ export default function PengaturanPage() {
                     <p className="text-xs text-muted-foreground">Foto kantor diatur di halaman Kelola Beranda. Tekan Simpan setelah selesai mengubah.</p>
                 </CardContent>
             </Card>
-        </div >
+            </>)}
+        </div>
     );
 }

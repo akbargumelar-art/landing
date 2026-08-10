@@ -5,16 +5,37 @@ import { v4 as uuid } from "uuid";
 import { db } from "@/db";
 import { mitraProgramParams, mitraProgramRewardRules, mitraPrograms } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
-import { computeMitraProgramRewards, recomputeMitraProgramLeaderboard } from "@/lib/mitra-data";
+import {
+    buildRewardRuleValues,
+    computeProgramRewards,
+    normalizeMechanismType,
+    normalizeTargetType,
+    recomputeProgramLeaderboard,
+    searchParticipantCandidates,
+} from "@/lib/mitra-programs";
 import { getClientIp, slugify } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
     const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]);
     if (auth.error) return auth.error;
 
-    const programs = await db.select().from(mitraPrograms).orderBy(desc(mitraPrograms.periodStart));
+    const url = new URL(request.url);
+    const targetType = normalizeTargetType(url.searchParams.get("targetType"));
+
+    // Pencarian kandidat peserta dilayani lewat route yang sama supaya halaman admin
+    // cukup mengenal satu alamat untuk seluruh urusan program.
+    const cariPeserta = url.searchParams.get("participantQuery");
+    if (cariPeserta !== null) {
+        return NextResponse.json({ candidates: await searchParticipantCandidates(targetType, cariPeserta) });
+    }
+
+    const programs = await db
+        .select()
+        .from(mitraPrograms)
+        .where(eq(mitraPrograms.targetType, targetType))
+        .orderBy(desc(mitraPrograms.periodStart));
     const params = await db.select().from(mitraProgramParams).orderBy(asc(mitraProgramParams.sortOrder));
     const rewardRules = await db.select().from(mitraProgramRewardRules).orderBy(asc(mitraProgramRewardRules.sortOrder));
 
@@ -32,28 +53,29 @@ export async function POST(request: Request) {
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
-    const id = uuid();
-    const now = new Date();
     const name = String(body.name || "").trim();
 
     if (!name || !body.periodStart || !body.periodEnd) {
         return NextResponse.json({ error: "Nama dan periode program wajib diisi" }, { status: 400 });
     }
 
+    const id = uuid();
+    const targetType = normalizeTargetType(body.targetType);
+    const mechanismType = normalizeMechanismType(body.mechanismType);
+
     await db.insert(mitraPrograms).values({
         id,
         name,
         slug: body.slug ? slugify(String(body.slug)) : slugify(name),
+        targetType,
+        mechanismType,
         descriptionMd: body.descriptionMd || "",
         mechanismMd: body.mechanismMd || "",
         periodStart: new Date(body.periodStart),
         periodEnd: new Date(body.periodEnd),
         status: body.status || "DRAFT",
-        rankingMode: body.rankingMode || "POINT",
-        mechanismType: body.mechanismType || "RANKING",
-        tieBreaker: body.tieBreaker || null,
         isPublic: Boolean(body.isPublic),
-        createdAt: now,
+        createdAt: new Date(),
     });
 
     if (Array.isArray(body.params) && body.params.length > 0) {
@@ -72,20 +94,7 @@ export async function POST(request: Request) {
     }
 
     if (Array.isArray(body.rewardRules) && body.rewardRules.length > 0) {
-        await db.insert(mitraProgramRewardRules).values(
-            body.rewardRules.map((rule: Record<string, unknown>, index: number) => ({
-                id: uuid(),
-                programId: id,
-                ruleType: rule.ruleType === "THRESHOLD" ? "THRESHOLD" : "RANK",
-                rankFrom: rule.rankFrom !== undefined && rule.rankFrom !== null && rule.rankFrom !== "" ? Number(rule.rankFrom) : null,
-                rankTo: rule.rankTo !== undefined && rule.rankTo !== null && rule.rankTo !== "" ? Number(rule.rankTo) : null,
-                paramKey: rule.paramKey ? String(rule.paramKey) : null,
-                comparator: rule.comparator ? String(rule.comparator) : null,
-                thresholdValue: rule.thresholdValue !== undefined && rule.thresholdValue !== null && rule.thresholdValue !== "" ? String(rule.thresholdValue) : null,
-                rewardLabel: String(rule.rewardLabel || `Reward ${index + 1}`),
-                sortOrder: index,
-            }))
-        );
+        await db.insert(mitraProgramRewardRules).values(buildRewardRuleValues(id, mechanismType, body.rewardRules));
     }
 
     await writeAdminAuditLog({
@@ -93,7 +102,7 @@ export async function POST(request: Request) {
         action: "CREATE",
         entity: "mitra_program",
         entityId: id,
-        diff: { name, status: body.status, isPublic: body.isPublic },
+        diff: { name, targetType, mechanismType, status: body.status },
         ip: getClientIp(request),
     });
 
@@ -106,21 +115,21 @@ export async function PATCH(request: Request) {
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));
-    if (!body.programId || !["recompute", "compute_rewards"].includes(body.action)) {
+    const programId = String(body.programId || "");
+    if (!programId || !["recompute", "compute_rewards"].includes(String(body.action))) {
         return NextResponse.json({ error: "Aksi tidak valid" }, { status: 400 });
     }
 
     if (body.action === "compute_rewards") {
-        const rewards = await computeMitraProgramRewards(String(body.programId));
-        return NextResponse.json({ rewards });
+        return NextResponse.json({ rewards: await computeProgramRewards(programId) });
     }
 
-    await recomputeMitraProgramLeaderboard(String(body.programId));
+    await recomputeProgramLeaderboard(programId);
     await writeAdminAuditLog({
         userId: auth.session?.userId,
         action: "RECOMPUTE",
         entity: "mitra_program_leaderboard",
-        entityId: String(body.programId),
+        entityId: programId,
         ip: getClientIp(request),
     });
 
