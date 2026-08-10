@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import React from "react";
-import { Camera, ImageIcon, Loader2, TriangleAlert } from "lucide-react";
+import { Camera, ImageIcon, Images, Loader2, TriangleAlert } from "lucide-react";
 
 import {
     BATAS_SEGAR_HARI,
@@ -21,6 +21,51 @@ type SumberFoto = Record<string, unknown>;
 
 function bacaTeks(nilai: unknown): string | null {
     return typeof nilai === "string" && nilai.length > 0 ? nilai : null;
+}
+
+/**
+ * Satu tombol pilih berkas. Dipakai dua kali per slot dengan satu-satunya perbedaan pada
+ * atribut `capture`, supaya aturan berkas yang diterima -- tipe dan penanganan pilihan --
+ * tidak punya dua salinan yang bisa menyimpang diam-diam.
+ */
+function TombolPilihFoto({
+    label,
+    icon: Icon,
+    langsungKamera,
+    nonaktif,
+    onPilih,
+}: {
+    label: string;
+    icon: typeof Camera;
+    langsungKamera?: boolean;
+    nonaktif: boolean;
+    onPilih: (file: File) => void;
+}) {
+    return (
+        <label
+            className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-semibold ${
+                nonaktif ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-gray-50"
+            }`}
+        >
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            {label}
+            <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                // Hanya tombol kamera yang memakai `capture`. Di tombol galeri atribut ini
+                // harus BENAR-BENAR tidak ada, bukan diisi string kosong -- sebagian ponsel
+                // memperlakukan `capture=""` sebagai perintah membuka kamera juga.
+                {...(langsungKamera ? { capture: "environment" as const } : {})}
+                className="hidden"
+                disabled={nonaktif}
+                onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onPilih(file);
+                    event.target.value = "";
+                }}
+            />
+        </label>
+    );
 }
 
 /**
@@ -91,26 +136,32 @@ export function OutletPhotoCard({
                                 </p>
                                 {url && <p className="text-xs text-muted-foreground">{formatTanggalFoto(bacaTeks(outlet[slot.atColumn]))}</p>}
 
-                                {bisaUnggah && (
-                                    <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50">
-                                        {unggahSlotIni ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-                                        {unggahSlotIni ? "Mengunggah..." : url ? "Ganti Foto" : "Tambah Foto"}
-                                        {/* capture="environment" membuat ponsel langsung membuka kamera
-                                            belakang, sehingga foto yang masuk memang diambil di lokasi. */}
-                                        <input
-                                            type="file"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            capture="environment"
-                                            className="hidden"
-                                            disabled={Boolean(sedangUnggah)}
-                                            onChange={(event) => {
-                                                const file = event.target.files?.[0];
-                                                if (file && onUpload) onUpload(slot.key, file);
-                                                event.target.value = "";
-                                            }}
+                                {bisaUnggah && (unggahSlotIni ? (
+                                    <div className="mt-2 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold text-muted-foreground">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Mengunggah...
+                                    </div>
+                                ) : (
+                                    /* Dua jalan masuk yang setara. Tombol Kamera didahulukan karena
+                                       memotret di tempat adalah cara yang diharapkan; Galeri untuk
+                                       foto yang sudah diambil lebih dulu, mis. saat sinyal di outlet
+                                       mati dan unggahannya baru bisa dilakukan setelah pindah tempat. */
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                        <TombolPilihFoto
+                                            label="Kamera"
+                                            icon={Camera}
+                                            langsungKamera
+                                            nonaktif={Boolean(sedangUnggah)}
+                                            onPilih={(file) => onUpload?.(slot.key, file)}
                                         />
-                                    </label>
-                                )}
+                                        <TombolPilihFoto
+                                            label="Galeri"
+                                            icon={Images}
+                                            nonaktif={Boolean(sedangUnggah)}
+                                            onPilih={(file) => onUpload?.(slot.key, file)}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     );
