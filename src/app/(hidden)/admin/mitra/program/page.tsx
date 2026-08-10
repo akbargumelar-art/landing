@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Award, Loader2, Plus, RefreshCw, Save, Search, Sparkles, X } from "lucide-react";
+import { Award, Flag, Loader2, Plus, RefreshCw, Save, Search, Sparkles, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -144,6 +144,27 @@ export default function AdminMitraProgramPage() {
             body: JSON.stringify({ action: "recompute", programId }),
         });
         alert("Leaderboard dihitung ulang.");
+    };
+
+    const endProgram = async (program: Program) => {
+        if (!confirm(`Akhiri program "${program.name}"? Status akan diubah ke ENDED, leaderboard tidak lagi menerima skor baru.`)) return;
+        const res = await fetch(`/api/admin/mitra/programs/${program.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "ENDED" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return alert(data.error || "Gagal mengakhiri program");
+        load();
+    };
+
+    const deleteProgram = async (program: Program) => {
+        if (!confirm(`Hapus program "${program.name}"? Seluruh peserta, pencapaian, leaderboard, dan pemenang program ini ikut terhapus dan TIDAK BISA dikembalikan.`)) return;
+        const res = await fetch(`/api/admin/mitra/programs/${program.id}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return alert(data.error || "Gagal menghapus program");
+        if (selectedProgramId === program.id) setSelectedProgramId("");
+        load();
     };
 
     const openManagement = async (programId: string) => {
@@ -341,11 +362,21 @@ export default function AdminMitraProgramPage() {
                                     <TableCell>{program.status} {program.isPublic ? "(Public)" : ""}</TableCell>
                                     <TableCell>{program.params?.length || 0}</TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex flex-wrap justify-end gap-2">
                                             <Button variant="outline" size="sm" onClick={() => openManagement(program.id)}>Kelola</Button>
                                             <Button variant="outline" size="sm" onClick={() => recompute(program.id)}>
                                                 <RefreshCw className="h-4 w-4" />
                                                 Recompute
+                                            </Button>
+                                            {program.status !== "ENDED" && (
+                                                <Button variant="outline" size="sm" onClick={() => endProgram(program)}>
+                                                    <Flag className="h-4 w-4" />
+                                                    Akhiri
+                                                </Button>
+                                            )}
+                                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteProgram(program)}>
+                                                <Trash2 className="h-4 w-4" />
+                                                Hapus
                                             </Button>
                                         </div>
                                     </TableCell>

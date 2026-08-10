@@ -223,3 +223,30 @@ export async function PUT(
     const [updated] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id));
     return NextResponse.json(updated);
 }
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const [existing] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id)).limit(1);
+    if (!existing) return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
+
+    // Params, peserta, skor, leaderboard, pemenang, dan aturan reward ikut terhapus lewat
+    // ON DELETE CASCADE di skema -- tidak perlu dihapus manual satu-satu di sini.
+    await db.delete(mitraPrograms).where(eq(mitraPrograms.id, id));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE",
+        entity: "mitra_program",
+        entityId: id,
+        diff: { name: existing.name, slug: existing.slug },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true });
+}
