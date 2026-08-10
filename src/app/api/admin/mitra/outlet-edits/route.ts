@@ -30,6 +30,23 @@ const LABEL_AKSI: Record<string, string> = {
     BRANDING: "Branding",
 };
 
+/**
+ * Awal hari menurut WIB, bukan menurut zona waktu server.
+ *
+ * Tanggal yang diketik admin dibaca sebagai tanggal Indonesia, dan kolom Waktu pada tabel
+ * maupun berkas Excel juga ditampilkan dalam WIB. Memakai `new Date("...T00:00:00")` akan
+ * memakai zona waktu proses: di server yang berjalan UTC, "sampai 10 Agustus" ikut menarik
+ * tujuh jam pertama tanggal 11 -- baris yang di layar jelas-jelas tertulis 11 Agustus.
+ *
+ * Offset ditulis eksplisit supaya hasilnya sama di server mana pun. Konversi ke waktu
+ * penyimpanan diserahkan ke driver MySQL, seperti halnya saat baris itu ditulis.
+ */
+function tengahMalamWib(tanggal: string, geserHari = 0): Date {
+    const waktu = new Date(`${tanggal}T00:00:00+07:00`);
+    waktu.setUTCDate(waktu.getUTCDate() + geserHari);
+    return waktu;
+}
+
 function teks(nilai: unknown): string {
     if (nilai === null || nilai === undefined || nilai === "") return "";
     return String(nilai);
@@ -99,14 +116,12 @@ export async function GET(request: Request) {
         filters.push(eq(mitraOutletEditLogs.action, action as "PHOTO" | "LOCATION" | "BRANDING"));
     }
     if (/^\d{4}-\d{2}-\d{2}$/.test(dari)) {
-        filters.push(gte(mitraOutletEditLogs.createdAt, new Date(`${dari}T00:00:00`)));
+        filters.push(gte(mitraOutletEditLogs.createdAt, tengahMalamWib(dari)));
     }
     if (/^\d{4}-\d{2}-\d{2}$/.test(sampai)) {
         // Batas atas eksklusif ke hari BERIKUTNYA: memakai `<= sampai` akan memotong seluruh
         // perubahan yang terjadi pada tanggal itu setelah pukul 00:00.
-        const besok = new Date(`${sampai}T00:00:00`);
-        besok.setDate(besok.getDate() + 1);
-        filters.push(lt(mitraOutletEditLogs.createdAt, besok));
+        filters.push(lt(mitraOutletEditLogs.createdAt, tengahMalamWib(sampai, 1)));
     }
     if (q) {
         const pola = `%${q}%`;
