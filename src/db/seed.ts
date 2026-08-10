@@ -14,7 +14,6 @@ import {
     submissionValues,
     winners,
     mitraUserProfiles,
-    mitraTerritories,
     mitraSalesforces,
     mitraOutlets,
     mitraOutletDetails,
@@ -525,18 +524,6 @@ async function seed() {
         if (existingMitraOutlets.length > 0) {
             console.log("  Portal Mitra already contains data, skipping sample data.");
         } else {
-            const regionId = uuid();
-            const clusterCirebonId = uuid();
-            const areaKesambiId = uuid();
-            const areaKuninganId = uuid();
-
-            await db.insert(mitraTerritories).values([
-                { id: regionId, name: "Region Cirebon Raya", type: "REGION", parentId: null, createdAt: new Date() },
-                { id: clusterCirebonId, name: "Cluster Cirebon Kuningan", type: "CLUSTER", parentId: regionId, createdAt: new Date() },
-                { id: areaKesambiId, name: "Area Kesambi", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
-                { id: areaKuninganId, name: "Area Kuningan Kota", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
-            ]);
-
             const outletAId = uuid();
             const outletBId = uuid();
             const sfCirebonId = uuid();
@@ -562,7 +549,6 @@ async function seed() {
                     longitude: 108.549,
                     latitude: -6.732,
                     locationUrl: buildOutletMapsUrl(-6.732, 108.549),
-                    territoryId: areaKesambiId,
                     category: "FISIK",
                     pjpDay: "Senin",
                     pjpType: "F1",
@@ -585,7 +571,6 @@ async function seed() {
                     longitude: 108.482,
                     latitude: -6.975,
                     locationUrl: buildOutletMapsUrl(-6.975, 108.482),
-                    territoryId: areaKuninganId,
                     category: "Non FISIK",
                     pjpDay: "Rabu",
                     pjpType: "F3",

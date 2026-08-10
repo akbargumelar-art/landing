@@ -155,6 +155,27 @@
       "when": 1786332958889,
       "tag": "0021_mitra_visit_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1786355305700,
+      "tag": "0022_outlet_edit_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1786356883397,
+      "tag": "0023_add_admin_user_taps",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786356920893,
+      "tag": "0024_drop_territory_tables",
+      "breakpoints": true
     }
   ]
 }

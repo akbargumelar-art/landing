@@ -505,26 +505,6 @@ export const mitraUserProfiles = mysqlTable("mitra_user_profiles", {
     index("mitra_user_profiles_role_idx").on(table.role),
 ]);
 
-export const mitraTerritories = mysqlTable("mitra_territories", {
-    id: varchar("id", { length: 36 }).primaryKey(),
-    name: varchar("name", { length: 255 }).notNull(),
-    type: mysqlEnum("type", ["REGION", "CLUSTER", "AREA"]).notNull(),
-    parentId: varchar("parent_id", { length: 36 }),
-    createdAt: datetime("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
-}, (table) => [
-    index("mitra_territories_parent_idx").on(table.parentId),
-    index("mitra_territories_type_idx").on(table.type),
-]);
-
-export const mitraUserTerritories = mysqlTable("mitra_user_territories", {
-    userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
-}, (table) => [
-    primaryKey({ columns: [table.userId, table.territoryId], name: "mitra_user_territories_pk" }),
-    index("mitra_user_territories_territory_idx").on(table.territoryId),
-]);
-
 /**
  * Master salesforce: satu baris per petugas, dipakai bersama oleh semua outlet yang
  * dikunjunginya. Sebelumnya nama dan fotonya disimpan berulang di tiap baris outlet,
@@ -565,7 +545,6 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     // Diturunkan dari latitude/longitude (lihat resolveOutletMapsUrl). Kolom tetap ada
     // supaya tautan manual pada data lama tidak hilang saat koordinat belum diisi.
     locationUrl: varchar("location_url", { length: 500 }),
-    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "set null" }),
     category: mysqlEnum("category", OUTLET_CATEGORIES).notNull().default(DEFAULT_OUTLET_CATEGORY),
     pjpDay: mysqlEnum("pjp_day", PJP_DAYS).notNull().default(DEFAULT_PJP_DAY),
     pjpType: mysqlEnum("pjp_type", PJP_TYPES).notNull().default(DEFAULT_PJP_TYPE),
@@ -594,7 +573,9 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     index("mitra_outlets_public_token_idx").on(table.publicToken),
     index("mitra_outlets_name_idx").on(table.name),
     index("mitra_outlets_owner_phone_idx").on(table.ownerPhone),
-    index("mitra_outlets_territory_idx").on(table.territoryId),
+    // Menggantikan indeks territory lama: TAP kini kunci pembatasan akses admin
+    // SUPERVISOR/SALESFORCE, jadi query yang sama-sama sering dipakainya butuh indeks juga.
+    index("mitra_outlets_tap_idx").on(table.tap),
     index("mitra_outlets_status_idx").on(table.status),
     index("mitra_outlets_salesforce_idx").on(table.salesforceId),
 ]);
@@ -790,7 +771,7 @@ export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
     actorType: mysqlEnum("actor_type", ["MITRA", "ADMIN"]).notNull(),
     actorPhone: varchar("actor_phone", { length: 50 }),
     actorUserId: varchar("actor_user_id", { length: 36 }),
-    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING"]).notNull(),
+    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING", "PROFILE"]).notNull(),
     beforeJson: json("before_json").$type<Record<string, unknown>>(),
     afterJson: json("after_json").$type<Record<string, unknown>>(),
     ip: varchar("ip", { length: 120 }),
@@ -958,18 +939,7 @@ export const mitraUserProfilesRelations = relations(mitraUserProfiles, ({ one })
     user: one(user, { fields: [mitraUserProfiles.userId], references: [user.id] }),
 }));
 
-export const mitraTerritoriesRelations = relations(mitraTerritories, ({ many }) => ({
-    userTerritories: many(mitraUserTerritories),
-    outlets: many(mitraOutlets),
-}));
-
-export const mitraUserTerritoriesRelations = relations(mitraUserTerritories, ({ one }) => ({
-    user: one(user, { fields: [mitraUserTerritories.userId], references: [user.id] }),
-    territory: one(mitraTerritories, { fields: [mitraUserTerritories.territoryId], references: [mitraTerritories.id] }),
-}));
-
 export const mitraOutletsRelations = relations(mitraOutlets, ({ one, many }) => ({
-    territory: one(mitraTerritories, { fields: [mitraOutlets.territoryId], references: [mitraTerritories.id] }),
     details: one(mitraOutletDetails),
     metrics: many(mitraOutletMetrics),
     programParticipants: many(mitraProgramParticipants),
@@ -1045,12 +1015,17 @@ export const adminUserProfiles = mysqlTable("admin_user_profiles", {
     index("admin_user_profiles_role_idx").on(table.role),
 ]);
 
-export const adminUserTerritories = mysqlTable("admin_user_territories", {
+/**
+ * TAP menggantikan territory sebagai kunci pembatasan akses admin SUPERVISOR/SALESFORCE.
+ * Tidak ada FK ke tabel master mana pun -- TAP hanyalah string bebas yang sudah berulang
+ * di mitra_outlets.tap dan mitra_salesforces.tap, tidak punya tabel master tersendiri.
+ */
+export const adminUserTaps = mysqlTable("admin_user_taps", {
     userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }).notNull(),
 }, (table) => [
-    primaryKey({ columns: [table.userId, table.territoryId], name: "admin_user_territories_pk" }),
-    index("admin_user_territories_territory_idx").on(table.territoryId),
+    primaryKey({ columns: [table.userId, table.tap], name: "admin_user_taps_pk" }),
+    index("admin_user_taps_tap_idx").on(table.tap),
 ]);
 
 export const adminAuditLogs = mysqlTable("admin_audit_logs", {
@@ -1070,10 +1045,9 @@ export const adminAuditLogs = mysqlTable("admin_audit_logs", {
 
 export const adminUserProfilesRelations = relations(adminUserProfiles, ({ one, many }) => ({
     user: one(user, { fields: [adminUserProfiles.userId], references: [user.id] }),
-    territories: many(adminUserTerritories),
+    taps: many(adminUserTaps),
 }));
 
-export const adminUserTerritoriesRelations = relations(adminUserTerritories, ({ one }) => ({
-    user: one(user, { fields: [adminUserTerritories.userId], references: [user.id] }),
-    territory: one(mitraTerritories, { fields: [adminUserTerritories.territoryId], references: [mitraTerritories.id] }),
+export const adminUserTapsRelations = relations(adminUserTaps, ({ one }) => ({
+    user: one(user, { fields: [adminUserTaps.userId], references: [user.id] }),
 }));
