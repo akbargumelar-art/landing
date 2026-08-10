@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, Camera, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronDown, ChevronUp, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
 
 import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
+import { mergedShareData, operatorShareData, OperatorShareChart } from "@/components/mitra/operator-share-chart";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
 import { OUTLET_BRANDINGS, OUTLET_CATEGORIES, PJP_DAYS, PJP_TYPES } from "@/lib/mitra-outlet-options";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
-import { MITRA_MARKET_SHARE_OPERATORS, type MitraMarketShareKey } from "@/lib/mitra-market-share";
+import type { MitraMarketShareKey } from "@/lib/mitra-market-share";
 
 interface DetailData {
     outlet: Record<string, string | number | null>;
@@ -36,6 +37,7 @@ interface DetailData {
     editLogs: EditLog[];
     bolehEdit: boolean;
     peranPengakses: string | null;
+    wilayah: { kabupaten: string; kecamatan: string }[];
 }
 
 interface EditLog {
@@ -75,6 +77,17 @@ export default function MitraOutletDetailPage() {
     const [profilDraft, setProfilDraft] = React.useState<ProfilDraft | null>(null);
     const [menyimpanProfil, setMenyimpanProfil] = React.useState(false);
     const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
+    // Kosong (semua tertutup) sebagai default: tiga tabel ini panjang dan bukan yang
+    // pertama ingin dilihat pembuka halaman, jadi disembunyikan sampai memang dibuka.
+    const [grupTerbuka, setGrupTerbuka] = React.useState<Set<string>>(new Set());
+
+    const alihkanGrup = (key: string) => {
+        setGrupTerbuka((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
 
     const muat = React.useCallback(() => {
         return fetch(`/api/public/mitra/outlets/${publicToken}/detail`)
@@ -248,6 +261,14 @@ export default function MitraOutletDetailPage() {
         );
     }
 
+    // Dropdown kabupaten/kecamatan saling terhubung: opsi kecamatan diturunkan dari
+    // kabupaten yang sedang dipilih, jadi kombinasi yang tidak ada di data outlet lain
+    // tidak bisa terpilih.
+    const kabupatenOptions = Array.from(new Set(data.wilayah.map((area) => area.kabupaten))).sort((a, b) => a.localeCompare(b, "id-ID"));
+    const kecamatanOptions = (kabupaten: string) => Array.from(new Set(
+        data.wilayah.filter((area) => area.kabupaten === kabupaten).map((area) => area.kecamatan)
+    )).sort((a, b) => a.localeCompare(b, "id-ID"));
+
     return (
         <main className="min-h-screen bg-gray-50">
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -341,21 +362,38 @@ export default function MitraOutletDetailPage() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="profil-kabupaten">Kabupaten</Label>
-                                    <Input
+                                    <select
                                         id="profil-kabupaten"
                                         value={profilDraft.kabupaten}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, kabupaten: event.target.value })}
+                                        onChange={(event) => {
+                                            const kabupaten = event.target.value;
+                                            setProfilDraft((prev) => {
+                                                if (!prev) return prev;
+                                                // Kecamatan lama bisa jadi tidak ada di kabupaten baru --
+                                                // reset supaya kombinasinya tidak diam-diam salah.
+                                                const kecamatanMasihCocok = kecamatanOptions(kabupaten).includes(prev.kecamatan);
+                                                return { ...prev, kabupaten, kecamatan: kecamatanMasihCocok ? prev.kecamatan : "" };
+                                            });
+                                        }}
                                         disabled={menyimpanProfil}
-                                    />
+                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                    >
+                                        <option value="">Pilih kabupaten</option>
+                                        {kabupatenOptions.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
+                                    </select>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="profil-kecamatan">Kecamatan</Label>
-                                    <Input
+                                    <select
                                         id="profil-kecamatan"
                                         value={profilDraft.kecamatan}
                                         onChange={(event) => setProfilDraft((prev) => prev && { ...prev, kecamatan: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                    />
+                                        disabled={menyimpanProfil || !profilDraft.kabupaten}
+                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
+                                    >
+                                        <option value="">{profilDraft.kabupaten ? "Pilih kecamatan" : "Pilih kabupaten dahulu"}</option>
+                                        {kecamatanOptions(profilDraft.kabupaten).map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
+                                    </select>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="profil-category">Kategori Outlet</Label>
@@ -426,28 +464,19 @@ export default function MitraOutletDetailPage() {
                     </div>
 
                     {data.marketShare ? (
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {MITRA_MARKET_SHARE_OPERATORS.map((operator) => {
-                                const percent = Number(data.marketShare?.[operator.key] ?? 0);
-                                return (
-                                    <div key={operator.key} className="rounded-lg border bg-gray-50 p-3">
-                                        <div className="flex items-baseline justify-between gap-2">
-                                            <p className="text-xs font-semibold text-gray-700">{operator.label}</p>
-                                            <p className="text-base font-bold tabular-nums text-gray-950">
-                                                {percent.toLocaleString("id-ID", { maximumFractionDigits: 2 })}%
-                                            </p>
-                                        </div>
-                                        {/* Lebar bar dipotong di 100% supaya data keliru (mis. 250) tidak
-                                            merusak tata letak kartu di sebelahnya. */}
-                                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                                            <div
-                                                className="h-full rounded-full"
-                                                style={{ width: `${Math.min(Math.max(percent, 0), 100)}%`, background: operator.color }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div className="mt-5 grid gap-6 lg:grid-cols-2">
+                            <div>
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Sebelum Merger
+                                </p>
+                                <OperatorShareChart data={operatorShareData(data.marketShare)} />
+                            </div>
+                            <div className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Setelah Merger (XL Smart &amp; IOH)
+                                </p>
+                                <OperatorShareChart data={mergedShareData(data.marketShare)} />
+                            </div>
                         </div>
                     ) : (
                         <p className="mt-4 text-sm text-muted-foreground">
@@ -476,17 +505,28 @@ export default function MitraOutletDetailPage() {
                     </div>
                 </div>
 
-                {/* 4. Tabel parameter: tiap parameter punya tiga angka (M-1, M, MoM). */}
+                {/* 4. Tabel parameter: tiap parameter punya tiga angka (M-1, M, MoM). Tertutup
+                    secara default -- tiga tabel ini panjang dan bukan hal pertama yang dicari
+                    saat membuka halaman, jadi baru dirender saat memang dibuka. */}
                 {MITRA_DETAIL_FIELD_GROUPS.map((group) => {
                     const values = data.details[group.key] || {};
+                    const terbuka = grupTerbuka.has(group.key);
                     return (
                         <div key={group.key} className="overflow-hidden rounded-lg border bg-white shadow-sm">
-                            <div className="flex flex-wrap items-start justify-between gap-2 border-b bg-gray-50/70 px-5 py-4">
-                                <div>
-                                    <h2 className="font-bold">{group.title}</h2>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                        FM-1 bulan sebelumnya penuh, M-1 periode sama bulan lalu, M bulan berjalan, MoM pertumbuhannya.
-                                    </p>
+                            <button
+                                type="button"
+                                onClick={() => alihkanGrup(group.key)}
+                                aria-expanded={terbuka}
+                                className="flex w-full flex-wrap items-start justify-between gap-2 border-b bg-gray-50/70 px-5 py-4 text-left transition-colors hover:bg-gray-100/70"
+                            >
+                                <div className="flex items-start gap-2">
+                                    {terbuka ? <ChevronUp className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}
+                                    <div>
+                                        <h2 className="font-bold">{group.title}</h2>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            FM-1 bulan sebelumnya penuh, M-1 periode sama bulan lalu, M bulan berjalan, MoM pertumbuhannya.
+                                        </p>
+                                    </div>
                                 </div>
                                 {/* Tanggal ini menjawab pertanyaan pertama pembaca angka: masih baru
                                     atau sudah basi. Sumbernya kolom updated_at yang tersentuh setiap
@@ -496,8 +536,10 @@ export default function MitraOutletDetailPage() {
                                         ? `Diperbarui ${formatWaktu(data.details.updatedAt)}`
                                         : "Belum pernah diperbarui"}
                                 </p>
-                            </div>
+                            </button>
 
+                            {terbuka && (
+                            <>
                             {/* Dua bentuk, satu sumber data. Di ponsel tabel empat kolom selalu
                                 memaksa geser ke samping, jadi barisnya dirender ulang sebagai
                                 blok bertumpuk. Di layar lebar tabelnya table-fixed supaya kolom
@@ -579,6 +621,8 @@ export default function MitraOutletDetailPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            </>
+                            )}
                         </div>
                     );
                 })}

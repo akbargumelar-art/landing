@@ -1,15 +1,19 @@
 "use client";
 
 import React from "react";
-import { ArrowDownAZ, ArrowUpAZ, Download, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 
 import { BackLink } from "@/components/back-link";
+import { OperatorShareChart } from "@/components/mitra/operator-share-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { bandingkanNilai, useUrutTabel } from "@/lib/use-sort";
 import {
+    MITRA_MARKET_SHARE_MERGED_GROUPS,
     MITRA_MARKET_SHARE_OPERATORS,
     type MitraMarketShareKey,
     sumShares,
@@ -43,10 +47,10 @@ export default function AdminMitraMarketSharePage() {
     // Sama seperti halaman Salesforce: formulirnya di atas, tombol Edit di tabel bawah.
     const formRef = React.useRef<HTMLDivElement>(null);
     const [filterKabupaten, setFilterKabupaten] = React.useState("");
+    const [filterKecamatan, setFilterKecamatan] = React.useState("");
     const [mengunggah, setMengunggah] = React.useState(false);
     const [hasilUnggah, setHasilUnggah] = React.useState<{ saved: number; errors: { row: number; message: string }[] } | null>(null);
-    // Kolom aktif + arahnya; klik ulang pada kolom yang sama membalik arah.
-    const [urut, setUrut] = React.useState<{ kolom: string; naik: boolean }>({ kolom: "kecamatan", naik: true });
+    const { urut, gantiUrut } = useUrutTabel<string>("kecamatan");
 
     const startEdit = (row: MarketShareRow) => {
         formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -76,6 +80,10 @@ export default function AdminMitraMarketSharePage() {
     const total = sumShares(form);
 
     const daftarKabupaten = Array.from(new Set(rows.map((row) => row.kabupaten))).sort();
+    // Daftar kecamatan menyesuaikan kabupaten yang sedang difilter, sama seperti datalist di formulir.
+    const daftarKecamatan = Array.from(new Set(
+        rows.filter((row) => !filterKabupaten || row.kabupaten === filterKabupaten).map((row) => row.kecamatan)
+    )).sort();
 
     /**
      * Penyaringan dan pengurutan dilakukan di sisi klien karena seluruh baris memang sudah
@@ -83,27 +91,29 @@ export default function AdminMitraMarketSharePage() {
      * akan membuat tabel terasa lebih lambat tanpa manfaat.
      */
     const barisTampil = React.useMemo(() => {
-        const disaring = filterKabupaten
-            ? rows.filter((row) => row.kabupaten === filterKabupaten)
-            : rows;
+        const disaring = rows
+            .filter((row) => !filterKabupaten || row.kabupaten === filterKabupaten)
+            .filter((row) => !filterKecamatan || row.kecamatan === filterKecamatan);
 
         const angka = new Set(MITRA_MARKET_SHARE_OPERATORS.map((operator) => String(operator.key)));
 
         return [...disaring].sort((a, b) => {
-            let selisih = 0;
+            let nilaiA: unknown;
+            let nilaiB: unknown;
             if (urut.kolom === "total") {
-                selisih = sumShares(a) - sumShares(b);
+                nilaiA = sumShares(a);
+                nilaiB = sumShares(b);
             } else if (angka.has(urut.kolom)) {
-                selisih = Number(a[urut.kolom as MitraMarketShareKey] || 0) - Number(b[urut.kolom as MitraMarketShareKey] || 0);
+                nilaiA = Number(a[urut.kolom as MitraMarketShareKey] || 0);
+                nilaiB = Number(b[urut.kolom as MitraMarketShareKey] || 0);
             } else {
-                // localeCompare dengan numeric supaya "Kecamatan 2" berada sebelum "Kecamatan 10".
-                const kiri = String(a[urut.kolom as keyof MarketShareRow] ?? "");
-                const kanan = String(b[urut.kolom as keyof MarketShareRow] ?? "");
-                selisih = kiri.localeCompare(kanan, "id-ID", { numeric: true, sensitivity: "base" });
+                nilaiA = a[urut.kolom as keyof MarketShareRow];
+                nilaiB = b[urut.kolom as keyof MarketShareRow];
             }
+            const selisih = bandingkanNilai(nilaiA, nilaiB);
             return urut.naik ? selisih : -selisih;
         });
-    }, [rows, filterKabupaten, urut]);
+    }, [rows, filterKabupaten, filterKecamatan, urut]);
 
     const ringkasan = React.useMemo(() => {
         if (barisTampil.length === 0) return null;
@@ -112,17 +122,15 @@ export default function AdminMitraMarketSharePage() {
             ...operator,
             rata: barisTampil.reduce((jumlah, row) => jumlah + Number(row[operator.key] || 0), 0) / barisTampil.length,
         }));
+        const rataGabungan = MITRA_MARKET_SHARE_MERGED_GROUPS.map((group) => ({
+            ...group,
+            rata: barisTampil.reduce((jumlah, row) => jumlah + group.sumber.reduce((s, key) => s + Number(row[key] || 0), 0), 0) / barisTampil.length,
+        }));
         const tertinggi = [...barisTampil].sort((a, b) => Number(b.telkomsel || 0) - Number(a.telkomsel || 0))[0];
         const terendah = [...barisTampil].sort((a, b) => Number(a.telkomsel || 0) - Number(b.telkomsel || 0))[0];
 
-        return { rataOperator, tertinggi, terendah, jumlah: barisTampil.length };
+        return { rataOperator, rataGabungan, tertinggi, terendah, jumlah: barisTampil.length };
     }, [barisTampil]);
-
-    const gantiUrut = (kolom: string) => {
-        setUrut((sebelumnya) => sebelumnya.kolom === kolom
-            ? { kolom, naik: !sebelumnya.naik }
-            : { kolom, naik: true });
-    };
 
     const updateField = (key: string, value: string) => {
         setForm((previous) => ({ ...previous, [key]: value }));
@@ -196,7 +204,11 @@ export default function AdminMitraMarketSharePage() {
                         <CardContent className="p-4">
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Kecamatan Tercatat</p>
                             <p className="mt-2 text-2xl font-extrabold text-gray-950">{ringkasan.jumlah.toLocaleString("id-ID")}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{filterKabupaten || "Seluruh kabupaten"}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {filterKecamatan || filterKabupaten
+                                    ? [filterKecamatan, filterKabupaten].filter(Boolean).join(", ")
+                                    : "Seluruh kabupaten"}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -227,6 +239,46 @@ export default function AdminMitraMarketSharePage() {
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {ringkasan && (
+                <Card>
+                    <CardContent className="p-5">
+                        <h2 className="font-bold">Rata-rata Pangsa Pasar Operator</h2>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Dari {ringkasan.jumlah.toLocaleString("id-ID")} kecamatan yang sedang tampil
+                            {(filterKecamatan || filterKabupaten) && ` · ${[filterKecamatan, filterKabupaten].filter(Boolean).join(", ")}`}
+                        </p>
+                        <div className="mt-5 grid gap-6 lg:grid-cols-2">
+                            <div>
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Sebelum Merger
+                                </p>
+                                <OperatorShareChart
+                                    data={ringkasan.rataOperator.map((operator) => ({
+                                        key: operator.key,
+                                        label: operator.label,
+                                        color: operator.color,
+                                        percent: operator.rata,
+                                    }))}
+                                />
+                            </div>
+                            <div className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Setelah Merger (XL Smart &amp; IOH)
+                                </p>
+                                <OperatorShareChart
+                                    data={ringkasan.rataGabungan.map((group) => ({
+                                        key: group.key,
+                                        label: group.label,
+                                        color: group.color,
+                                        percent: group.rata,
+                                    }))}
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
             <Card>
@@ -358,12 +410,29 @@ export default function AdminMitraMarketSharePage() {
                         />
                         <select
                             value={filterKabupaten}
-                            onChange={(event) => setFilterKabupaten(event.target.value)}
+                            onChange={(event) => {
+                                const kabupaten = event.target.value;
+                                setFilterKabupaten(kabupaten);
+                                // Kecamatan yang sedang dipilih bisa jadi tidak ada di kabupaten baru --
+                                // reset supaya filter tidak diam-diam menyaring ke hasil kosong.
+                                if (filterKecamatan && !rows.some((row) => row.kabupaten === kabupaten && row.kecamatan === filterKecamatan)) {
+                                    setFilterKecamatan("");
+                                }
+                            }}
                             className="h-10 rounded-md border bg-white px-3 text-sm"
                             aria-label="Filter kabupaten"
                         >
                             <option value="">Semua kabupaten</option>
                             {daftarKabupaten.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </select>
+                        <select
+                            value={filterKecamatan}
+                            onChange={(event) => setFilterKecamatan(event.target.value)}
+                            className="h-10 rounded-md border bg-white px-3 text-sm"
+                            aria-label="Filter kecamatan"
+                        >
+                            <option value="">Semua kecamatan</option>
+                            {daftarKecamatan.map((item) => <option key={item} value={item}>{item}</option>)}
                         </select>
                         <Button onClick={load} size="icon" aria-label="Cari">
                             <Search className="h-4 w-4" />
@@ -422,36 +491,5 @@ export default function AdminMitraMarketSharePage() {
                 </CardContent>
             </Card>
         </div>
-    );
-}
-
-/** Kepala kolom yang bisa diklik untuk mengurutkan; arah panah menunjukkan urutan aktif. */
-function TombolUrut({
-    kolom,
-    label,
-    urut,
-    onKlik,
-    kanan = false,
-}: {
-    kolom: string;
-    label: string;
-    urut: { kolom: string; naik: boolean };
-    onKlik: (kolom: string) => void;
-    kanan?: boolean;
-}) {
-    const aktif = urut.kolom === kolom;
-
-    return (
-        <button
-            type="button"
-            onClick={() => onKlik(kolom)}
-            className={`inline-flex items-center gap-1 font-semibold transition-colors hover:text-red-600 ${aktif ? "text-red-600" : ""} ${kanan ? "flex-row-reverse" : ""}`}
-            title={`Urutkan menurut ${label}`}
-        >
-            {label}
-            {aktif
-                ? (urut.naik ? <ArrowDownAZ className="h-3.5 w-3.5" /> : <ArrowUpAZ className="h-3.5 w-3.5" />)
-                : <ArrowDownAZ className="h-3.5 w-3.5 opacity-25" />}
-        </button>
     );
 }

@@ -260,19 +260,6 @@ export default function MitraOutletProfilePage() {
     );
 }
 
-/**
- * Foto salesforce digeser ke atas supaya kepalanya menyembul dari lingkaran. Ketiga angka
- * di bawah harus tetap sejalan: garis potong salinan yang menyembul dihitung dari geseran
- * dan tinggi fotonya, bukan diketik terpisah. Ketika garis potong jatuh di bawah tepi atas
- * lingkaran, sisa gambarnya tergambar sebagai kotak persegi yang menutupi bingkai putih dan
- * caption di atasnya -- persis keluhan "caption tertutup blok kotak". Dengan rumus ini
- * potongannya berhenti tepat di tepi lingkaran, sehingga yang menutupi caption hanya piksel
- * fotonya sendiri (foto salesforce diunggah dengan latar transparan).
- */
-const FOTO_GESER_ATAS = 18; // persen tinggi kotak avatar
-const FOTO_TINGGI = 118;    // persen tinggi kotak avatar
-const FOTO_POTONG = (FOTO_GESER_ATAS / FOTO_TINGGI) * 100;
-
 // Salesforce dapat kartunya sendiri (selebar dua kolom) karena hanya kolom ini yang
 // membawa foto; menaruhnya di grid Info biasa akan membuat satu sel jauh lebih tinggi
 // daripada tetangganya. Tanpa foto, inisial nama dipakai sebagai penggantinya.
@@ -298,37 +285,13 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
                                 <Image
                                     src={photoUrl}
                                     alt={displayName}
-                                    width={96}
-                                    height={113}
+                                    fill
                                     sizes="96px"
-                                    className="absolute left-0 w-full max-w-none object-cover object-top"
-                                    style={{ top: `-${FOTO_GESER_ATAS}%`, height: `${FOTO_TINGGI}%` }}
+                                    className="object-cover object-top"
                                     unoptimized
                                 />
                             </div>
-                            <div className="pointer-events-none absolute inset-0 z-[1] rounded-full border-2 border-white shadow-sm" />
-                            {/* Salinan yang menyembul dipotong tepat di tepi atas lingkaran secara vertikal
-                                (garis potong dihitung dari geser/tinggi supaya tidak ada sisa kotak yang
-                                menutupi caption -- itu bug sebelumnya). Ke samping sengaja dipersempit
-                                10%-90%: lingkaran hanya membuka celah sempit di titik teratasnya, jadi
-                                sembulan selebar penuh kotak muncul sebagai potongan rata di dahi begitu
-                                bersambung dengan lingkaran. Dipersempit, sambungannya mengikuti bentuk
-                                kepala, bukan blok persegi. */}
-                            <Image
-                                src={photoUrl}
-                                alt=""
-                                aria-hidden="true"
-                                width={96}
-                                height={113}
-                                sizes="96px"
-                                className="pointer-events-none absolute left-0 z-[2] w-full max-w-none object-cover object-top"
-                                style={{
-                                    top: `-${FOTO_GESER_ATAS}%`,
-                                    height: `${FOTO_TINGGI}%`,
-                                    clipPath: `polygon(10% 0, 90% 0, 90% ${FOTO_POTONG}%, 10% ${FOTO_POTONG}%)`,
-                                }}
-                                unoptimized
-                            />
+                            <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-white shadow-sm" />
                         </>
                     ) : (
                         <span className="flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-muted-foreground shadow-sm">

@@ -604,7 +604,6 @@ export const mitraMarketShares = mysqlTable("mitra_market_shares", {
     kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
     telkomsel: decimal("telkomsel", { precision: 5, scale: 2 }).notNull().default("0.00"),
     xl: decimal("xl", { precision: 5, scale: 2 }).notNull().default("0.00"),
-    axis: decimal("axis", { precision: 5, scale: 2 }).notNull().default("0.00"),
     smartfren: decimal("smartfren", { precision: 5, scale: 2 }).notNull().default("0.00"),
     indosat: decimal("indosat", { precision: 5, scale: 2 }).notNull().default("0.00"),
     tri: decimal("tri", { precision: 5, scale: 2 }).notNull().default("0.00"),

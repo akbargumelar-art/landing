@@ -1,0 +1,1 @@
+ALTER TABLE `mitra_market_shares` DROP COLUMN `axis`;

@@ -27,5 +27,6 @@ export async function GET(
         editLogs: data.editLogs,
         bolehEdit: data.bolehEdit,
         peranPengakses: data.peranPengakses,
+        wilayah: data.wilayah,
     });
 }
