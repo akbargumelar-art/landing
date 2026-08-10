@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Eye, FileText, Loader2, MapPin, Pencil, Plus, Router, Search, Trash2, Wifi } from "lucide-react";
+import { CheckCircle2, Copy, Eye, FileText, Loader2, MapPin, Pencil, Plus, Router, Search, Trash2, Wifi } from "lucide-react";
 import { IndihomeLocationsBanner } from "@/components/admin/indihome-locations-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -79,6 +79,10 @@ export default function AdminIndihomePage() {
     const [message, setMessage] = useState("");
     const [productDialog, setProductDialog] = useState(false);
     const [draft, setDraft] = useState<ProductDraft>(emptyProduct);
+    // Menentukan judul dialog dan pesan sukses: duplikat memakai form tambah yang sama
+    // (draft.id kosong sehingga tersimpan sebagai paket baru), tapi judulnya perlu beda
+    // supaya admin tidak mengira sedang mengedit paket sumbernya.
+    const [duplicating, setDuplicating] = useState(false);
     const [selectedLead, setSelectedLead] = useState<IndihomeLead | null>(null);
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
@@ -121,12 +125,29 @@ export default function AdminIndihomePage() {
 
     function openAddProduct() {
         setDraft({ ...emptyProduct, locations: [...locationOptions] });
+        setDuplicating(false);
         setProductDialog(true);
         setMessage("");
     }
 
     function openEditProduct(product: AdminProduct) {
         setDraft({ ...product, featuresText: product.features.join("\n") });
+        setDuplicating(false);
+        setProductDialog(true);
+        setMessage("");
+    }
+
+    // Salinan dibuka lewat form tambah, bukan langsung disimpan: kecepatan, harga, atau
+    // lokasi paket duplikat hampir selalu perlu disesuaikan sebelum benar-benar disimpan,
+    // jadi lebih aman membiarkan admin meninjau dulu daripada diam-diam menggandakan persis.
+    function openDuplicateProduct(product: AdminProduct) {
+        setDraft({
+            ...product,
+            id: undefined,
+            name: `${product.name} (Copy)`,
+            featuresText: product.features.join("\n"),
+        });
+        setDuplicating(true);
         setProductDialog(true);
         setMessage("");
     }
@@ -233,7 +254,7 @@ export default function AdminIndihomePage() {
                                     <CardContent className="p-5">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-950 text-white"><Wifi className="h-5 w-5" /></div>
-                                            <div className="flex gap-1"><button type="button" onClick={() => openEditProduct(product)} title="Edit paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => deleteProduct(product)} title="Hapus paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></div>
+                                            <div className="flex gap-1"><button type="button" onClick={() => openEditProduct(product)} title="Edit paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => openDuplicateProduct(product)} title="Duplikat paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Copy className="h-4 w-4" /></button><button type="button" onClick={() => deleteProduct(product)} title="Hapus paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></div>
                                         </div>
                                         <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold"><span className={`rounded-full px-2 py-1 ${product.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>{product.isActive ? "Aktif" : "Nonaktif"}</span>{product.isFeatured && <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">Terpopuler</span>}</div>
                                         <h4 className="mt-4 font-bold text-gray-950">{product.name}</h4>
@@ -273,7 +294,7 @@ export default function AdminIndihomePage() {
 
             <Dialog open={productDialog} onOpenChange={setProductDialog}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader><DialogTitle>{draft.id ? "Edit paket IndiHome" : "Tambah paket IndiHome"}</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{draft.id ? "Edit paket IndiHome" : duplicating ? "Duplikat paket IndiHome" : "Tambah paket IndiHome"}</DialogTitle></DialogHeader>
                     <form onSubmit={saveProduct} className="space-y-5">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2 sm:col-span-2"><Label htmlFor="product-name">Nama paket</Label><Input id="product-name" required minLength={3} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
