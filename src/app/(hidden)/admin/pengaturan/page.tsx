@@ -373,8 +373,8 @@ export default function PengaturanPage() {
                                 <p className="text-xs text-muted-foreground">
                                     Mengirim satu pesan ke group setiap salesforce selesai memperbarui foto
                                     outlet. Satu kunjungan (satu sesi OTP) = satu pesan, dikirim sekitar
-                                    2 menit setelah unggahan terakhir, dengan satu foto yang diundi dari
-                                    foto yang baru diunggah. Perubahan long-lat tidak dikirim ke group.
+                                    2 menit setelah unggahan terakhir, memakai foto Tampak Depan dari
+                                    kunjungan itu. Perubahan long-lat tidak dikirim ke group.
                                 </p>
                             </div>
                             <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">

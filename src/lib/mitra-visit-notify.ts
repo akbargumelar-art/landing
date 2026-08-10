@@ -3,6 +3,7 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces, mitraVisitNotifications } from "@/db/schema";
+import { MITRA_PHOTO_SLOTS } from "@/lib/mitra-outlet-photos";
 import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMessage } from "@/lib/whatsapp";
 
 /**
@@ -15,9 +16,9 @@ import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMe
  *    per sesi OTP dan baru dikirim setelah JEDA_HENING_MS berlalu tanpa unggahan baru.
  *    Hanya foto yang memicu notifikasi -- perubahan long-lat cukup masuk riwayat edit.
  *
- * 2. FOTO YANG DIKIRIM DIUNDI. WhatsApp hanya memuat satu gambar per pesan, jadi satu foto
- *    dipilih acak dari foto yang diunggah PADA KUNJUNGAN INI -- foto lama dari kunjungan
- *    sebelumnya tidak ikut diundi.
+ * 2. YANG DIKIRIM ADALAH FOTO TAMPAK DEPAN. WhatsApp hanya memuat satu gambar per pesan,
+ *    dan tampak depan adalah satu-satunya slot yang bisa dinilai sekilas oleh pembaca group.
+ *    Diambil dari foto kunjungan INI, bukan foto tersimpan dari kunjungan sebelumnya.
  *
  * 3. ANTAR PESAN DIBERI JEDA ACAK 30-120 DETIK. Beberapa outlet bisa selesai berbarengan;
  *    mengirim beruntun tanpa jeda adalah pola yang membuat nomor WhatsApp diblokir.
@@ -29,6 +30,13 @@ import { getVisitNotifyConfig, renderTemplate, sendWhatsAppImage, sendWhatsAppMe
 const JEDA_HENING_MS = 2 * 60 * 1000;
 const JEDA_KIRIM_MIN_MS = 30_000;
 const JEDA_KIRIM_MAKS_MS = 120_000;
+
+/**
+ * Slot yang dikirim ke group. Diturunkan dari penanda `utama` di MITRA_PHOTO_SLOTS, bukan
+ * ditulis "depan" langsung di sini, supaya kalau suatu saat slot utamanya dipindah, yang
+ * terkirim ikut pindah alih-alih diam-diam menunjuk slot yang sudah bukan foto utama.
+ */
+const SLOT_DIKIRIM = MITRA_PHOTO_SLOTS.find((slot) => slot.utama)?.key ?? "depan";
 
 /** Selang periksa saat masih ada antrean tetapi belum ada yang melewati jeda hening. */
 const SELANG_PERIKSA_MS = 15_000;
@@ -118,8 +126,9 @@ export async function catatAktivitasKunjungan(input: AktivitasKunjungan): Promis
             await db
                 .update(mitraVisitNotifications)
                 .set({
-                    // Slot yang sama diunggah ulang cukup menimpa entri lamanya, supaya undian
-                    // tidak jadi berat sebelah ke slot yang kebetulan difoto berkali-kali.
+                    // Slot yang sama diunggah ulang menimpa entri lamanya, jadi yang terkirim
+                    // adalah percobaan terakhir salesforce -- bukan jepretan pertama yang
+                    // barangkali justru diulang karena hasilnya buram.
                     photosJson: [...foto.filter((f) => f.slot !== input.foto.slot), input.foto],
                     lastActivityAt: sekarang,
                 })
@@ -294,8 +303,10 @@ async function kirimSatu(baris: BarisNotifikasi): Promise<void> {
             link: urlAbsolut(`/mitra/o/${outlet.publicToken}`) || "",
         });
 
-        // Aturan 2: satu foto diundi dari foto kunjungan ini.
-        const terpilih = foto.length ? foto[Math.floor(Math.random() * foto.length)] : null;
+        // Aturan 2: tampak depan yang dikirim. Kunjungan bisa saja hanya memperbarui etalase
+        // atau POP tanpa memotret ulang muka outlet; dalam hal itu foto pertama kunjungan ini
+        // yang dipakai, supaya pesannya tetap membawa bukti kunjungan alih-alih kosong.
+        const terpilih = foto.find((f) => f.slot === SLOT_DIKIRIM) || foto[0] || null;
         const gambar = terpilih ? urlAbsolut(terpilih.url) : null;
 
         if (terpilih && !gambar) {
