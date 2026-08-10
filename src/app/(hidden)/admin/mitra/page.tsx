@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Activity, BadgeCheck, BookText, ClipboardList, Database, FileSpreadsheet, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
+import { Activity, BadgeCheck, BookText, ClipboardList, Database, FileSpreadsheet, History, LayoutDashboard, MessageCircle, PieChart, QrCode, ShieldCheck, Trash2, Users, UserCog } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ const modules = [
     { href: "/admin/mitra/market-share", label: "Market Share", icon: PieChart, text: "Pangsa pasar operator per kecamatan." },
     { href: "/admin/mitra/qr", label: "QR Bulk", icon: QrCode, text: "Export kartu QR 2 x 5 per lembar A4." },
     { href: "/admin/mitra/referensi", label: "Referensi Key", icon: BookText, text: "Daftar metricKey, programSlug, dan paramKey untuk berkas import." },
+    { href: "/admin/mitra/perubahan", label: "Perubahan Outlet", icon: History, text: "Foto, long-lat, dan branding yang diubah dari Portal Mitra. Bisa diunduh Excel." },
     { href: "/admin/mitra/audit", label: "Audit", icon: ClipboardList, text: "Jejak perubahan dan export." },
 ];
 
