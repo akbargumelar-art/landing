@@ -155,10 +155,13 @@ export function OutletPhotoCard({
     outlet,
     onUpload,
     sedangUnggah,
+    compactMobile = false,
 }: {
     outlet: SumberFoto;
     onUpload?: (slot: MitraPhotoSlotKey, file: File) => void;
     sedangUnggah?: MitraPhotoSlotKey | null;
+    /** Memadatkan kartu dalam editor lapangan tanpa mengubah profil publik. */
+    compactMobile?: boolean;
 }) {
     const bisaUnggah = Boolean(onUpload);
     const jumlahPerluDiperbarui = MITRA_PHOTO_SLOTS.filter(
@@ -169,11 +172,11 @@ export function OutletPhotoCard({
     const tutupFoto = React.useCallback(() => setFotoTerbuka(null), []);
 
     return (
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
+        <div className={`rounded-lg border bg-white shadow-sm ${compactMobile ? "p-3 sm:p-5" : "p-5"}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                     <h2 className="font-bold">Foto Outlet</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className={`mt-0.5 text-xs text-muted-foreground ${compactMobile ? "hidden sm:block" : ""}`}>
                         Diperbarui salesforce setiap kunjungan, dijadwalkan {BATAS_SEGAR_HARI} hari sekali.
                     </p>
                 </div>
@@ -185,7 +188,10 @@ export function OutletPhotoCard({
                 )}
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={compactMobile
+                ? "mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-4 lg:grid-cols-4"
+                : "mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"}
+            >
                 {MITRA_PHOTO_SLOTS.map((slot) => {
                     const url = bacaTeks(outlet[slot.urlColumn]);
                     const status = statusFoto(bacaTeks(outlet[slot.atColumn]));
@@ -193,7 +199,7 @@ export function OutletPhotoCard({
 
                     return (
                         <div key={slot.key} className="overflow-hidden rounded-lg border">
-                            <div className="relative h-36 w-full bg-gray-100">
+                            <div className={`relative w-full bg-gray-100 ${compactMobile ? "h-24 sm:h-36" : "h-36"}`}>
                                 {url ? (
                                     // Tombol, bukan div ber-onClick: petak ini membuka dialog, jadi
                                     // harus bisa dicapai lewat Tab dan dipicu dengan Enter juga.
@@ -221,9 +227,9 @@ export function OutletPhotoCard({
                                 )}
                             </div>
 
-                            <div className="space-y-1 p-3">
-                                <p className="text-sm font-semibold text-gray-950">{slot.label}</p>
-                                <p className="text-xs text-muted-foreground">{slot.hint}</p>
+                            <div className={`space-y-1 ${compactMobile ? "p-2 sm:p-3" : "p-3"}`}>
+                                <p className={`${compactMobile ? "text-xs sm:text-sm" : "text-sm"} font-semibold text-gray-950`}>{slot.label}</p>
+                                <p className={`text-xs text-muted-foreground ${compactMobile ? "hidden sm:block" : ""}`}>{slot.hint}</p>
                                 <p className={`text-xs font-semibold ${status.perluDiperbarui ? "text-amber-700" : "text-green-700"}`}>
                                     {status.label}
                                 </p>
@@ -262,7 +268,7 @@ export function OutletPhotoCard({
             </div>
 
             {bisaUnggah && (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className={`mt-3 text-xs text-muted-foreground ${compactMobile ? "hidden sm:block" : ""}`}>
                     Format JPG, PNG, atau WebP. Maksimal 5 MB per foto. Klik foto untuk memperbesar.
                 </p>
             )}

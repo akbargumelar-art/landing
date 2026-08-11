@@ -86,3 +86,27 @@ test("route tulis lain tidak melewatkan pemeriksaan peran", () => {
 test("peran yang boleh mengubah outlet tidak melebar", () => {
     assert.deepEqual([...ROLE_MUTASI_OUTLET].sort(), ["ADMIN_INPUT", "SALESFORCE", "SUPERVISOR", "SUPER_ADMIN"]);
 });
+
+test("PUT master outlet tidak dapat mengubah grup performance", () => {
+    const berkas = join(AKAR_API, "mitra", "outlets", "[id]", "route.ts");
+    const isi = readFileSync(berkas, "utf8");
+    const mulai = isi.indexOf("export async function PUT");
+    const selesai = isi.indexOf("export async function DELETE", mulai);
+    const handlerPut = isi.slice(mulai, selesai);
+
+    assert.ok(mulai >= 0 && selesai > mulai, "handler PUT outlet harus ditemukan");
+    for (const field of ["sellthruDigipos", "sellthruNota", "rechargeDigipos"]) {
+        assert.equal(handlerPut.includes(field), false, `${field} hanya boleh ditulis lewat import admin`);
+    }
+    assert.equal(handlerPut.includes("mitraOutletDetails"), false, "PUT outlet tidak boleh menulis tabel detail");
+    assert.match(handlerPut, /grupPerformanceDikirim/);
+    assert.match(handlerPut, /hanya dapat diperbarui melalui Upload Data admin/);
+});
+
+test("import admin tetap menjadi jalur tulis grup performance", () => {
+    const berkas = join(AKAR_API, "mitra", "imports", "route.ts");
+    const isi = readFileSync(berkas, "utf8");
+
+    assert.match(isi, /requireRole\(\["SUPER_ADMIN", "ADMIN_INPUT"\]\)/);
+    assert.match(isi, /commitOutletDetailRows/);
+});

@@ -72,6 +72,8 @@ audit log.
 | Lihat daftar/detail outlet dashboard | Tidak | Outlet binaan sendiri | TAP ditugaskan | Semua | Semua | Semua |
 | Edit profil operasional outlet | Tidak | Outlet binaan sendiri | TAP ditugaskan | Tidak | Semua | Semua |
 | Edit lokasi, branding, dan foto | Tidak | Outlet binaan sendiri | TAP ditugaskan | Tidak | Semua | Semua |
+| Ubah Sellthru Digipos/Nota/Recharge dari form outlet | Tidak | Tidak | Tidak | Tidak | Tidak | Tidak |
+| Import Sellthru Digipos/Nota/Recharge | Tidak | Tidak | Tidak | Tidak | Ya | Ya |
 | Ubah field master/assignment | Tidak | Tidak | Tidak | Tidak | Sesuai endpoint saat ini | Ya |
 | Lihat program Salesforce | Baca-saja setelah OTP | Hasil sendiri | Data TAP ditugaskan | Semua | Semua | Semua |
 | Konfigurasi/import/recompute program | Tidak | Tidak | Tidak | Tidak | Sesuai endpoint saat ini | Ya |
@@ -101,6 +103,11 @@ audit log.
 Field berikut **tidak boleh** diubah oleh Salesforce atau Supervisor: `id`, `outletCode`,
 `publicToken`, `rsNumber`, `tap`, `salesforceId`, `status`, data performance, target KPI, skor KPI,
 konfigurasi program, peserta program, aturan benefit, dan data audit.
+
+Tiga grup performance `sellthruDigiposJson`, `sellthruNotaJson`, dan `rechargeDigiposJson` selalu
+baca-saja pada form Database Outlet untuk **semua role**, termasuk Admin Input dan Super Admin.
+Data tersebut hanya diperbarui melalui jalur **Upload Data/import** khusus yang dibatasi untuk
+Admin Input dan Super Admin. Endpoint edit satu outlet tidak boleh menerima ketiga grup tersebut.
 
 ### User Stories dan Acceptance Criteria
 
@@ -206,6 +213,7 @@ Acceptance criteria:
 - Mengizinkan pemilik outlet mengubah data melalui OTP.
 - Menambahkan workflow persetujuan Supervisor pada MVP.
 - Mengubah rumus KPI, target, benefit, atau mekanisme Racing/Reward.
+- Menyediakan edit manual Sellthru Digipos, Sellthru Nota, atau Recharge Digipos pada form outlet.
 - Memberikan hak konfigurasi/import program kepada Salesforce, Supervisor, atau Manager.
 - Membangun aplikasi mobile native, SSO perusahaan, atau login menggunakan OTP.
 - Menampilkan password, hash, secret, token sesi, kode OTP, atau kredensial sistem lainnya.
@@ -344,7 +352,8 @@ outlet secara penuh:
 | `/api/admin/mitra/outlets/[id]/location` | `PATCH` | Salesforce sendiri, Supervisor TAP, Admin Input, Super Admin |
 | `/api/admin/mitra/outlets/[id]/branding` | `PATCH` | Salesforce sendiri, Supervisor TAP, Admin Input, Super Admin |
 | `/api/admin/mitra/outlets/[id]/photos` | `POST`/`DELETE` | Salesforce sendiri, Supervisor TAP, Admin Input, Super Admin |
-| `/api/admin/mitra/outlets/[id]` | `PUT` | Tetap untuk pengelola master; tidak ditambahkan ke role lapangan |
+| `/api/admin/mitra/outlets/[id]` | `PUT` | Tetap untuk pengelola master; tidak menerima grup Sellthru/Recharge |
+| `/api/admin/mitra/imports` | `POST` | Satu-satunya jalur tulis grup Sellthru/Recharge; Admin Input dan Super Admin |
 | `/api/admin/mitra/programs/[id]` | `GET` | Data difilter menurut role/scope sebelum respons dibentuk |
 
 Endpoint harus menolak field tak dikenal dan menggunakan allowlist eksplisit per aksi. Validasi
@@ -437,6 +446,8 @@ mutasi baru yang boleh menghasilkan aktor OTP/MITRA.
 - Sesi OTP valid dapat `GET` detail tetapi gagal pada setiap method mutasi.
 - Sesi login tanpa OTP dapat mengubah field yang diizinkan dalam scope.
 - Payload gabungan field diizinkan dan field master ditolak atomik tanpa partial write.
+- Payload `PUT` outlet yang menyertakan grup Sellthru/Recharge ditolak `400` dan tidak mengubah
+  `mitra_outlet_details`; pembaruan hanya berhasil melalui import admin khusus.
 - Program detail tidak mengandung participant/result/winner lintas scope.
 - Audit log tercipta untuk sukses dan tidak tercipta sebagai perubahan sukses untuk request gagal.
 

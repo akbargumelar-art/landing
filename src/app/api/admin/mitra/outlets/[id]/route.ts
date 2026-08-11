@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { findOutletInScope, getAdminActorScope } from "@/lib/admin-scope";
-import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
+import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
 import { getOutletEditLogs, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
@@ -54,6 +54,18 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+
+    // Detail performance hanya boleh datang dari pipeline import admin. Tolak eksplisit
+    // alih-alih mengabaikan payload, supaya klien lama tidak mengira angkanya tersimpan.
+    const grupPerformanceDikirim = MITRA_DETAIL_FIELD_GROUPS
+        .map((group) => group.key)
+        .filter((key) => Object.prototype.hasOwnProperty.call(body, key));
+    if (grupPerformanceDikirim.length > 0) {
+        return NextResponse.json({
+            error: "Sellthru Digipos, Sellthru Nota, dan Recharge Digipos hanya dapat diperbarui melalui Upload Data admin",
+        }, { status: 400 });
+    }
+
     const [existing] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
 
     if (!existing) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
@@ -119,22 +131,6 @@ export async function PUT(
             after: { latitude, longitude },
             ip: ipAdmin,
         });
-    }
-
-    if (body.sellthruDigipos || body.sellthruNota || body.rechargeDigipos) {
-        const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
-        const values = {
-            outletId: id,
-            sellthruDigiposJson: sanitizeDetailGroup(body.sellthruDigipos, MITRA_DETAIL_FIELD_GROUPS[0].fields.map((field) => field.key)),
-            sellthruNotaJson: sanitizeDetailGroup(body.sellthruNota, MITRA_DETAIL_FIELD_GROUPS[1].fields.map((field) => field.key)),
-            rechargeDigiposJson: sanitizeDetailGroup(body.rechargeDigipos, MITRA_DETAIL_FIELD_GROUPS[2].fields.map((field) => field.key)),
-        };
-
-        if (details) {
-            await db.update(mitraOutletDetails).set(values).where(eq(mitraOutletDetails.outletId, id));
-        } else {
-            await db.insert(mitraOutletDetails).values(values);
-        }
     }
 
     await writeAdminAuditLog({

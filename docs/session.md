@@ -1191,3 +1191,48 @@ jatuh tempo, opsi approval) memang di luar cakupan dan tidak disentuh.
 - Urutan naik wajib diikuti: migrasi, pembuatan akun, dan verifikasi login seluruh petugas
   dilakukan lebih dulu selagi jalur lama masih hidup, baru build ini dinaikkan. Menaikkan
   sekaligus akan menghentikan pembaruan foto lapangan pada hari yang sama.
+
+## Upload foto login dan detail performance baca-saja - 11 Agustus 2026
+
+- Backend upload foto berbasis login dan scope sudah ada di
+  `/api/admin/mitra/outlets/[id]/photos`, tetapi halaman Database Outlet sebelumnya hanya
+  menampilkan status foto. Panel tersebut sekarang memakai `OutletPhotoCard`, sehingga
+  Salesforce, Supervisor, Admin Input, dan Super Admin dapat memilih Kamera atau Galeri untuk
+  empat slot foto. Manager tetap hanya dapat melihat.
+- Unggah foto tidak memakai OTP. Endpoint memeriksa sesi login, role, serta outlet binaan/TAP,
+  kemudian menulis waktu pembaruan dan audit dengan user ID.
+- Sellthru Digipos, Sellthru Nota, dan Recharge Digipos sekarang ditampilkan sebagai tabel
+  collapse/expand baca-saja untuk seluruh role. Input form dihapus agar tidak memberi kesan data
+  tersebut dapat diedit manual.
+- `PUT /api/admin/mitra/outlets/[id]` menolak payload tiga grup detail tersebut dengan HTTP 400
+  dan tidak lagi menyimpannya. Satu-satunya jalur pembaruan tetap Upload Data/import melalui
+  `/api/admin/mitra/imports`, yang dibatasi untuk SUPER_ADMIN dan ADMIN_INPUT.
+- PRD akses login diperbarui dengan matriks yang membedakan baca di form outlet dan import khusus.
+
+Verifikasi: ESLint pada halaman outlet dan endpoint detail lulus; `npx tsc --noEmit` lulus;
+`npm test` lulus 22/22 termasuk dua test kontrak baru untuk melarang mutasi grup performance
+melalui `PUT` outlet dan mempertahankan import admin sebagai jalur tulis; `npm run build` lulus
+pada Next.js 15.5.12. Build tetap menampilkan dua warning `<img>` lama pada halaman Pengaturan
+yang tidak terkait. Smoke test browser dengan akun Salesforce dan database hidup belum dilakukan.
+
+## Editor outlet Salesforce lebih compact di mobile - 11 Agustus 2026
+
+- Panel edit Database Outlet untuk role lapangan memakai padding dan jarak vertikal lebih kecil
+  pada layar mobile, sedangkan breakpoint desktop tetap mempertahankan ukuran sebelumnya.
+- Field administratif nonaktif (ID Digipos, Nomor RS, TAP, Salesforce, dan status) tidak lagi
+  memenuhi layar sebagai input abu-abu. Di mobile semuanya diringkas dalam panel collapse
+  **Identitas & penugasan**; tampilan input desktop tidak berubah.
+- Field profil penting tetap selebar penuh, sementara Kabupaten/Kecamatan dan pilihan
+  Kategori/PJP/Branding memakai grid dua kolom pada mobile. Tinggi input/select diperkecil menjadi
+  36 px pada mobile dan kembali 40 px mulai breakpoint `sm`.
+- `OutletPhotoCard` mendapat opsi `compactMobile` yang hanya dipakai editor role lapangan: foto
+  tampil dua kolom, thumbnail lebih pendek, hint panjang disembunyikan, dan padding diperkecil.
+  Profil publik yang memakai komponen sama tidak berubah.
+- Tombol Simpan Perubahan menjadi action bar sticky di bagian bawah viewport mobile agar tetap
+  mudah dijangkau pada form panjang. Riwayat dan tiga grup performance juga memakai padding lebih
+  kecil tetapi tetap collapse/expand.
+
+Verifikasi: ESLint terarah pada halaman outlet dan kartu foto lulus; `npx tsc --noEmit` lulus;
+`npm run build` lulus pada Next.js 15.5.12. Build tetap hanya menampilkan dua warning `<img>` lama
+di halaman Pengaturan. Belum ada screenshot/browser smoke dengan sesi Salesforce dan viewport
+perangkat nyata karena database/login runtime belum tersedia pada sesi ini.
