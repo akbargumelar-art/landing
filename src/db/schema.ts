@@ -1233,6 +1233,20 @@ export const adminUserProfiles = mysqlTable("admin_user_profiles", {
     userId: varchar("user_id", { length: 36 }).primaryKey().references(() => user.id, { onDelete: "cascade" }),
     phone: varchar("phone", { length: 50 }),
     role: mysqlEnum("role", ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]).notNull().default("MANAGER"),
+    /**
+     * Identitas petugas untuk akun ber-role SALESFORCE: menautkan akun login ke satu baris
+     * master salesforce, sehingga scope-nya bisa dipersempit ke outlet binaannya sendiri.
+     * Membatasi lewat TAP saja tidak cukup -- satu TAP berisi banyak petugas, jadi tanpa
+     * kolom ini seorang salesforce tetap bisa menyunting outlet rekan setimnya.
+     *
+     * UNIQUE ditegakkan database dan berlaku untuk SELURUH baris, termasuk akun nonaktif:
+     * MySQL tidak mengenal partial unique index, jadi "satu akun aktif per master" mustahil
+     * diwakili constraint. Konsekuensinya disengaja -- mengganti pemegang akun dilakukan
+     * dengan memindahkan tautan pada akun yang ada, bukan membuat akun kedua.
+     */
+    salesforceId: varchar("salesforce_id", { length: 36 })
+        .unique()
+        .references(() => mitraSalesforces.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
     lastLoginAt: datetime("last_login_at"),
     failedLoginAttempts: int("failed_login_attempts").notNull().default(0),

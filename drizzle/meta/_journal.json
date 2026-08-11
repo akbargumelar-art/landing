@@ -246,6 +246,13 @@
       "when": 1786413563716,
       "tag": "0034_kpi_salesforce",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1786440109029,
+      "tag": "0035_admin_salesforce_assignment",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,3 @@
+ALTER TABLE `admin_user_profiles` ADD `salesforce_id` varchar(36);--> statement-breakpoint
+ALTER TABLE `admin_user_profiles` ADD CONSTRAINT `admin_user_profiles_salesforce_id_unique` UNIQUE(`salesforce_id`);--> statement-breakpoint
+ALTER TABLE `admin_user_profiles` ADD CONSTRAINT `admin_user_profiles_salesforce_id_mitra_salesforces_id_fk` FOREIGN KEY (`salesforce_id`) REFERENCES `mitra_salesforces`(`id`) ON DELETE set null ON UPDATE no action;
