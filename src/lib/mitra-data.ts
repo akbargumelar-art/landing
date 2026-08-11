@@ -18,7 +18,6 @@ import {
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
 import { getOutletEditLogs } from "@/lib/mitra-outlet-edit";
-import { bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
 import {
     hashSessionToken,
     isFuture,
@@ -210,13 +209,6 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             .limit(1)
         : [];
 
-    // Dipakai mengisi dropdown kabupaten/kecamatan yang saling terhubung di form edit
-    // profil -- daftarnya wilayah yang benar-benar sudah dipakai outlet lain, bukan
-    // ketikan bebas, supaya tidak ada wilayah baru yang salah eja masuk ke data.
-    const wilayahRows = await db
-        .selectDistinct({ kabupaten: mitraOutlets.kabupaten, kecamatan: mitraOutlets.kecamatan })
-        .from(mitraOutlets);
-
     return {
         outlet: {
             ...outlet,
@@ -237,10 +229,13 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         },
         performance,
         marketShare: marketShare || null,
-        wilayah: wilayahRows.filter((row): row is { kabupaten: string; kecamatan: string } => Boolean(row.kabupaten && row.kecamatan)),
         editLogs: await getOutletEditLogs(outletRecord.id),
-        // Dipakai halaman untuk menyembunyikan kontrol yang memang akan ditolak server.
-        bolehEdit: bolehEditOutlet(whitelistPengakses?.keterangan),
+        /**
+         * Sesi OTP kini murni baca. Field dipertahankan dan dipaku `false` selama masa
+         * kompatibilitas supaya build lama yang masih membacanya menyembunyikan kontrol edit
+         * alih-alih menampilkan tombol yang pasti ditolak server.
+         */
+        bolehEdit: false as const,
         peranPengakses: whitelistPengakses?.keterangan || null,
     };
 }

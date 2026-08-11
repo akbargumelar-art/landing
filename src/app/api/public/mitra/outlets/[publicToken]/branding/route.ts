@@ -1,55 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
 
-import { db } from "@/db";
-import { mitraOutlets } from "@/db/schema";
-import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
-import { OUTLET_BRANDINGS } from "@/lib/mitra-outlet-options";
-import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
+import { KODE_WAJIB_LOGIN, PESAN_WAJIB_LOGIN } from "@/lib/mitra-outlet-edit";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-    request: NextRequest,
-    { params }: { params: Promise<{ publicToken: string }> }
-) {
-    const { publicToken } = await params;
-    const sessionToken = request.cookies.get(MITRA_DETAIL_SESSION_COOKIE)?.value;
-    const izin = await pastikanBolehEdit(publicToken, sessionToken);
-
-    if (!izin.ok) {
-        return NextResponse.json({ error: izin.error }, { status: izin.status });
-    }
-
-    const akses = izin.akses;
-
-    const body = await request.json().catch(() => ({}));
-    const branding = String(body.branding || "");
-
-    // Dicocokkan ke daftar tetap, bukan diterima apa adanya: kolomnya enum di database,
-    // dan nilai di luar daftar akan ditolak MySQL sebagai galat, bukan disimpan.
-    if (!(OUTLET_BRANDINGS as readonly string[]).includes(branding)) {
-        return NextResponse.json({ error: "Pilihan branding tidak dikenal" }, { status: 400 });
-    }
-
-    if (branding === akses.outlet.branding) {
-        return NextResponse.json({ success: true, branding, unchanged: true });
-    }
-
-    await db
-        .update(mitraOutlets)
-        .set({ branding: branding as (typeof OUTLET_BRANDINGS)[number] })
-        .where(eq(mitraOutlets.id, akses.outlet.id));
-
-    await writeOutletEditLog({
-        outletId: akses.outlet.id,
-        actorType: "MITRA",
-        actorPhone: akses.session.phoneE164,
-        action: "BRANDING",
-        before: { branding: akses.outlet.branding },
-        after: { branding },
-        ip: getClientIp(request),
-    });
-
-    return NextResponse.json({ success: true, branding });
+/**
+ * Route mutasi publik yang sudah dipensiunkan. Sesi OTP hanya membuktikan hak MELIHAT, jadi
+ * jalur ini tidak lagi menerima perubahan apa pun -- perubahan outlet dilakukan dari dashboard
+ * dengan akun Salesforce atau Supervisor.
+ *
+ * Endpoint sengaja DIPERTAHANKAN, bukan dihapus, selama masa kompatibilitas: bookmark dan
+ * halaman lama yang masih tersimpan di perangkat lapangan akan menerima kode stabil
+ * LOGIN_REQUIRED_FOR_WRITE dan bisa mengarahkan penggunanya ke halaman masuk, alih-alih
+ * mendapat 404 yang terbaca seperti gangguan.
+ *
+ * Logika validasi dan penyimpanan yang dulu ada di sini tidak disisakan dalam bentuk kode mati:
+ * jalur tulis yang masih utuh di balik satu pemeriksaan adalah jalur yang bisa hidup lagi tanpa
+ * disengaja. Riwayatnya tetap tersimpan di git bila kelak dibutuhkan endpoint admin.
+ */
+export async function POST() {
+    return NextResponse.json({ error: PESAN_WAJIB_LOGIN, code: KODE_WAJIB_LOGIN }, { status: 403 });
 }

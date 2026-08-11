@@ -3,17 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, Camera, ChevronDown, ChevronUp, Crosshair, History, Loader2, Lock, MapPin, Pencil, ShieldCheck, Tag, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronDown, ChevronUp, History, Lock, MapPin, Pencil, ShieldCheck, Tag } from "lucide-react";
 
 import { InfoCard } from "@/components/mitra/info-card";
 import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { afterMergerShareData, operatorShareData, OperatorShareChart } from "@/components/mitra/operator-share-chart";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import type { MitraPhotoSlotKey } from "@/lib/mitra-outlet-photos";
-import { OUTLET_BRANDINGS, OUTLET_CATEGORIES, PJP_DAYS, PJP_TYPES } from "@/lib/mitra-outlet-options";
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import type { MitraMarketShareKey } from "@/lib/mitra-market-share";
 
@@ -33,11 +29,14 @@ interface DetailData {
         periodYm: string;
         value: string;
     }[];
-    marketShare: (Record<MitraMarketShareKey, string> & { kabupaten: string; kecamatan: string }) | null;
+    marketShare: (Record<MitraMarketShareKey, string> & {
+        kabupaten: string;
+        kecamatan: string;
+        /** Kapan angka wilayah ini terakhir diubah admin; dipakai sebagai keterangan kebaruan data. */
+        updatedAt: string | null;
+    }) | null;
     editLogs: EditLog[];
-    bolehEdit: boolean;
     peranPengakses: string | null;
-    wilayah: { kabupaten: string; kecamatan: string }[];
 }
 
 interface EditLog {
@@ -48,35 +47,17 @@ interface EditLog {
     createdAt: string;
 }
 
-interface ProfilDraft {
-    name: string;
-    ownerName: string;
-    ownerPhone: string;
-    kabupaten: string;
-    kecamatan: string;
-    category: string;
-    pjpDay: string;
-    pjpType: string;
-}
-
+/**
+ * Halaman ini murni baca. Sesi OTP membuktikan hak MELIHAT, bukan identitas aktor yang boleh
+ * mengubah data -- perubahan outlet dilakukan dari dashboard dengan akun Salesforce atau
+ * Supervisor. Karena itu tidak ada state draft, handler mutasi, maupun kontrol edit di sini:
+ * menyembunyikan tombol saja tidak cukup, kodenya sekalian tidak ada.
+ */
 export default function MitraOutletDetailPage() {
     const params = useParams();
     const publicToken = String(params.publicToken || "");
     const [data, setData] = React.useState<DetailData | null>(null);
     const [loading, setLoading] = React.useState(true);
-    const [mengunggah, setMengunggah] = React.useState<MitraPhotoSlotKey | null>(null);
-    const [menandaiLokasi, setMenandaiLokasi] = React.useState(false);
-    const [menyimpanBranding, setMenyimpanBranding] = React.useState(false);
-    // Lokasi dan branding memakai mode edit eksplisit: keduanya mengubah data yang dipakai
-    // orang lain, jadi tidak boleh berubah hanya karena tombol tersenggol. Foto tidak
-    // perlu -- memilih berkas sudah merupakan tindakan sadar tersendiri.
-    const [editLokasi, setEditLokasi] = React.useState(false);
-    const [editBranding, setEditBranding] = React.useState(false);
-    const [editProfil, setEditProfil] = React.useState(false);
-    const [brandingDraft, setBrandingDraft] = React.useState("");
-    const [profilDraft, setProfilDraft] = React.useState<ProfilDraft | null>(null);
-    const [menyimpanProfil, setMenyimpanProfil] = React.useState(false);
-    const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
     // Kosong (semua tertutup) sebagai default: tiga tabel ini panjang dan bukan yang
     // pertama ingin dilihat pembuka halaman, jadi disembunyikan sampai memang dibuka.
     const [grupTerbuka, setGrupTerbuka] = React.useState<Set<string>>(new Set());
@@ -99,149 +80,6 @@ export default function MitraOutletDetailPage() {
         muat().finally(() => setLoading(false));
     }, [muat]);
 
-    const unggahFoto = async (slot: MitraPhotoSlotKey, file: File) => {
-        setMengunggah(slot);
-        setPesan(null);
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("slot", slot);
-
-        try {
-            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/photo`, { method: "POST", body: fd });
-            const hasil = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                setPesan({ ok: false, teks: hasil.error || "Foto gagal diunggah." });
-            } else {
-                setPesan({ ok: true, teks: "Foto outlet berhasil diperbarui." });
-                await muat();
-            }
-        } catch {
-            setPesan({ ok: false, teks: "Koneksi bermasalah saat mengunggah foto." });
-        } finally {
-            setMengunggah(null);
-        }
-    };
-
-    const simpanBranding = async (branding: string) => {
-        if (!branding) return;
-        setMenyimpanBranding(true);
-        setPesan(null);
-
-        try {
-            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/branding`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ branding }),
-            });
-            const hasil = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                setPesan({ ok: false, teks: hasil.error || "Branding gagal disimpan." });
-            } else {
-                setPesan({ ok: true, teks: `Branding outlet diperbarui menjadi ${branding}.` });
-                setEditBranding(false);
-                await muat();
-            }
-        } catch {
-            setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan branding." });
-        } finally {
-            setMenyimpanBranding(false);
-        }
-    };
-
-    const bukaEditProfil = () => {
-        if (!data) return;
-        setProfilDraft({
-            name: String(data.outlet.name || ""),
-            ownerName: String(data.outlet.ownerName || ""),
-            ownerPhone: data.details.ownerPhone || "",
-            kabupaten: String(data.outlet.kabupaten || ""),
-            kecamatan: String(data.outlet.kecamatan || ""),
-            category: String(data.outlet.category || ""),
-            pjpDay: String(data.outlet.pjpDay || ""),
-            pjpType: String(data.outlet.pjpType || ""),
-        });
-        setEditProfil(true);
-    };
-
-    const simpanProfil = async () => {
-        if (!profilDraft) return;
-        setMenyimpanProfil(true);
-        setPesan(null);
-
-        try {
-            const res = await fetch(`/api/public/mitra/outlets/${publicToken}/profile`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(profilDraft),
-            });
-            const hasil = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                setPesan({ ok: false, teks: hasil.error || "Profil outlet gagal disimpan." });
-            } else {
-                setPesan({ ok: true, teks: "Profil outlet berhasil diperbarui." });
-                setEditProfil(false);
-                await muat();
-            }
-        } catch {
-            setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan profil outlet." });
-        } finally {
-            setMenyimpanProfil(false);
-        }
-    };
-
-    /**
-     * Koordinat diambil dari GPS perangkat, bukan diketik. Mengetik lintang/bujur manual
-     * adalah sumber titik outlet yang meleset -- satu digit tertukar sudah memindahkan
-     * penanda belasan kilometer, dan tidak ada cara memverifikasinya dari layar admin.
-     */
-    const tandaiLokasi = () => {
-        if (!navigator.geolocation) {
-            setPesan({ ok: false, teks: "Perangkat atau browser ini tidak mendukung penanda lokasi." });
-            return;
-        }
-
-        setMenandaiLokasi(true);
-        setPesan(null);
-
-        navigator.geolocation.getCurrentPosition(
-            async (posisi) => {
-                try {
-                    const res = await fetch(`/api/public/mitra/outlets/${publicToken}/location`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            latitude: posisi.coords.latitude,
-                            longitude: posisi.coords.longitude,
-                            accuracy: posisi.coords.accuracy,
-                        }),
-                    });
-                    const hasil = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                        setPesan({ ok: false, teks: hasil.error || "Lokasi gagal disimpan." });
-                    } else {
-                        setPesan({ ok: true, teks: `Lokasi outlet diperbarui (ketelitian ±${Math.round(posisi.coords.accuracy)} m).` });
-                        setEditLokasi(false);
-                        await muat();
-                    }
-                } catch {
-                    setPesan({ ok: false, teks: "Koneksi bermasalah saat menyimpan lokasi." });
-                } finally {
-                    setMenandaiLokasi(false);
-                }
-            },
-            (error) => {
-                setMenandaiLokasi(false);
-                setPesan({
-                    ok: false,
-                    teks: error.code === error.PERMISSION_DENIED
-                        ? "Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini lalu coba lagi."
-                        : "Lokasi tidak terbaca. Pastikan GPS aktif dan Anda berada di depan outlet.",
-                });
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
-    };
-
     if (loading) {
         return <main className="min-h-screen bg-gray-50 py-16 text-center text-sm text-muted-foreground">Memuat detail...</main>;
     }
@@ -261,14 +99,6 @@ export default function MitraOutletDetailPage() {
         );
     }
 
-    // Dropdown kabupaten/kecamatan saling terhubung: opsi kecamatan diturunkan dari
-    // kabupaten yang sedang dipilih, jadi kombinasi yang tidak ada di data outlet lain
-    // tidak bisa terpilih.
-    const kabupatenOptions = Array.from(new Set(data.wilayah.map((area) => area.kabupaten))).sort((a, b) => a.localeCompare(b, "id-ID"));
-    const kecamatanOptions = (kabupaten: string) => Array.from(new Set(
-        data.wilayah.filter((area) => area.kabupaten === kabupaten).map((area) => area.kecamatan)
-    )).sort((a, b) => a.localeCompare(b, "id-ID"));
-
     return (
         <main className="min-h-screen bg-gray-50">
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -285,20 +115,13 @@ export default function MitraOutletDetailPage() {
                             <h1 className="mt-1 text-2xl font-extrabold">{data.outlet.name}</h1>
                             <p className="mt-1 text-sm text-muted-foreground">{data.outlet.outletCode} - {data.outlet.ownerName}</p>
                         </div>
-                        {/* Peran ditampilkan supaya pengakses langsung paham mengapa tombol
-                            ubah ada atau tidak ada, tanpa harus menebak. */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${data.bolehEdit ? "bg-green-50 text-green-700" : "bg-gray-100 text-muted-foreground"}`}>
-                                {data.bolehEdit ? <Pencil className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                                {data.peranPengakses || "Tanpa keterangan"}
-                            </span>
-                            {data.bolehEdit && !editProfil && (
-                                <Button type="button" variant="outline" size="sm" onClick={bukaEditProfil}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit Profil
-                                </Button>
-                            )}
-                        </div>
+                        {/* Keterangan pemegang nomor tetap ditampilkan sebagai konteks, tetapi
+                            tidak lagi menentukan hak apa pun -- lencananya selalu berbentuk
+                            "hanya lihat" supaya tidak ada yang menunggu tombol ubah muncul. */}
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            <Lock className="h-3.5 w-3.5" />
+                            {data.peranPengakses ? `${data.peranPengakses} · hanya lihat` : "Hanya lihat"}
+                        </span>
                     </div>
 
                     <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -321,146 +144,25 @@ export default function MitraOutletDetailPage() {
                         </a>
                     )}
 
-                    {/* ID Digipos dan Nomor RS tidak ada tombol edit apa pun di halaman ini --
-                        keduanya nomor administratif yang mengikat outlet ke sistem lain, dan
-                        TAP/Salesforce tetap penugasan internal yang hanya diubah lewat admin. */}
-                    {editProfil && profilDraft && (
-                        <div className="mt-4 space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4">
-                            <p className="text-xs text-muted-foreground">
-                                Nama outlet, owner, wilayah, kategori, dan jadwal PJP bisa diubah dari sini. ID Digipos,
-                                Nomor RS, TAP, dan Salesforce tetap dikelola admin.
-                            </p>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-name">Nama Outlet</Label>
-                                    <Input
-                                        id="profil-name"
-                                        value={profilDraft.name}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, name: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-owner-name">Nama Owner</Label>
-                                    <Input
-                                        id="profil-owner-name"
-                                        value={profilDraft.ownerName}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, ownerName: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-owner-phone">Nomor WhatsApp Owner</Label>
-                                    <Input
-                                        id="profil-owner-phone"
-                                        value={profilDraft.ownerPhone}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, ownerPhone: event.target.value })}
-                                        placeholder="08xxxxxxxxxx"
-                                        inputMode="tel"
-                                        disabled={menyimpanProfil}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-kabupaten">Kabupaten</Label>
-                                    <select
-                                        id="profil-kabupaten"
-                                        value={profilDraft.kabupaten}
-                                        onChange={(event) => {
-                                            const kabupaten = event.target.value;
-                                            setProfilDraft((prev) => {
-                                                if (!prev) return prev;
-                                                // Kecamatan lama bisa jadi tidak ada di kabupaten baru --
-                                                // reset supaya kombinasinya tidak diam-diam salah.
-                                                const kecamatanMasihCocok = kecamatanOptions(kabupaten).includes(prev.kecamatan);
-                                                return { ...prev, kabupaten, kecamatan: kecamatanMasihCocok ? prev.kecamatan : "" };
-                                            });
-                                        }}
-                                        disabled={menyimpanProfil}
-                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                    >
-                                        <option value="">Pilih kabupaten</option>
-                                        {kabupatenOptions.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-kecamatan">Kecamatan</Label>
-                                    <select
-                                        id="profil-kecamatan"
-                                        value={profilDraft.kecamatan}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, kecamatan: event.target.value })}
-                                        disabled={menyimpanProfil || !profilDraft.kabupaten}
-                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                    >
-                                        <option value="">{profilDraft.kabupaten ? "Pilih kecamatan" : "Pilih kabupaten dahulu"}</option>
-                                        {kecamatanOptions(profilDraft.kabupaten).map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-category">Kategori Outlet</Label>
-                                    <select
-                                        id="profil-category"
-                                        value={profilDraft.category}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, category: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                    >
-                                        {OUTLET_CATEGORIES.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-pjp-day">Hari PJP</Label>
-                                    <select
-                                        id="profil-pjp-day"
-                                        value={profilDraft.pjpDay}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, pjpDay: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                    >
-                                        {PJP_DAYS.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="profil-pjp-type">Tipe PJP</Label>
-                                    <select
-                                        id="profil-pjp-type"
-                                        value={profilDraft.pjpType}
-                                        onChange={(event) => setProfilDraft((prev) => prev && { ...prev, pjpType: event.target.value })}
-                                        disabled={menyimpanProfil}
-                                        className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                    >
-                                        {PJP_TYPES.map((pilihan) => <option key={pilihan} value={pilihan}>{pilihan}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button onClick={simpanProfil} disabled={menyimpanProfil}>
-                                    {menyimpanProfil ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
-                                    Simpan Profil
-                                </Button>
-                                <Button type="button" variant="ghost" onClick={() => setEditProfil(false)} disabled={menyimpanProfil}>
-                                    <X className="h-4 w-4" />
-                                    Batal
-                                </Button>
-                            </div>
-                        </div>
-                    )}
                 </div>
-
-                {pesan && (
-                    <p className={`rounded-lg p-3 text-sm ${pesan.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                        {pesan.teks}
-                    </p>
-                )}
 
                 {/* 2. Market share kecamatan */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
                         <h2 className="font-bold">Market Share Kecamatan</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {data.marketShare
-                                ? `${data.marketShare.kecamatan}, ${data.marketShare.kabupaten}`
-                                : "Angka wilayah, bukan angka outlet ini"}
-                        </p>
+                        <div className="text-xs text-muted-foreground sm:text-right">
+                            <p>
+                                {data.marketShare
+                                    ? `${data.marketShare.kecamatan}, ${data.marketShare.kabupaten}`
+                                    : "Angka wilayah, bukan angka outlet ini"}
+                            </p>
+                            {/* Angka pangsa pasar tidak berubah tiap hari, jadi tanggalnya ikut
+                                menentukan arti angkanya -- tanpa itu pembaca tidak bisa tahu
+                                apakah yang dilihatnya data bulan ini atau tahun lalu. */}
+                            {data.marketShare?.updatedAt && (
+                                <p className="mt-0.5">Data diperbarui {formatWaktu(data.marketShare.updatedAt)}</p>
+                            )}
+                        </div>
                     </div>
 
                     {data.marketShare ? (
@@ -628,11 +330,7 @@ export default function MitraOutletDetailPage() {
                 })}
 
                 {/* 5. Foto outlet -- boleh langsung ganti tanpa mode edit. */}
-                <OutletPhotoCard
-                    outlet={data.outlet}
-                    onUpload={data.bolehEdit ? unggahFoto : undefined}
-                    sedangUnggah={mengunggah}
-                />
+                <OutletPhotoCard outlet={data.outlet} />
 
                 {data.outlet.latitude != null && data.outlet.longitude != null && (
                     <OdpSekitar
@@ -648,15 +346,18 @@ export default function MitraOutletDetailPage() {
                     />
                 )}
 
-                {!data.bolehEdit && (
-                    <p className="flex items-start gap-2 rounded-lg border bg-gray-50 p-4 text-sm text-muted-foreground">
-                        <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span>
-                            Nomor Anda terdaftar tetapi statusnya hanya bisa melihat. Perubahan foto, lokasi, dan
-                            branding hanya untuk salesforce, merchandiser, supervisor, manager, atau organik Telkomsel.
-                        </span>
-                    </p>
-                )}
+                {/* Diarahkan ke login, bukan ke verifikasi OTP ulang: OTP berapa kali pun
+                    diverifikasi tidak akan pernah membuka hak ubah. */}
+                <p className="flex items-start gap-2 rounded-lg border bg-gray-50 p-4 text-sm text-muted-foreground">
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                        Halaman ini hanya menampilkan data. Untuk mengubah foto, lokasi, branding, atau profil
+                        outlet, silakan{" "}
+                        <Link href="/portal-admin" className="font-semibold text-red-600 hover:underline">
+                            masuk menggunakan akun Salesforce atau Supervisor
+                        </Link>.
+                    </span>
+                </p>
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* 6. Lokasi outlet */}
@@ -668,12 +369,6 @@ export default function MitraOutletDetailPage() {
                                     Diambil dari GPS perangkat, bukan diketik. Dilakukan sesekali saja, saat memang dibutuhkan.
                                 </p>
                             </div>
-                            {data.bolehEdit && !editLokasi && (
-                                <Button type="button" variant="outline" size="sm" onClick={() => setEditLokasi(true)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit
-                                </Button>
-                            )}
                         </div>
 
                         <div className="mt-4 rounded-lg border bg-gray-50 p-4">
@@ -691,24 +386,6 @@ export default function MitraOutletDetailPage() {
                             )}
                         </div>
 
-                        {editLokasi && (
-                            <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3">
-                                <p className="text-xs text-muted-foreground">
-                                    Tekan tombol di bawah <strong>saat berada di depan outlet</strong>. Koordinat dengan
-                                    ketelitian di atas 200 m akan ditolak.
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button onClick={tandaiLokasi} disabled={menandaiLokasi}>
-                                        {menandaiLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
-                                        {menandaiLokasi ? "Membaca lokasi..." : "Simpan Lokasi Saya"}
-                                    </Button>
-                                    <Button type="button" variant="ghost" onClick={() => setEditLokasi(false)} disabled={menandaiLokasi}>
-                                        <X className="h-4 w-4" />
-                                        Batal
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {/* 7. Branding outlet */}
@@ -718,17 +395,6 @@ export default function MitraOutletDetailPage() {
                                 <Tag className="h-4 w-4 text-red-600" />
                                 <h2 className="font-bold">Branding Outlet</h2>
                             </div>
-                            {data.bolehEdit && !editBranding && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => { setBrandingDraft(String(data.outlet.branding || "")); setEditBranding(true); }}
-                                >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit
-                                </Button>
-                            )}
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             Materi promosi yang terpasang di outlet. Ubah bila brandingnya berganti.
@@ -738,38 +404,6 @@ export default function MitraOutletDetailPage() {
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Branding Terpasang</p>
                             <p className="mt-1 font-semibold text-gray-950">{String(data.outlet.branding || "-")}</p>
                         </div>
-
-                        {editBranding && (
-                            <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3">
-                                <label htmlFor="branding" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    Pilih Branding Baru
-                                </label>
-                                <select
-                                    id="branding"
-                                    value={brandingDraft}
-                                    onChange={(event) => setBrandingDraft(event.target.value)}
-                                    disabled={menyimpanBranding}
-                                    className="h-10 w-full rounded-md border bg-white px-3 text-sm disabled:opacity-60"
-                                >
-                                    {OUTLET_BRANDINGS.map((pilihan) => (
-                                        <option key={pilihan} value={pilihan}>{pilihan}</option>
-                                    ))}
-                                </select>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        onClick={() => simpanBranding(brandingDraft)}
-                                        disabled={menyimpanBranding || !brandingDraft || brandingDraft === data.outlet.branding}
-                                    >
-                                        {menyimpanBranding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
-                                        Simpan Branding
-                                    </Button>
-                                    <Button type="button" variant="ghost" onClick={() => setEditBranding(false)} disabled={menyimpanBranding}>
-                                        <X className="h-4 w-4" />
-                                        Batal
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
 
                         <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
                             Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu

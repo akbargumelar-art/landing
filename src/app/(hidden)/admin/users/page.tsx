@@ -31,6 +31,16 @@ interface AdminUser {
     lastLoginAt: string | null;
     createdAt: string;
     taps: string[];
+    salesforceId: string | null;
+    salesforceName: string | null;
+}
+
+interface SalesforceOption {
+    id: string;
+    name: string;
+    tap: string;
+    /** Sudah dipakai akun lain; ditandai agar sebab tidak-bisa-dipilihnya terlihat. */
+    taken: boolean;
 }
 
 const emptyDraft = {
@@ -40,11 +50,13 @@ const emptyDraft = {
     phone: "",
     role: "MANAGER" as AdminRole,
     taps: [] as string[],
+    salesforceId: "",
 };
 
 export default function AdminUsersPage() {
     const [users, setUsers] = React.useState<AdminUser[]>([]);
     const [availableTaps, setAvailableTaps] = React.useState<string[]>([]);
+    const [salesforceOptions, setSalesforceOptions] = React.useState<SalesforceOption[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [message, setMessage] = React.useState("");
@@ -67,6 +79,7 @@ export default function AdminUsersPage() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Gagal memuat user.");
             setUsers(data.users || []);
+            setSalesforceOptions(data.salesforceOptions || []);
             const tapsData = tapsResponse.ok ? await tapsResponse.json().catch(() => ({})) : {};
             setAvailableTaps(Array.isArray(tapsData.taps) ? tapsData.taps : []);
         } catch (error) {
@@ -94,6 +107,7 @@ export default function AdminUsersPage() {
             phone: user.phone || "",
             role: user.role,
             taps: user.taps,
+            salesforceId: user.salesforceId || "",
         });
         setDialogOpen(true);
         setMessage("");
@@ -123,6 +137,7 @@ export default function AdminUsersPage() {
                         phone: draft.phone,
                         isActive: editingUser.isActive,
                         taps: draft.taps,
+                        salesforceId: draft.salesforceId,
                     }),
                 });
                 const data = await response.json();
@@ -198,6 +213,14 @@ export default function AdminUsersPage() {
                                             TAP: {user.taps.length > 0 ? user.taps.join(", ") : "Belum ditetapkan"}
                                         </p>
                                     )}
+                                    {/* Akun salesforce tanpa tautan master tidak akan pernah cocok
+                                        dengan outlet mana pun, jadi ditandai jelas alih-alih tampak
+                                        normal sampai petugasnya gagal bekerja. */}
+                                    {user.role === "SALESFORCE" && (
+                                        <p className={`mt-1 text-xs ${user.salesforceName ? "text-muted-foreground" : "font-semibold text-red-600"}`}>
+                                            Petugas: {user.salesforceName || "Belum ditautkan — akun ini belum bisa dipakai"}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
@@ -260,6 +283,34 @@ export default function AdminUsersPage() {
                                 ))}
                             </select>
                         </div>
+                        {draft.role === "SALESFORCE" && (
+                            <div className="space-y-2">
+                                <Label htmlFor="user-salesforce">Master Salesforce</Label>
+                                <select
+                                    id="user-salesforce"
+                                    value={draft.salesforceId}
+                                    onChange={(event) => setDraft({ ...draft, salesforceId: event.target.value })}
+                                    className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
+                                >
+                                    <option value="">— Pilih petugas —</option>
+                                    {salesforceOptions.map((option) => {
+                                        // Master yang sudah dipakai akun lain tetap ditampilkan tetapi
+                                        // dimatikan, kecuali memang milik akun yang sedang disunting.
+                                        const milikSendiri = option.id === editingUser?.salesforceId;
+                                        return (
+                                            <option key={option.id} value={option.id} disabled={option.taken && !milikSendiri}>
+                                                {option.name}{option.tap ? ` · ${option.tap}` : ""}
+                                                {option.taken && !milikSendiri ? " (sudah dipakai akun lain)" : ""}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    Menentukan outlet mana yang boleh dilihat dan diubah akun ini. Satu petugas hanya
+                                    boleh tertaut ke satu akun — untuk mengganti pemegangnya, sunting akun lama itu.
+                                </p>
+                            </div>
+                        )}
                         {TAP_SCOPED.includes(draft.role) && (
                             <div className="space-y-2">
                                 <Label>TAP</Label>

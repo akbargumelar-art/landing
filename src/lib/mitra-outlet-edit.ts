@@ -1,68 +1,20 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
-import { mitraDetailSessions, mitraOutletEditLogs, mitraOutlets } from "@/db/schema";
-import { hashSessionToken, maskPhone } from "@/lib/mitra-utils";
-import { findMatchingWhitelist } from "@/lib/mitra-data";
-import { PESAN_TIDAK_BOLEH_EDIT, bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
+import { mitraOutletEditLogs } from "@/db/schema";
+import { maskPhone } from "@/lib/mitra-utils";
 
 export type MitraEditAction = "PHOTO" | "LOCATION" | "BRANDING" | "PROFILE";
 
 /**
- * Mengembalikan outlet beserta sesi detail yang sah, atau null.
- *
- * Dipakai endpoint yang MENGUBAH data, jadi pemeriksaannya harus mengikat sesi ke outlet
- * yang sedang diedit -- bukan sekadar "punya sesi yang masih berlaku". Tanpa ikatan itu,
- * satu OTP untuk outlet A bisa dipakai menyunting outlet B.
+ * Kode galat stabil untuk klien: dipakai UI lama/bookmark untuk mengarahkan pengguna ke
+ * halaman login alih-alih meminta OTP ulang -- yang tidak akan pernah berhasil.
  */
-export async function getEditableOutlet(publicToken: string, sessionToken: string | undefined) {
-    if (!sessionToken) return null;
+export const KODE_WAJIB_LOGIN = "LOGIN_REQUIRED_FOR_WRITE";
 
-    const [outlet] = await db
-        .select()
-        .from(mitraOutlets)
-        .where(eq(mitraOutlets.publicToken, publicToken))
-        .limit(1);
-
-    if (!outlet) return null;
-
-    const [session] = await db
-        .select()
-        .from(mitraDetailSessions)
-        .where(and(
-            eq(mitraDetailSessions.tokenHash, hashSessionToken(sessionToken)),
-            eq(mitraDetailSessions.outletId, outlet.id),
-            gt(mitraDetailSessions.expiresAt, new Date())
-        ))
-        .limit(1);
-
-    if (!session) return null;
-
-    // Peran pemegang nomor menentukan boleh-tidaknya menyunting. Diambil di sini, bukan di
-    // tiap endpoint, supaya tidak ada jalur ubah yang lupa memeriksanya.
-    const whitelist = await findMatchingWhitelist(session.phoneE164, { id: outlet.id, tap: outlet.tap });
-    const keterangan = whitelist?.keterangan || null;
-
-    return { outlet, session, keterangan, bolehEdit: bolehEditOutlet(keterangan) };
-}
-
-/** Pemeriksaan gabungan untuk endpoint yang mengubah data outlet. */
-type HasilIzin =
-    | { ok: false; error: string; status: 401 | 403 }
-    | { ok: true; akses: NonNullable<Awaited<ReturnType<typeof getEditableOutlet>>> };
-
-export async function pastikanBolehEdit(
-    publicToken: string,
-    sessionToken: string | undefined
-): Promise<HasilIzin> {
-    const akses = await getEditableOutlet(publicToken, sessionToken);
-
-    if (!akses) return { ok: false, error: "Verifikasi OTP diperlukan untuk mengubah data outlet", status: 401 };
-    if (!akses.bolehEdit) return { ok: false, error: PESAN_TIDAK_BOLEH_EDIT, status: 403 };
-
-    return { ok: true, akses };
-}
+export const PESAN_WAJIB_LOGIN =
+    "Untuk mengubah data, silakan masuk menggunakan akun Salesforce atau Supervisor.";
 
 export async function writeOutletEditLog(input: {
     outletId: string;

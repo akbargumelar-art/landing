@@ -1,85 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
 
-import { db } from "@/db";
-import { mitraOutlets } from "@/db/schema";
-import { pastikanBolehEdit, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
-import { findPhotoSlot } from "@/lib/mitra-outlet-photos";
-import { catatAktivitasKunjungan } from "@/lib/mitra-visit-notify";
-import { MITRA_DETAIL_SESSION_COOKIE, getClientIp } from "@/lib/mitra-utils";
-import { saveUploadedImage } from "@/lib/uploads";
+import { KODE_WAJIB_LOGIN, PESAN_WAJIB_LOGIN } from "@/lib/mitra-outlet-edit";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(
-    request: NextRequest,
-    { params }: { params: Promise<{ publicToken: string }> }
-) {
-    const { publicToken } = await params;
-    const sessionToken = request.cookies.get(MITRA_DETAIL_SESSION_COOKIE)?.value;
-    const izin = await pastikanBolehEdit(publicToken, sessionToken);
-
-    if (!izin.ok) {
-        return NextResponse.json({ error: izin.error }, { status: izin.status });
-    }
-
-    const akses = izin.akses;
-
-    const formData = await request.formData().catch(() => null);
-    if (!formData) {
-        return NextResponse.json({ error: "Data unggahan tidak terbaca" }, { status: 400 });
-    }
-
-    // Slot dicocokkan ke daftar tetap, tidak dipakai langsung sebagai nama kolom --
-    // nilai kiriman tidak boleh menentukan kolom mana yang ditulis.
-    const slot = findPhotoSlot(formData.get("slot") || "depan");
-    if (!slot) {
-        return NextResponse.json({ error: "Jenis foto tidak dikenal" }, { status: 400 });
-    }
-
-    // Batas 5 MB dan tanpa SVG: unggahan ini terbuka untuk siapa pun yang lolos OTP,
-    // jauh lebih luas daripada jalur admin.
-    //
-    // Foto langsung diperkecil ke 1600 px. Foto kamera ponsel berukuran 4-5 MB gagal
-    // ditampilkan WhatsApp saat diteruskan ke group, dan 1600 px sudah jauh di atas
-    // ukuran tampil terbesarnya di web -- jadi yang hilang cuma berat berkasnya.
-    const hasil = await saveUploadedImage(formData.get("file") as File | null, {
-        maxBytes: 5 * 1024 * 1024,
-        publicUpload: true,
-        maxDimensi: 1600,
-    });
-
-    if (!hasil.ok) {
-        return NextResponse.json({ error: hasil.error }, { status: hasil.status || 400 });
-    }
-
-    const sekarang = new Date();
-    const sebelum = akses.outlet[slot.urlColumn];
-
-    await db
-        .update(mitraOutlets)
-        .set({ [slot.urlColumn]: hasil.url, [slot.atColumn]: sekarang })
-        .where(eq(mitraOutlets.id, akses.outlet.id));
-
-    await writeOutletEditLog({
-        outletId: akses.outlet.id,
-        actorType: "MITRA",
-        actorPhone: akses.session.phoneE164,
-        action: "PHOTO",
-        before: { slot: slot.key, url: sebelum },
-        after: { slot: slot.key, label: slot.label, url: hasil.url },
-        ip: getClientIp(request),
-    });
-
-    // Notifikasi group tidak dikirim di sini: foto diunggah satu per satu, jadi aktivitasnya
-    // hanya dicatat dan satu pesan menyusul setelah kunjungan selesai. Lihat mitra-visit-notify.
-    await catatAktivitasKunjungan({
-        outletId: akses.outlet.id,
-        sessionId: akses.session.id,
-        actorPhone: akses.session.phoneE164,
-        foto: { slot: slot.key, label: slot.label, url: hasil.url! },
-    });
-
-    return NextResponse.json({ success: true, slot: slot.key, url: hasil.url, updatedAt: sekarang });
+/**
+ * Route mutasi publik yang sudah dipensiunkan. Sesi OTP hanya membuktikan hak MELIHAT, jadi
+ * jalur ini tidak lagi menerima perubahan apa pun -- perubahan outlet dilakukan dari dashboard
+ * dengan akun Salesforce atau Supervisor.
+ *
+ * Endpoint sengaja DIPERTAHANKAN, bukan dihapus, selama masa kompatibilitas: bookmark dan
+ * halaman lama yang masih tersimpan di perangkat lapangan akan menerima kode stabil
+ * LOGIN_REQUIRED_FOR_WRITE dan bisa mengarahkan penggunanya ke halaman masuk, alih-alih
+ * mendapat 404 yang terbaca seperti gangguan.
+ *
+ * Logika validasi dan penyimpanan yang dulu ada di sini tidak disisakan dalam bentuk kode mati:
+ * jalur tulis yang masih utuh di balik satu pemeriksaan adalah jalur yang bisa hidup lagi tanpa
+ * disengaja. Riwayatnya tetap tersimpan di git bila kelak dibutuhkan endpoint admin.
+ */
+export async function POST() {
+    return NextResponse.json({ error: PESAN_WAJIB_LOGIN, code: KODE_WAJIB_LOGIN }, { status: 403 });
 }

@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { adminUserProfiles, adminUserTaps, user, type AdminRole } from "@/db/schema";
+import { adminUserProfiles, adminUserTaps, mitraSalesforces, user, type AdminRole } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { validateAdminAssignment } from "@/lib/admin-assignment";
 import { getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
-
-const VALID_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"];
-const TAP_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
 export async function GET() {
     const authResult = await requireRole(["SUPER_ADMIN"]);
@@ -25,13 +23,27 @@ export async function GET() {
             role: adminUserProfiles.role,
             isActive: adminUserProfiles.isActive,
             lastLoginAt: adminUserProfiles.lastLoginAt,
+            salesforceId: adminUserProfiles.salesforceId,
+            salesforceName: mitraSalesforces.name,
             createdAt: user.createdAt,
         })
         .from(user)
         .leftJoin(adminUserProfiles, eq(user.id, adminUserProfiles.userId))
+        .leftJoin(mitraSalesforces, eq(adminUserProfiles.salesforceId, mitraSalesforces.id))
         .orderBy(asc(user.name));
 
     const assignments = await db.select().from(adminUserTaps);
+
+    // Master salesforce yang masih aktif, untuk mengisi pemilih di form akun. Yang sudah
+    // tertaut ke akun lain tetap dikirim tetapi ditandai, supaya Super Admin melihat sebabnya
+    // alih-alih mendapati pilihannya hilang tanpa penjelasan.
+    const masterSalesforce = await db
+        .select({ id: mitraSalesforces.id, name: mitraSalesforces.name, tap: mitraSalesforces.tap })
+        .from(mitraSalesforces)
+        .where(eq(mitraSalesforces.isActive, true))
+        .orderBy(asc(mitraSalesforces.name));
+
+    const sudahTertaut = new Set(users.map((row) => row.salesforceId).filter(Boolean));
 
     return NextResponse.json({
         users: users.map((row) => ({
@@ -40,6 +52,7 @@ export async function GET() {
             isActive: row.isActive ?? true,
             taps: assignments.filter((assignment) => assignment.userId === row.id).map((assignment) => assignment.tap),
         })),
+        salesforceOptions: masterSalesforce.map((row) => ({ ...row, taken: sudahTertaut.has(row.id) })),
     });
 }
 
@@ -63,12 +76,11 @@ export async function POST(request: Request) {
     if (!password || password.length < 8) {
         return NextResponse.json({ error: "Password wajib diisi minimal 8 karakter" }, { status: 400 });
     }
-    if (!VALID_ROLES.includes(role as AdminRole)) {
-        return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
-    }
-    if (TAP_SCOPED.includes(role as AdminRole) && taps.length === 0) {
-        return NextResponse.json({ error: "Role ini wajib memiliki minimal satu TAP" }, { status: 400 });
-    }
+    // Assignment divalidasi SEBELUM akun dibuat: bila ditolak setelah signUpEmail berhasil,
+    // yang tertinggal adalah akun tanpa profil -- persis kondisi yang jalur bootstrap dulu
+    // perlakukan secara istimewa.
+    const assignment = await validateAdminAssignment({ role, taps, salesforceId: body.salesforceId });
+    if (assignment.error) return assignment.error;
 
     let created;
     try {
@@ -85,6 +97,7 @@ export async function POST(request: Request) {
         userId,
         phone,
         role: role as AdminRole,
+        salesforceId: assignment.salesforceId,
         isActive: true,
         createdAt: new Date(),
     });
