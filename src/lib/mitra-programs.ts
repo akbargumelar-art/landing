@@ -17,14 +17,15 @@ import {
 import { hashSessionToken, toDecimalString } from "@/lib/mitra-utils";
 
 export type ProgramTargetType = "OUTLET" | "SALESFORCE";
-export type ProgramMechanismType = "RACING" | "REWARD";
+export type ProgramMechanismType = "RACING" | "REWARD" | "KPI";
 
 export function normalizeTargetType(nilai: unknown): ProgramTargetType {
     return String(nilai || "").toUpperCase() === "SALESFORCE" ? "SALESFORCE" : "OUTLET";
 }
 
 export function normalizeMechanismType(nilai: unknown): ProgramMechanismType {
-    return String(nilai || "").toUpperCase() === "REWARD" ? "REWARD" : "RACING";
+    const value = String(nilai || "").toUpperCase();
+    return value === "KPI" ? "KPI" : value === "REWARD" ? "REWARD" : "RACING";
 }
 
 /**
@@ -38,21 +39,28 @@ export function buildRewardRuleValues(
     mechanismType: ProgramMechanismType,
     rules: Record<string, unknown>[]
 ) {
-    return rules.map((rule, index) => ({
-        id: uuid(),
-        programId,
-        rankFrom: mechanismType === "RACING" && rule.rankFrom ? Number(rule.rankFrom) : null,
-        rankTo: mechanismType === "RACING" && rule.rankTo ? Number(rule.rankTo) : null,
-        paramKey: mechanismType === "REWARD" && rule.paramKey ? String(rule.paramKey) : null,
-        comparator: mechanismType === "REWARD"
-            ? ((rule.comparator ? String(rule.comparator) : ">=") as ">=" | ">" | "<=" | "<" | "=")
-            : null,
-        thresholdValue: mechanismType === "REWARD" && rule.thresholdValue !== undefined && rule.thresholdValue !== null && rule.thresholdValue !== ""
-            ? String(rule.thresholdValue)
-            : null,
-        rewardLabel: String(rule.rewardLabel || `Hadiah ${index + 1}`),
-        sortOrder: index,
-    }));
+    return rules.map((rule, index) => {
+        const comparatorInput = String(rule.comparator || ">=");
+        const comparator = ([">=", ">", "<=", "<", "="] as const).find((value) => value === comparatorInput) || ">=";
+        const sourceInput = String(rule.scoreSource || "PERFORMANCE").toUpperCase();
+        const scoreSource = (["TOTAL", "COMPLIANCE", "PERFORMANCE"] as const).find((value) => value === sourceInput) || "PERFORMANCE";
+        const benefitInput = String(rule.benefitType || "NONE").toUpperCase();
+        const benefitType = (["REWARD", "PUNISHMENT", "NONE"] as const).find((value) => value === benefitInput) || "NONE";
+        return {
+            id: uuid(),
+            programId,
+            rankFrom: mechanismType === "RACING" && rule.rankFrom ? Number(rule.rankFrom) : null,
+            rankTo: mechanismType === "RACING" && rule.rankTo ? Number(rule.rankTo) : null,
+            paramKey: mechanismType === "REWARD" && rule.paramKey ? String(rule.paramKey) : null,
+            comparator: mechanismType === "REWARD" || mechanismType === "KPI" ? comparator : null,
+            thresholdValue: (mechanismType === "REWARD" || mechanismType === "KPI") && rule.thresholdValue !== undefined && rule.thresholdValue !== null && rule.thresholdValue !== ""
+                ? String(rule.thresholdValue) : null,
+            scoreSource: mechanismType === "KPI" ? scoreSource : null,
+            benefitType: mechanismType === "KPI" ? benefitType : null,
+            rewardLabel: String(rule.rewardLabel || `Hadiah ${index + 1}`),
+            sortOrder: index,
+        };
+    });
 }
 
 /**
@@ -432,6 +440,7 @@ export interface RewardMatch {
 export async function computeProgramRewards(programId: string): Promise<RewardMatch[]> {
     const [program] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, programId)).limit(1);
     if (!program) return [];
+    if (program.mechanismType === "KPI") return [];
 
     const rules = await db
         .select()

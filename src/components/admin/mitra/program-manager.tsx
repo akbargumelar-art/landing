@@ -3,6 +3,7 @@
 import React from "react";
 import {
     Award,
+    ClipboardCheck,
     Download,
     Flag,
     Loader2,
@@ -25,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type TargetType = "OUTLET" | "SALESFORCE";
-type MechanismType = "RACING" | "REWARD";
+type MechanismType = "RACING" | "REWARD" | "KPI";
 type GroupBy = "NONE" | "TAP" | "KABUPATEN" | "KECAMATAN";
 
 interface ProgramParam {
@@ -36,6 +37,9 @@ interface ProgramParam {
     weight: string;
     aggregation: "SUM" | "AVG" | "LAST";
     isScored: boolean;
+    kpiCategory: "NONE" | "COMPLIANCE" | "PERFORMANCE";
+    achievementCap: string | null;
+    polarity: "HIGHER_BETTER" | "LOWER_BETTER";
 }
 
 interface RewardRule {
@@ -46,6 +50,8 @@ interface RewardRule {
     comparator: string | null;
     thresholdValue: string | null;
     rewardLabel: string;
+    scoreSource: "TOTAL" | "COMPLIANCE" | "PERFORMANCE" | null;
+    benefitType: "REWARD" | "PUNISHMENT" | "NONE" | null;
 }
 
 interface Program {
@@ -64,6 +70,21 @@ interface Program {
     isPublic: boolean;
     params?: ProgramParam[];
     rewardRules?: RewardRule[];
+    kpiComplianceMinScore: string | null;
+    kpiDefaultCap: string | null;
+    kpiHidePunishment: boolean;
+}
+
+interface KpiResultRow {
+    participantKey: string;
+    salesforceId: string;
+    salesforceName: string;
+    tap: string;
+    complianceScore: string;
+    performanceScore: string;
+    compliancePassed: boolean;
+    benefitType: "NONE" | "REWARD" | "PUNISHMENT";
+    benefitLabel: string;
 }
 
 interface Participant {
@@ -103,9 +124,22 @@ interface UploadResult {
  * dan muncul di tabel, tetapi tidak ikut menentukan peringkat. Dipakai untuk menunjukkan
  * tahapan sebuah alur ketika yang diadu hanya hasil akhirnya.
  */
-function parseParams(text: string) {
+function parseParams(text: string, mechanismType: MechanismType = "RACING") {
     return text.split("\n").map((line) => {
         const parts = line.split(",").map((part) => part.trim());
+        if (mechanismType === "KPI") {
+            const [key, label, category, weight, aggregation, cap, polarity] = parts;
+            return {
+                key,
+                label: label || key,
+                kpiCategory: String(category || "").toUpperCase(),
+                weight: weight || "0",
+                aggregation: (aggregation || "SUM").toUpperCase(),
+                achievementCap: cap || null,
+                polarity: String(polarity || "HIGHER").toUpperCase().startsWith("LOWER") ? "LOWER_BETTER" : "HIGHER_BETTER",
+                isScored: true,
+            };
+        }
         const isScored = !parts.some((part) => part.toUpperCase() === "INFO");
         const [key, label, weight, aggregation] = parts.filter((part) => part.toUpperCase() !== "INFO");
         return {
@@ -118,7 +152,11 @@ function parseParams(text: string) {
     }).filter((param) => param.key);
 }
 
-function formatParams(params: ProgramParam[]) {
+function formatParams(params: ProgramParam[], mechanismType: MechanismType = "RACING") {
+    if (mechanismType === "KPI") return params.map((param) => [
+        param.key, param.label, param.kpiCategory, param.weight, param.aggregation,
+        param.achievementCap || "", param.polarity === "LOWER_BETTER" ? "LOWER" : "HIGHER",
+    ].join(",")).join("\n");
     return params.map((param) => [
         param.key,
         param.label,
@@ -140,6 +178,16 @@ function parseRewardRules(text: string, mechanismType: MechanismType) {
                 rewardLabel: label.join(",").trim(),
             };
         }
+        if (mechanismType === "KPI") {
+            const [scoreSource, comparator, thresholdValue, benefitType, ...label] = parts;
+            return {
+                scoreSource: String(scoreSource || "PERFORMANCE").toUpperCase(),
+                comparator: comparator || ">=",
+                thresholdValue: thresholdValue || "0",
+                benefitType: String(benefitType || "NONE").toUpperCase(),
+                rewardLabel: label.join(",").trim(),
+            };
+        }
         const [paramKey, comparator, thresholdValue, ...label] = parts;
         return {
             paramKey: paramKey || null,
@@ -153,6 +201,8 @@ function parseRewardRules(text: string, mechanismType: MechanismType) {
 function formatRewardRules(rules: RewardRule[], mechanismType: MechanismType) {
     return rules.map((rule) => mechanismType === "RACING"
         ? `${rule.rankFrom ?? ""},${rule.rankTo ?? ""},${rule.rewardLabel}`
+        : mechanismType === "KPI"
+            ? `${rule.scoreSource || "PERFORMANCE"},${rule.comparator || ">="},${rule.thresholdValue || "0"},${rule.benefitType || "NONE"},${rule.rewardLabel}`
         : `${rule.paramKey || ""},${rule.comparator || ">="},${rule.thresholdValue || "0"},${rule.rewardLabel}`
     ).join("\n");
 }
@@ -169,6 +219,12 @@ const MECHANISM_COPY: Record<MechanismType, { judul: string; ringkas: string; at
         ringkas: "Tidak diadu; setiap peserta yang mencapai target mendapat hadiahnya.",
         aturan: "Aturan Hadiah — format: paramKey, pembanding, nilai, hadiah",
         contoh: "omzet,>=,5000000,Voucher 500rb\n,>=,1000,Bonus Total Poin",
+    },
+    KPI: {
+        judul: "KPI",
+        ringkas: "Setiap salesforce dinilai terhadap targetnya sendiri; tidak ada peringkat atau juara.",
+        aturan: "Aturan Benefit — format: sumber, pembanding, nilai, jenis, label",
+        contoh: "COMPLIANCE,<,80,PUNISHMENT,Surat Peringatan - Compliance\nPERFORMANCE,>=,100,REWARD,Rp 100.000\nPERFORMANCE,>=,90,REWARD,Rp 50.000",
     },
 };
 
@@ -209,6 +265,10 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const [uploadResult, setUploadResult] = React.useState<UploadResult | null>(null);
     const [uploading, setUploading] = React.useState(false);
     const [rewards, setRewards] = React.useState<RewardPreviewRow[]>([]);
+    const [kpiResults, setKpiResults] = React.useState<KpiResultRow[]>([]);
+    const [targetFile, setTargetFile] = React.useState<File | null>(null);
+    const [targetUploadResult, setTargetUploadResult] = React.useState<UploadResult | null>(null);
+    const [targetUploading, setTargetUploading] = React.useState(false);
 
     const [form, setForm] = React.useState({
         name: "",
@@ -222,10 +282,16 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         thumbnailUrl: "",
         paramsText: "omzet,Omzet,1\nakuisisi,Akuisisi,1",
         rewardRulesText: MECHANISM_COPY.RACING.contoh,
+        kpiComplianceMinScore: "80",
+        kpiDefaultCap: "",
+        kpiHidePunishment: true,
     });
     const [uploadingImage, setUploadingImage] = React.useState(false);
     const [editGroupBy, setEditGroupBy] = React.useState<GroupBy>("NONE");
     const [editThumb, setEditThumb] = React.useState("");
+    const [editKpiComplianceMinScore, setEditKpiComplianceMinScore] = React.useState("");
+    const [editKpiDefaultCap, setEditKpiDefaultCap] = React.useState("");
+    const [editKpiHidePunishment, setEditKpiHidePunishment] = React.useState(true);
 
     /** Key visual program; dipakai sebagai gambar kartu di daftar program publik. */
     const unggahGambar = async (file: File, simpan: (url: string) => void) => {
@@ -252,7 +318,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     // Contoh aturan ikut berganti saat tab pindah, karena format barisnya memang berbeda
     // antara racing dan reward.
     React.useEffect(() => {
-        setForm((prev) => ({ ...prev, rewardRulesText: MECHANISM_COPY[tab].contoh }));
+        setForm((prev) => ({
+            ...prev,
+            rewardRulesText: MECHANISM_COPY[tab].contoh,
+            paramsText: tab === "KPI"
+                ? "visit_pjp,Visit Sesuai PJP,COMPLIANCE,,AVG,100,HIGHER\nsales_perdana,Sales Perdana,PERFORMANCE,100,SUM,120,HIGHER"
+                : prev.paramsText,
+            groupBy: tab === "KPI" ? "NONE" : prev.groupBy,
+        }));
     }, [tab]);
 
     // Daftar wilayah untuk filter tambah massal; dipakai bersama outlet dan salesforce.
@@ -283,7 +356,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const simpanProgram = async (event: React.FormEvent) => {
         event.preventDefault();
         setSaving(true);
-        const params = parseParams(form.paramsText);
+        const params = parseParams(form.paramsText, tab);
 
         const res = await fetch("/api/admin/mitra/programs", {
             method: "POST",
@@ -313,7 +386,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
 
         setSelected(data.program);
         setSelectedParams(data.params || []);
-        setParamsText(formatParams(data.params || []));
+        setParamsText(formatParams(data.params || [], data.program.mechanismType));
         setParticipants(data.participants || []);
         setRewardRulesText(formatRewardRules(data.rewardRules || [], data.program.mechanismType));
         setWinnersText((data.winners || []).map((w: { code: string; rank: number; prizeLabel?: string | null }) => `${w.code},${w.rank},${w.prizeLabel || ""}`).join("\n"));
@@ -324,6 +397,12 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         setQuery("");
         setCandidates([]);
         setRewards([]);
+        setKpiResults(data.kpiResults || []);
+        setEditKpiComplianceMinScore(data.program.kpiComplianceMinScore || "");
+        setEditKpiDefaultCap(data.program.kpiDefaultCap || "");
+        setEditKpiHidePunishment(Boolean(data.program.kpiHidePunishment));
+        setTargetFile(null);
+        setTargetUploadResult(null);
         setUploadResult(null);
         setFile(null);
     };
@@ -392,6 +471,19 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         if (res.ok && mode === "commit") load();
     };
 
+    const unggahTarget = async (mode: "preview" | "commit") => {
+        if (!selected || !targetFile) return;
+        setTargetUploading(true);
+        const fd = new FormData();
+        fd.append("file", targetFile);
+        fd.append("mode", mode);
+        const res = await fetch(`/api/admin/mitra/programs/${selected.id}/kpi-targets`, { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        setTargetUploading(false);
+        setTargetUploadResult(data);
+        if (!res.ok) alert(data.error || "Gagal memproses target KPI");
+    };
+
     const hitungReward = async () => {
         if (!selected) return;
         setBusy(true);
@@ -438,7 +530,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
             </div>
 
             <div className="inline-flex rounded-lg border bg-white p-1">
-                {(["RACING", "REWARD"] as MechanismType[]).map((jenis) => (
+                {(["RACING", "REWARD", ...(isSalesforce ? ["KPI" as const] : [])] as MechanismType[]).map((jenis) => (
                     <button
                         key={jenis}
                         type="button"
@@ -447,7 +539,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                             tab === jenis ? "bg-red-600 text-white" : "text-gray-600 hover:bg-gray-50"
                         }`}
                     >
-                        {jenis === "RACING" ? <Flag className="h-4 w-4" /> : <Award className="h-4 w-4" />}
+                        {jenis === "RACING" ? <Flag className="h-4 w-4" /> : jenis === "KPI" ? <ClipboardCheck className="h-4 w-4" /> : <Award className="h-4 w-4" />}
                         {MECHANISM_COPY[jenis].judul}
                     </button>
                 ))}
@@ -490,7 +582,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 </div>
                                 <p className="text-xs text-muted-foreground">Tampil sebagai gambar kartu program di halaman publik.</p>
                             </div>
-                            <div className="space-y-2">
+                            {tab !== "KPI" && <div className="space-y-2">
                                 <Label>Bagi Peringkat Per</Label>
                                 <select value={form.groupBy} onChange={(e) => setForm((p) => ({ ...p, groupBy: e.target.value as GroupBy }))} className="h-10 w-full rounded-md border px-3 text-sm">
                                     <option value="NONE">Tanpa pembagian (satu papan)</option>
@@ -502,7 +594,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     Kalau dipilih, peringkat dihitung terpisah di tiap wilayah — aturan &quot;juara 1&quot; jadi
                                     menghasilkan satu pemenang per wilayah.
                                 </p>
-                            </div>
+                            </div>}
+                            {tab === "KPI" && (
+                                <>
+                                    <div className="space-y-2"><Label>Ambang Compliance (%)</Label><Input type="number" min="0" step="0.01" value={form.kpiComplianceMinScore} onChange={(e) => setForm((p) => ({ ...p, kpiComplianceMinScore: e.target.value }))} /></div>
+                                    <div className="space-y-2"><Label>Batas Achievement bawaan</Label><select value={form.kpiDefaultCap} onChange={(e) => setForm((p) => ({ ...p, kpiDefaultCap: e.target.value }))} className="h-10 w-full rounded-md border px-3 text-sm"><option value="">Tanpa batas (loss)</option><option value="100">100%</option><option value="110">110%</option><option value="120">120%</option></select></div>
+                                    <label className="flex items-end gap-2 pb-2 text-sm lg:col-span-2"><input type="checkbox" checked={form.kpiHidePunishment} onChange={(e) => setForm((p) => ({ ...p, kpiHidePunishment: e.target.checked }))} /> Sembunyikan label punishment di halaman publik</label>
+                                </>
+                            )}
                             <div className="space-y-2 lg:col-span-2">
                                 <Label>Deskripsi Publik</Label>
                                 <Textarea rows={3} value={form.descriptionMd} onChange={(e) => setForm((p) => ({ ...p, descriptionMd: e.target.value }))} />
@@ -512,17 +611,24 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 <Textarea rows={3} value={form.mechanismMd} onChange={(e) => setForm((p) => ({ ...p, mechanismMd: e.target.value }))} />
                             </div>
                             <div className="space-y-2 lg:col-span-2">
-                                <Label>Parameter Penilaian — format: key, label, bobot, agregasi</Label>
+                                <Label>{tab === "KPI" ? "Parameter — format: key, label, kategori, bobot, agregasi, cap, polaritas" : "Parameter Penilaian — format: key, label, bobot, agregasi"}</Label>
                                 <Textarea rows={4} value={form.paramsText} onChange={(e) => setForm((p) => ({ ...p, paramsText: e.target.value }))} />
-                                <p className="text-xs text-muted-foreground">
+                                {tab !== "KPI" && <p className="text-xs text-muted-foreground">
                                     Bobot otomatis dikalikan ke setiap pencapaian yang diunggah. Agregasi: SUM (dijumlah),
                                     AVG (rata-rata), LAST (ambil tanggal terbaru) — kosongkan untuk SUM.
-                                </p>
-                                <p className="text-xs text-muted-foreground">
+                                </p>}
+                                {tab !== "KPI" && <p className="text-xs text-muted-foreground">
                                     Tambahkan <code>INFO</code> di akhir baris untuk parameter yang hanya ditampilkan di
                                     tabel tanpa ikut dihitung — mis. <code>beli_mitra,Pembelian via Mitra,,,INFO</code>.
                                     Berguna untuk memperlihatkan tahapan alur ketika yang diadu hanya hasil akhirnya.
-                                </p>
+                                </p>}
+                                {tab === "KPI" && (() => {
+                                    const parsed = parseParams(form.paramsText, "KPI");
+                                    const compliance = parsed.filter((param) => param.kpiCategory === "COMPLIANCE").length;
+                                    const performance = parsed.filter((param) => param.kpiCategory === "PERFORMANCE");
+                                    const weight = performance.reduce((sum, param) => sum + Number(param.weight || 0), 0);
+                                    return <p className={`text-xs ${weight === 100 ? "text-green-700" : "text-amber-700"}`}>{compliance} compliance · {performance.length} performance · total bobot performance {weight}%{weight !== 100 ? " (disarankan 100%)" : ""}</p>;
+                                })()}
                             </div>
                             <div className="space-y-2 lg:col-span-2">
                                 <Label>{copy.aturan}</Label>
@@ -615,7 +721,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     <option value="PUBLISHED">PUBLISHED</option>
                                 </select>
                             </div>
-                            <div className="space-y-1">
+                            {selected.mechanismType === "KPI" && (
+                                <>
+                                    <div className="space-y-1"><Label className="text-xs">Ambang Compliance (%)</Label><Input className="w-36" type="number" min="0" step="0.01" value={editKpiComplianceMinScore} onChange={(e) => setEditKpiComplianceMinScore(e.target.value)} /></div>
+                                    <div className="space-y-1"><Label className="text-xs">Cap bawaan</Label><select value={editKpiDefaultCap} onChange={(e) => setEditKpiDefaultCap(e.target.value)} className="h-10 rounded-md border px-3 text-sm"><option value="">Tanpa batas</option><option value="100">100%</option><option value="110">110%</option><option value="120">120%</option></select></div>
+                                    <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={editKpiHidePunishment} onChange={(e) => setEditKpiHidePunishment(e.target.checked)} /> Sembunyikan punishment publik</label>
+                                </>
+                            )}
+                            {selected.mechanismType !== "KPI" && <div className="space-y-1">
                                 <Label className="text-xs">Bagi Peringkat Per</Label>
                                 <select value={editGroupBy} onChange={(e) => setEditGroupBy(e.target.value as GroupBy)} className="h-10 rounded-md border px-3 text-sm">
                                     <option value="NONE">Tanpa pembagian</option>
@@ -623,7 +736,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     {!isSalesforce && <option value="KABUPATEN">Kabupaten</option>}
                                     {!isSalesforce && <option value="KECAMATAN">Kecamatan</option>}
                                 </select>
-                            </div>
+                            </div>}
                             <div className="space-y-1">
                                 <Label className="text-xs">Key Visual</Label>
                                 <div className="flex items-center gap-2">
@@ -653,7 +766,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 // seolah masih berlaku.
                                 const perluHitungUlang = editGroupBy !== selected.groupBy;
                                 if (await kirimKelola(
-                                    { status: editStatus, isPublic: editIsPublic, groupBy: editGroupBy, thumbnailUrl: editThumb },
+                                    { status: editStatus, isPublic: editIsPublic, groupBy: editGroupBy, thumbnailUrl: editThumb, kpiComplianceMinScore: editKpiComplianceMinScore, kpiDefaultCap: editKpiDefaultCap, kpiHidePunishment: editKpiHidePunishment },
                                     perluHitungUlang ? "" : "Pengaturan tersimpan."
                                 )) {
                                     if (perluHitungUlang) {
@@ -677,9 +790,10 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     body: JSON.stringify({ action: "recompute", programId: selected.id }),
                                 });
                                 setBusy(false);
-                                alert("Papan skor dihitung ulang.");
+                                alert(selected.mechanismType === "KPI" ? "Hasil KPI dihitung ulang." : "Papan skor dihitung ulang.");
+                                if (selected.mechanismType === "KPI") bukaKelola(selected.id);
                             }}>
-                                <RefreshCw className="h-4 w-4" /> Hitung Ulang Papan Skor
+                                <RefreshCw className="h-4 w-4" /> {selected.mechanismType === "KPI" ? "Hitung Ulang KPI" : "Hitung Ulang Papan Skor"}
                             </Button>
                         </div>
 
@@ -860,11 +974,19 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 </div>
                             </div>
 
+                            {selected.mechanismType === "KPI" && <div className="space-y-3">
+                                <div><h3 className="font-bold">Target KPI</h3><p className="text-sm text-muted-foreground">Target per Salesforce dan parameter. Unduh template, periksa, lalu simpan.</p></div>
+                                <Button variant="outline" size="sm" onClick={() => window.open(`/api/admin/mitra/programs/${selected.id}/kpi-targets`, "_blank")}><Download className="h-4 w-4" /> Unduh Template Target</Button>
+                                <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { setTargetFile(e.target.files?.[0] || null); setTargetUploadResult(null); }} className="block h-10 w-full rounded-md border px-3 py-2 text-sm" />
+                                <div className="flex gap-2"><Button variant="outline" size="sm" disabled={!targetFile || targetUploading} onClick={() => unggahTarget("preview")}>{targetUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Periksa Target</Button><Button size="sm" disabled={!targetFile || targetUploading} onClick={() => unggahTarget("commit")}><Upload className="h-4 w-4" /> Simpan Target</Button></div>
+                                {targetUploadResult && <div className="rounded-md border p-3 text-sm"><p className="font-semibold">{targetUploadResult.imported !== undefined ? `${targetUploadResult.imported} target tersimpan.` : `${targetUploadResult.validCount || 0} dari ${targetUploadResult.rowCount || 0} baris siap disimpan.`}</p>{targetUploadResult.errors?.length ? <div className="mt-2 max-h-40 overflow-y-auto rounded bg-red-50 p-2 text-xs text-red-700">{targetUploadResult.errors.slice(0, 25).map((error) => <p key={`${error.row}-${error.message}`}>Baris {error.row}: {error.message}</p>)}</div> : null}</div>}
+                            </div>}
+
                             <div className="space-y-3">
                                 <div>
                                     <h3 className="font-bold">Unggah Pencapaian</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Satu baris = satu peserta, satu parameter, satu tanggal. Unggah ulang tanggal yang sama
+                                        Satu baris = satu {selected.mechanismType === "KPI" ? "outlet" : "peserta"}, satu parameter, satu tanggal. Unggah ulang tanggal yang sama
                                         akan menimpa nilainya, jadi aman dikirim tiap hari sampai periode berakhir.
                                     </p>
                                 </div>
@@ -909,13 +1031,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 <div>
                                     <h3 className="font-bold">Parameter Penilaian</h3>
                                     <p className="text-xs text-muted-foreground">
-                                        Format: key, label, bobot, agregasi. Tambahkan <code>INFO</code> agar parameter
-                                        hanya tampil di tabel tanpa ikut dihitung.
+                                        {selected.mechanismType === "KPI"
+                                            ? "Format: key, label, kategori, bobot, agregasi, cap, polaritas."
+                                            : <>Format: key, label, bobot, agregasi. Tambahkan <code>INFO</code> agar parameter hanya tampil di tabel tanpa ikut dihitung.</>}
                                     </p>
                                 </div>
                                 <Textarea rows={5} value={paramsText} onChange={(e) => setParamsText(e.target.value)} />
                                 <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
-                                    const baru = parseParams(paramsText);
+                                    const baru = parseParams(paramsText, selected.mechanismType);
                                     const keyBaru = new Set(baru.map((param) => param.key));
                                     const hilang = selectedParams.filter((param) => !keyBaru.has(param.key));
                                     if (hilang.length > 0 && !confirm(
@@ -939,6 +1062,12 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 }}>
                                     <Save className="h-4 w-4" /> Simpan Parameter
                                 </Button>
+                                {selected.mechanismType === "KPI" && (() => {
+                                    const parsed = parseParams(paramsText, "KPI");
+                                    const performance = parsed.filter((param) => param.kpiCategory === "PERFORMANCE");
+                                    const weight = performance.reduce((sum, param) => sum + Number(param.weight || 0), 0);
+                                    return <p className={`text-xs ${weight === 100 ? "text-green-700" : "text-amber-700"}`}>{parsed.filter((param) => param.kpiCategory === "COMPLIANCE").length} compliance · {performance.length} performance · bobot performance {weight}%{weight !== 100 ? " (disarankan 100%)" : ""}</p>;
+                                })()}
                             </div>
 
                             <div className="space-y-3">
@@ -951,15 +1080,16 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     )}
                                 </div>
                                 <Textarea rows={5} value={rewardRulesText} onChange={(e) => setRewardRulesText(e.target.value)} />
+                                {selected.mechanismType === "KPI" && <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">{parseRewardRules(rewardRulesText, "KPI").map((rule, index) => <li key={`${rule.scoreSource}-${rule.thresholdValue}-${index}`}>{rule.scoreSource} {rule.comparator} {rule.thresholdValue} → {rule.benefitType}: {rule.rewardLabel}</li>)}</ol>}
                                 <Button variant="outline" size="sm" disabled={busy} onClick={() => kirimKelola(
                                     { rewardRules: parseRewardRules(rewardRulesText, selected.mechanismType) },
-                                    "Aturan hadiah tersimpan."
+                                    selected.mechanismType === "KPI" ? "Aturan benefit tersimpan." : "Aturan hadiah tersimpan."
                                 )}>
                                     <Save className="h-4 w-4" /> Simpan Aturan
                                 </Button>
                             </div>
 
-                            <div className="space-y-3">
+                            {selected.mechanismType !== "KPI" && <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-bold">Hadiah Otomatis</h3>
                                     <Button variant="outline" size="sm" disabled={busy} onClick={hitungReward}>
@@ -1002,7 +1132,12 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 }}>
                                     <Award className="h-4 w-4" /> Publikasikan Pemenang
                                 </Button>
-                            </div>
+                            </div>}
+
+                            {selected.mechanismType === "KPI" && <div className="space-y-3 lg:col-span-2">
+                                <div><h3 className="font-bold">Pratinjau Hasil KPI</h3><p className="text-sm text-muted-foreground">Hasil cache terakhir; tekan Hitung Ulang KPI setelah target, aktual, atau aturan berubah.</p></div>
+                                <div className="max-w-full overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Salesforce</TableHead><TableHead>TAP</TableHead><TableHead>Compliance</TableHead><TableHead>Gerbang</TableHead><TableHead>Performance</TableHead><TableHead>Benefit</TableHead></TableRow></TableHeader><TableBody>{kpiResults.length ? kpiResults.map((row) => <TableRow key={row.participantKey}><TableCell className="font-medium">{row.salesforceName}</TableCell><TableCell>{row.tap || "(Tanpa TAP)"}</TableCell><TableCell>{Number(row.complianceScore).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</TableCell><TableCell className={row.compliancePassed ? "text-green-700" : "text-red-700"}>{row.compliancePassed ? "Lolos" : "Tidak lolos"}</TableCell><TableCell>{Number(row.performanceScore).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</TableCell><TableCell>{row.benefitLabel || "Tanpa benefit"}</TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-20 text-center text-muted-foreground">Belum ada hasil. Unggah target dan pencapaian, lalu hitung ulang.</TableCell></TableRow>}</TableBody></Table></div>
+                            </div>}
                         </div>
                     </CardContent>
                 </Card>

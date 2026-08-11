@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, ArrowRight, Award, Crown, Filter, Gift, Lock, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, ClipboardCheck, Crown, Filter, Gift, Lock, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KpiPublicView, type KpiPublicPayload } from "@/components/mitra/kpi-public-view";
 
 type TargetType = "OUTLET" | "SALESFORCE";
-type MechanismType = "RACING" | "REWARD";
+type MechanismType = "RACING" | "REWARD" | "KPI";
 
 interface LeaderboardRow {
     participantKey: string;
@@ -70,6 +71,7 @@ interface ProgramDetail {
     winners: WinnerRow[];
     rewardRules?: RewardRuleRow[];
     groups?: string[];
+    kpi?: KpiPublicPayload;
 }
 
 function formatTanggal(value?: string | null) {
@@ -176,6 +178,7 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
     const program = data?.program;
     const mechanismType: MechanismType = program?.mechanismType || "RACING";
     const isRacing = mechanismType === "RACING";
+    const isKpi = mechanismType === "KPI";
     const semuaBaris = React.useMemo(() => data?.leaderboard || [], [data]);
     const semuaPemenang = data?.winners || [];
     const programParams = data?.params || [];
@@ -239,8 +242,8 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
 
                     <div className="mt-6 flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white">
-                            {isRacing ? <Trophy className="h-3.5 w-3.5" /> : <Gift className="h-3.5 w-3.5" />}
-                            Program {istilah} · {isRacing ? "Racing" : "Reward"}
+                            {isRacing ? <Trophy className="h-3.5 w-3.5" /> : isKpi ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Gift className="h-3.5 w-3.5" />}
+                            Program {istilah} · {isRacing ? "Racing" : isKpi ? "KPI" : "Reward"}
                         </span>
                         {program?.status && (
                             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-red-600">
@@ -271,6 +274,8 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                 <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
                     <GerbangOtp slug={slug} onVerified={muat} />
                 </section>
+            ) : data?.kpi && isKpi ? (
+                <KpiPublicView slug={slug} initial={data.kpi} />
             ) : (
             <>
 

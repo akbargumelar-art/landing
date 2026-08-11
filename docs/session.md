@@ -948,3 +948,54 @@ Parser tetap menerima label/alias seperti `XL Smart`, tetapi menyimpan nilainya 
   merger membaca `41/27/22` dari `telkomselAfter/xlsmart/ioh` walau kolom lama berisi angka lain.
 - Migrasi `0025` dan `0026` belum dijalankan pada database nyata; runtime input/upload dengan
   sesi admin dan MySQL hidup belum diuji.
+
+## Implementasi PRD Penilaian KPI Salesforce - 11 Agustus 2026
+
+PRD `docs/prd-kpi-salesforce.md` diimplementasikan sebagai mekanisme ketiga pada Program
+Salesforce. KPI tidak memakai leaderboard atau pemenang: aktual diunggah per outlet, target
+ditetapkan per Salesforce/parameter, kemudian hasil di-rollup ke Salesforce dan TAP.
+
+### Keputusan dan model data
+
+- `mitra_programs.mechanism_type` menerima `KPI`, dengan ambang compliance, cap bawaan, serta
+  toggle privasi untuk menyembunyikan label punishment di tampilan publik.
+- Parameter program mendapat kategori `COMPLIANCE`/`PERFORMANCE`, cap achievement, dan polaritas
+  higher/lower-better. Kolom `reward_label` lama tetap dipertahankan agar Racing/Reward tidak
+  mengalami regresi.
+- Migrasi aditif `drizzle/0034_kpi_salesforce.sql` menambah `mitra_kpi_targets`,
+  `mitra_kpi_outlet_scores`, dan `mitra_kpi_results`; snapshot dan journal Drizzle ikut dibuat.
+- Mesin hitung baru berada di `src/lib/mitra-kpi.ts`. Data harian dipadatkan oleh SQL menjadi
+  satu agregat per outlet/parameter sebelum diproses Next.js, sehingga recompute dan halaman
+  publik tidak menarik seluruh baris harian mentah.
+- Parameter tanpa target ditandai kosong dan dikeluarkan dari skor. Compliance menjadi gerbang;
+  jika gagal, aturan performance dilewati. Aturan benefit KPI memakai first-match-wins.
+
+### Admin dan publik
+
+- `/admin/mitra/program-salesforce` memiliki tab KPI, konfigurasi ambang/cap/privasi, format
+  parameter KPI, pratinjau bobot, urutan aturan benefit, upload target, upload aktual per outlet,
+  recompute, dan tabel pratinjau hasil.
+- Endpoint baru `/api/admin/mitra/programs/[id]/kpi-targets` menyediakan template, preview,
+  commit atomik, validasi nomor baris/duplikat/target, dan reset. Endpoint skor yang sama dengan
+  mekanisme lama bercabang ke tabel aktual KPI dan menolak outlet yang Salesforce-nya bukan
+  peserta program.
+- `/mitra/program-sf/[slug]` tetap memakai gate OTP program yang sudah ada. Setelah verifikasi,
+  KPI menampilkan kartu ringkasan, tabel TAP dan Salesforce yang tertutup secara bawaan, rincian
+  Compliance/Performance, serta tabel outlet dengan filter URL dan pagination 100 baris.
+- Label punishment dapat disamarkan menjadi `Disembunyikan`; skor dan jumlah punishment tetap
+  terlihat agar laporan agregat tidak berubah diam-diam.
+
+### Verifikasi dan batasan
+
+- `npx tsc --noEmit`: lulus.
+- ESLint terarah pada seluruh schema/library/API/komponen KPI dan file program terkait: lulus
+  tanpa warning atau error.
+- `npx tsx --test src/lib/mitra-kpi.test.ts`: 5/5 unit test lulus (cap/polaritas/GAP,
+  AVG+LAST, compliance berbobot, compliance gate+first match, dan target kosong).
+- `npx drizzle-kit check`: lulus.
+- `npm run build`: lulus pada Next.js 15.5.12; route baru `kpi-targets` masuk output. Dua warning
+  `<img>` lama di halaman Pengaturan tetap ada dan tidak terkait perubahan ini.
+- `npm run db:migrate` dicoba terhadap `localhost:3306/abk_ciraya`, tetapi gagal
+  `ECONNREFUSED`. Karena itu migrasi SQL, upload Excel terhadap MySQL nyata, OTP, serta QA visual
+  360 px belum diverifikasi end-to-end pada sesi ini. Jangan deploy kode sebelum migrasi `0034`
+  berhasil diterapkan dan alur tersebut diuji pada database staging/lokal yang hidup.

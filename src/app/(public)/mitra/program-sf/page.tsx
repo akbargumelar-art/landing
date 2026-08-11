@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gift, Trophy } from "lucide-react";
+import { ArrowRight, ClipboardCheck, Gift, Trophy } from "lucide-react";
 
 import { getPublicPrograms } from "@/lib/mitra-programs";
 
@@ -40,8 +40,8 @@ export default async function ProgramSalesforceListPage() {
                             >
                                 <div className="flex items-center gap-2">
                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">
-                                        {program.mechanismType === "RACING" ? <Trophy className="h-3.5 w-3.5" /> : <Gift className="h-3.5 w-3.5" />}
-                                        {program.mechanismType === "RACING" ? "Racing" : "Reward"}
+                                        {program.mechanismType === "RACING" ? <Trophy className="h-3.5 w-3.5" /> : program.mechanismType === "KPI" ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Gift className="h-3.5 w-3.5" />}
+                                        {program.mechanismType === "RACING" ? "Racing" : program.mechanismType === "KPI" ? "KPI" : "Reward"}
                                     </span>
                                     <span className="text-xs font-semibold uppercase text-muted-foreground">{program.status}</span>
                                 </div>

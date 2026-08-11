@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraPrograms } from "@/db/schema";
+import { getPublicKpiDetail } from "@/lib/mitra-kpi";
 import { getPublicProgramDetail, hasValidProgramSession, normalizeTargetType } from "@/lib/mitra-programs";
 import { MITRA_PROGRAM_SESSION_COOKIE } from "@/lib/mitra-utils";
 
@@ -48,6 +49,18 @@ export async function GET(
         const sessionToken = (await cookies()).get(MITRA_PROGRAM_SESSION_COOKIE)?.value;
         if (!await hasValidProgramSession(program.id, sessionToken)) {
             return NextResponse.json({ locked: true, program }, { status: 401 });
+        }
+
+        if (program.mechanismType === "KPI") {
+            const kpi = await getPublicKpiDetail(program.id, {
+                tap: url.searchParams.get("tap") || undefined,
+                sf: url.searchParams.get("sf") || undefined,
+                param: url.searchParams.get("param") || undefined,
+                q: url.searchParams.get("q") || undefined,
+                page: Number(url.searchParams.get("page") || 1),
+            });
+            if (!kpi) return NextResponse.json({ error: "Data KPI tidak ditemukan" }, { status: 404 });
+            return NextResponse.json({ program, kpi });
         }
     }
 

@@ -11,11 +11,13 @@ import {
     mitraProgramWinners,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getAdminKpiResults } from "@/lib/mitra-kpi";
 import {
     buildRewardRuleValues,
     groupValueOf,
     listProgramParticipants,
     normalizeGroupBy,
+    normalizeMechanismType,
     participantColumns,
     resolveParticipantCodes,
     type ProgramGroupBy,
@@ -37,11 +39,12 @@ export async function GET(
     if (!program) return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
 
     const targetType = program.targetType as ProgramTargetType;
-    const [programParams, participants, rewardRules, winnerRows] = await Promise.all([
+    const [programParams, participants, rewardRules, winnerRows, kpiResults] = await Promise.all([
         db.select().from(mitraProgramParams).where(eq(mitraProgramParams.programId, id)).orderBy(asc(mitraProgramParams.sortOrder)),
         listProgramParticipants(id, targetType),
         db.select().from(mitraProgramRewardRules).where(eq(mitraProgramRewardRules.programId, id)).orderBy(asc(mitraProgramRewardRules.sortOrder)),
         db.select().from(mitraProgramWinners).where(eq(mitraProgramWinners.programId, id)).orderBy(asc(mitraProgramWinners.rank)),
+        program.mechanismType === "KPI" ? getAdminKpiResults(id) : Promise.resolve([]),
     ]);
 
     // Pemenang disimpan berbasis participantKey; nama dan kodenya diambil dari daftar
@@ -58,7 +61,7 @@ export async function GET(
         isPublished: row.isPublished,
     }));
 
-    return NextResponse.json({ program, params: programParams, participants, rewardRules, winners });
+    return NextResponse.json({ program, params: programParams, participants, rewardRules, winners, kpiResults });
 }
 
 export async function PUT(
@@ -109,6 +112,9 @@ export async function PUT(
     }
 
     if (body.action === "publish_winners") {
+        if (existing.mechanismType === "KPI") {
+            return NextResponse.json({ error: "Program KPI tidak memiliki pemenang atau peringkat" }, { status: 400 });
+        }
         const diminta = Array.isArray(body.winners)
             ? (body.winners as unknown[]).map((value) => {
                 const row = value as Record<string, unknown>;
@@ -173,15 +179,16 @@ export async function PUT(
         return NextResponse.json({ success: true, winnerCount: diminta.length });
     }
 
-    const mechanismType = body.mechanismType
-        ? (String(body.mechanismType).toUpperCase() === "REWARD" ? "REWARD" as const : "RACING" as const)
-        : existing.mechanismType;
+    const mechanismType = body.mechanismType ? normalizeMechanismType(body.mechanismType) : existing.mechanismType;
+    if (mechanismType === "KPI" && existing.targetType !== "SALESFORCE") {
+        return NextResponse.json({ error: "Mekanisme KPI hanya tersedia untuk Program Salesforce" }, { status: 400 });
+    }
 
     await db.update(mitraPrograms).set({
         name: body.name ?? existing.name,
         slug: body.slug ? slugify(String(body.slug)) : existing.slug,
         mechanismType,
-        groupBy: body.groupBy ? normalizeGroupBy(body.groupBy) : existing.groupBy,
+        groupBy: mechanismType === "KPI" ? "NONE" : body.groupBy ? normalizeGroupBy(body.groupBy) : existing.groupBy,
         thumbnailUrl: body.thumbnailUrl === "" ? null : body.thumbnailUrl ?? existing.thumbnailUrl,
         descriptionMd: body.descriptionMd ?? existing.descriptionMd,
         mechanismMd: body.mechanismMd ?? existing.mechanismMd,
@@ -189,6 +196,15 @@ export async function PUT(
         periodEnd: body.periodEnd ? new Date(body.periodEnd) : existing.periodEnd,
         status: body.status ?? existing.status,
         isPublic: body.isPublic ?? existing.isPublic,
+        kpiComplianceMinScore: mechanismType === "KPI"
+            ? (body.kpiComplianceMinScore === "" ? null : body.kpiComplianceMinScore ?? existing.kpiComplianceMinScore)
+            : null,
+        kpiDefaultCap: mechanismType === "KPI"
+            ? (body.kpiDefaultCap === "" ? null : body.kpiDefaultCap ?? existing.kpiDefaultCap)
+            : null,
+        kpiHidePunishment: mechanismType === "KPI"
+            ? body.kpiHidePunishment ?? existing.kpiHidePunishment
+            : false,
     }).where(eq(mitraPrograms.id, id));
 
     if (Array.isArray(body.params)) {
@@ -204,14 +220,21 @@ export async function PUT(
 
         for (const [index, param] of body.params.entries()) {
             const key = String(param.key || slugify(String(param.label || `param-${index + 1}`))).replace(/-/g, "_");
+            const kpiCategory: "NONE" | "COMPLIANCE" | "PERFORMANCE" = mechanismType === "KPI" && ["COMPLIANCE", "PERFORMANCE"].includes(String(param.kpiCategory).toUpperCase())
+                ? String(param.kpiCategory).toUpperCase() as "COMPLIANCE" | "PERFORMANCE" : "NONE";
             keyDikirim.add(key);
             const values = {
                 key,
                 label: String(param.label || `Parameter ${index + 1}`),
                 unit: param.unit ? String(param.unit) : null,
-                weight: String(param.weight || "1"),
+                weight: String(param.weight ?? (mechanismType === "KPI" ? "0" : "1")),
                 aggregation: param.aggregation || "SUM",
                 isScored: param.isScored !== false,
+                kpiCategory,
+                achievementCap: mechanismType === "KPI" && param.achievementCap !== "" && param.achievementCap != null
+                    ? String(param.achievementCap) : null,
+                polarity: mechanismType === "KPI" && String(param.polarity).toUpperCase().startsWith("LOWER")
+                    ? "LOWER_BETTER" as const : "HIGHER_BETTER" as const,
                 sortOrder: index,
             };
 

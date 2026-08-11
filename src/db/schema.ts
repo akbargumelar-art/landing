@@ -857,13 +857,15 @@ export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", 
  * `mechanismType` menentukan cara pemenang ditentukan:
  * - RACING   : peserta diadu, pemenang diambil dari peringkat leaderboard.
  * - REWARD   : tidak diadu; siapa pun yang melewati target dapat hadiahnya.
+ * - KPI      : tidak diadu dan tidak ada peringkat; tiap peserta dinilai terhadap
+ *              targetnya sendiri, lalu menerima reward atau punishment.
  */
 export const mitraPrograms = mysqlTable("mitra_programs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
     targetType: mysqlEnum("target_type", ["OUTLET", "SALESFORCE"]).notNull().default("OUTLET"),
-    mechanismType: mysqlEnum("mechanism_type", ["RACING", "REWARD"]).notNull().default("RACING"),
+    mechanismType: mysqlEnum("mechanism_type", ["RACING", "REWARD", "KPI"]).notNull().default("RACING"),
     /**
      * Membagi persaingan jadi beberapa liga terpisah. Pada NONE seluruh peserta diadu
      * dalam satu papan; pada TAP/KABUPATEN/KECAMATAN peringkat dihitung ulang di dalam
@@ -877,6 +879,20 @@ export const mitraPrograms = mysqlTable("mitra_programs", {
     periodEnd: datetime("period_end").notNull(),
     status: mysqlEnum("status", ["DRAFT", "ACTIVE", "ENDED", "PUBLISHED"]).notNull().default("DRAFT"),
     isPublic: boolean("is_public").notNull().default(false),
+    /**
+     * Ambang skor compliance yang harus dilewati sebelum reward performance berlaku.
+     * Di bawah angka ini peserta langsung menerima punishment, berapa pun skor
+     * performance-nya -- gerbang, bukan komponen yang dirata-rata.
+     */
+    kpiComplianceMinScore: decimal("kpi_compliance_min_score", { precision: 6, scale: 2 }),
+    /** Batas achievement bawaan saat parameter baru dibuat; NULL berarti tanpa batas. */
+    kpiDefaultCap: decimal("kpi_default_cap", { precision: 6, scale: 2 }),
+    /**
+     * Menyembunyikan label punishment dari halaman publik. Sesi OTP berlaku per program,
+     * bukan per orang, jadi tanpa saklar ini sanksi seseorang terbaca seluruh rekannya.
+     * Skor tetap tampil apa adanya; yang disembunyikan hanya labelnya.
+     */
+    kpiHidePunishment: boolean("kpi_hide_punishment").notNull().default(false),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
@@ -899,6 +915,21 @@ export const mitraProgramParams = mysqlTable("mitra_program_params", {
      * dan pencatatan, misalnya -- ketika yang benar-benar diadu hanya hasil akhirnya.
      */
     isScored: boolean("is_scored").notNull().default(true),
+    /**
+     * Kategori penilaian KPI. Hanya bermakna pada program bermekanisme KPI; program
+     * racing/reward tetap NONE dan tidak berubah perilakunya.
+     */
+    kpiCategory: mysqlEnum("kpi_category", ["NONE", "COMPLIANCE", "PERFORMANCE"]).notNull().default("NONE"),
+    /**
+     * Batas atas achievement (100 / 110 / 120). NULL berarti dibiarkan tembus berapa pun --
+     * "loss" dalam istilah penyusun KPI.
+     */
+    achievementCap: decimal("achievement_cap", { precision: 6, scale: 2 }),
+    /**
+     * Arah parameter. Tidak semua KPI makin besar makin baik: jumlah komplain atau outlet
+     * tidak aktif justru sebaliknya, dan tanpa kolom ini achievement-nya akan terbalik.
+     */
+    polarity: mysqlEnum("polarity", ["HIGHER_BETTER", "LOWER_BETTER"]).notNull().default("HIGHER_BETTER"),
     sortOrder: int("sort_order").notNull().default(0),
 }, (table) => [
     uniqueIndex("mitra_program_params_unique_idx").on(table.programId, table.key),
@@ -980,8 +1011,8 @@ export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
 /**
  * Aturan penentu hadiah. Kolom mana yang dibaca ditentukan oleh `mechanismType` program
  * induknya -- RACING memakai rankFrom/rankTo, REWARD memakai paramKey/comparator/
- * thresholdValue -- sehingga tidak ada kombinasi ambigu seperti "aturan peringkat pada
- * program yang tidak punya peringkat".
+ * thresholdValue, KPI memakai scoreSource/comparator/thresholdValue -- sehingga tidak ada
+ * kombinasi ambigu seperti "aturan peringkat pada program yang tidak punya peringkat".
  */
 export const mitraProgramRewardRules = mysqlTable("mitra_program_reward_rules", {
     id: varchar("id", { length: 36 }).primaryKey(),
@@ -991,10 +1022,92 @@ export const mitraProgramRewardRules = mysqlTable("mitra_program_reward_rules", 
     paramKey: varchar("param_key", { length: 120 }),
     comparator: mysqlEnum("comparator", [">=", ">", "<=", "<", "="]),
     thresholdValue: decimal("threshold_value", { precision: 18, scale: 2 }),
+    /** Skor yang dibaca aturan KPI: compliance, performance, atau gabungan keduanya. */
+    scoreSource: mysqlEnum("score_source", ["TOTAL", "COMPLIANCE", "PERFORMANCE"]),
+    /**
+     * Membedakan hadiah dari sanksi. Dibutuhkan karena halaman publik mewarnai dan --
+     * bila disembunyikan -- menyaring keduanya secara berbeda, dan menebaknya dari teks
+     * label ("Surat Peringatan" vs "Rp 100.000") tidak pernah bisa diandalkan.
+     */
+    benefitType: mysqlEnum("benefit_type", ["REWARD", "PUNISHMENT", "NONE"]),
     rewardLabel: varchar("reward_label", { length: 255 }).notNull(),
     sortOrder: int("sort_order").notNull().default(0),
 }, (table) => [
     index("mitra_program_reward_rules_program_idx").on(table.programId),
+]);
+
+/**
+ * Target KPI per salesforce per parameter. Satu program mewakili satu periode, jadi tidak
+ * ada kolom bulan: periode baru berarti program baru.
+ *
+ * Target sengaja tidak disimpan di `mitra_program_params` karena angkanya berbeda tiap
+ * orang -- SF senior dan SF baru tidak dinilai dengan tuntutan yang sama.
+ */
+export const mitraKpiTargets = mysqlTable("mitra_kpi_targets", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
+    targetValue: decimal("target_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_targets_unique_idx").on(table.programId, table.participantKey, table.paramId),
+    index("mitra_kpi_targets_sf_idx").on(table.salesforceId),
+]);
+
+/**
+ * Pencapaian mentah KPI, satu baris per outlet per parameter per tanggal.
+ *
+ * Tidak memakai `mitra_program_scores` karena unique index tabel itu berporos pada
+ * participantKey (di program KPI = salesforce), sedangkan satu salesforce membina banyak
+ * outlet: seluruh baris outlet milik satu SF pada parameter dan tanggal yang sama akan
+ * bertabrakan, dan onDuplicateKeyUpdate jalur import akan menimpanya -- outlet terakhir
+ * menang, sisanya hilang tanpa jejak.
+ *
+ * `salesforce_id` disimpan redundan (bisa diturunkan dari outlet) agar rollup per-SF tidak
+ * perlu join, sekaligus supaya perpindahan binaan outlet di kemudian hari tidak mengubah
+ * angka periode yang sudah lewat.
+ */
+export const mitraKpiOutletScores = mysqlTable("mitra_kpi_outlet_scores", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
+    rawValue: decimal("raw_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    achievementDate: date("achievement_date", { mode: "string" }).notNull(),
+    batchId: varchar("batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_outlet_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.achievementDate),
+    index("mitra_kpi_outlet_scores_sf_idx").on(table.programId, table.salesforceId),
+    index("mitra_kpi_outlet_scores_batch_idx").on(table.batchId),
+]);
+
+/**
+ * Hasil perhitungan KPI per salesforce, sejajar peran mitra_program_leaderboard pada
+ * racing -- bedanya tidak ada kolom peringkat, karena KPI tidak mengadu siapa pun.
+ *
+ * `tap` disalin saat hitung, tidak dijoin saat baca, supaya laporan periode lama tidak
+ * ikut berubah ketika seseorang dipindah wilayah.
+ */
+export const mitraKpiResults = mysqlTable("mitra_kpi_results", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }).notNull().default(""),
+    complianceScore: decimal("compliance_score", { precision: 8, scale: 2 }).notNull().default("0.00"),
+    performanceScore: decimal("performance_score", { precision: 8, scale: 2 }).notNull().default("0.00"),
+    compliancePassed: boolean("compliance_passed").notNull().default(true),
+    benefitType: mysqlEnum("benefit_type", ["NONE", "REWARD", "PUNISHMENT"]).notNull().default("NONE"),
+    benefitLabel: varchar("benefit_label", { length: 255 }).notNull().default(""),
+    benefitRuleId: varchar("benefit_rule_id", { length: 36 }),
+    computedAt: datetime("computed_at").notNull(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_results_unique_idx").on(table.programId, table.participantKey),
+    index("mitra_kpi_results_tap_idx").on(table.programId, table.tap),
 ]);
 
 /**
