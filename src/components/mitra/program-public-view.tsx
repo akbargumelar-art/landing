@@ -81,13 +81,33 @@ function formatPoin(value: string | number) {
     return Number(value).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
 
-/** Emas, perak, perunggu untuk tiga besar; sisanya netral. */
+/**
+ * Platinum, emas, perunggu untuk tiga besar; sisanya netral.
+ *
+ * Sebelumnya juara 1 emas dan juara 3 oranye -- dua rona bertetangga yang sekilas
+ * tertukar. Sekarang tiap tingkat memakai keluarga warna yang berjauhan: dingin keperakan,
+ * kuning hangat, lalu tembaga pekat. Juara 1 tetap paling menonjol lewat mahkota, kartu
+ * yang terangkat, dan bayangannya -- bukan lewat warna yang paling mencolok.
+ */
 function gayaPeringkat(rank: number | null) {
     if (!rank) return "bg-gray-100 text-gray-400 ring-gray-200";
-    if (rank === 1) return "bg-amber-100 text-amber-700 ring-amber-300";
-    if (rank === 2) return "bg-slate-100 text-slate-700 ring-slate-300";
-    if (rank === 3) return "bg-orange-100 text-orange-700 ring-orange-300";
+    if (rank === 1) return "bg-slate-200 text-slate-800 ring-slate-400";
+    if (rank === 2) return "bg-amber-100 text-amber-700 ring-amber-300";
+    if (rank === 3) return "bg-orange-200 text-orange-800 ring-orange-400";
     return "bg-gray-100 text-gray-600 ring-gray-200";
+}
+
+/** Warna kartu podium, sejalan dengan lencana peringkat di tabel. */
+function gayaKartuPodium(rank: number) {
+    if (rank === 1) return "border-slate-400 bg-gradient-to-b from-slate-100 via-white to-white shadow-md sm:-mt-3 sm:pb-6";
+    if (rank === 2) return "border-amber-300 bg-amber-50/60";
+    return "border-orange-300 bg-orange-50/70";
+}
+
+function warnaIkonPodium(rank: number) {
+    if (rank === 1) return "text-slate-600";
+    if (rank === 2) return "text-amber-500";
+    return "text-orange-600";
 }
 
 export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
@@ -670,7 +690,9 @@ function PodiumPemenang({ winners, sementara }: { winners: WinnerRow[]; sementar
     return (
         <div className="rounded-lg border bg-white p-4 shadow-sm sm:p-5">
             <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 sm:mb-5">
-                <Trophy className="h-4 w-4 text-amber-500 sm:h-5 sm:w-5" />
+                {/* Netral, bukan emas: amber di kartu ini kini berarti juara 2, jadi ikon
+                    judul yang keemasan akan terbaca seperti penanda peringkat. */}
+                <Trophy className="h-4 w-4 text-slate-600 sm:h-5 sm:w-5" />
                 <h2 className="text-sm font-bold sm:text-base">{sementara ? "Pemenang Sementara" : "Pemenang Program"}</h2>
                 {sementara && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 sm:text-xs">
@@ -691,22 +713,16 @@ function PodiumPemenang({ winners, sementara }: { winners: WinnerRow[]; sementar
                              * juara 1 ke atas di sana; kelasnya ditulis utuh, bukan dirangkai
                              * dari variabel, supaya ikut ter-generate.
                              */
-                            className={`${juara ? "order-first sm:order-none" : ""} flex items-center gap-3 rounded-lg border-2 p-2.5 text-left sm:block sm:p-4 sm:text-center ${
-                                juara
-                                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white sm:-mt-3 sm:pb-6"
-                                    : winner.rank === 2
-                                        ? "border-slate-200 bg-slate-50/60"
-                                        : "border-orange-200 bg-orange-50/50"
-                            }`}
+                            className={`${juara ? "order-first sm:order-none" : ""} flex items-center gap-3 rounded-lg border-2 p-2.5 text-left sm:block sm:p-4 sm:text-center ${gayaKartuPodium(winner.rank)}`}
                         >
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm sm:mx-auto sm:mb-2 sm:h-10 sm:w-10">
                                 {juara
-                                    ? <Crown className="h-4 w-4 text-amber-500 sm:h-5 sm:w-5" />
-                                    : <Award className={`h-4 w-4 sm:h-5 sm:w-5 ${winner.rank === 2 ? "text-slate-400" : "text-orange-400"}`} />}
+                                    ? <Crown className={`h-4 w-4 sm:h-5 sm:w-5 ${warnaIkonPodium(winner.rank)}`} />
+                                    : <Award className={`h-4 w-4 sm:h-5 sm:w-5 ${warnaIkonPodium(winner.rank)}`} />}
                             </div>
 
                             <div className="min-w-0 flex-1 sm:flex-none">
-                                <p className={`text-[10px] font-extrabold uppercase tracking-wide sm:text-xs ${juara ? "text-amber-600" : "text-muted-foreground"}`}>
+                                <p className={`text-[10px] font-extrabold uppercase tracking-wide sm:text-xs ${juara ? "text-slate-700" : "text-muted-foreground"}`}>
                                     Juara {winner.rank}
                                 </p>
                                 {/* Nama peserta bisa sangat panjang (kode + nomor + nama pemilik),
