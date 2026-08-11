@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, UploadCloud, Ticket } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface Product {
     id: string;
@@ -24,6 +25,7 @@ interface Voucher {
 }
 
 export default function VoucherPage() {
+    const { loading: scopeLoading, bolehInputData, bolehHapusData } = useAdminScope();
     const [products, setProducts] = useState<Product[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<string>("");
@@ -140,7 +142,7 @@ export default function VoucherPage() {
         setProducts(products.map(p => p.id === selectedProduct ? { ...p, stock: Math.max(0, p.stock - 1) } : p));
     };
 
-    if (loading && products.length === 0) {
+    if ((loading && products.length === 0) || scopeLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
     }
 
@@ -166,7 +168,7 @@ export default function VoucherPage() {
                         </select>
                     </div>
 
-                    <Card className="bg-red-50 border-red-100">
+                    {bolehInputData ? <Card className="bg-red-50 border-red-100">
                         <CardContent className="p-4 space-y-4">
                             <h3 className="font-semibold text-red-900 text-sm">Upload Massal</h3>
                             <p className="text-xs text-red-800">
@@ -200,7 +202,9 @@ export default function VoucherPage() {
                                 Unduh Template Voucher
                             </Button>
                         </CardContent>
-                    </Card>
+                    </Card> : (
+                        <Card><CardContent className="p-4 text-sm text-muted-foreground">Mode viewer: stok voucher hanya dapat dilihat.</CardContent></Card>
+                    )}
                 </div>
 
                 <div className="md:col-span-2">
@@ -233,7 +237,7 @@ export default function VoucherPage() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            {!v.isUsed && (
+                                            {!v.isUsed && bolehHapusData && (
                                                 <button onClick={() => handleDelete(v.id)} className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg cursor-pointer">
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>

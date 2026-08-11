@@ -40,6 +40,20 @@ export const DEFAULT_PJP_DAY: PjpDay = "Senin";
 export const DEFAULT_PJP_TYPE: PjpType = "F1";
 export const DEFAULT_OUTLET_BRANDING: OutletBranding = "Non Branding";
 
+/**
+ * Hari operasional PJP mengikuti waktu Indonesia Barat, bukan zona waktu perangkat.
+ * Ini penting ketika petugas membuka dashboard dekat tengah malam atau perangkatnya masih
+ * memakai zona waktu lain: filter "hari ini" harus tetap sama dengan hari kerja Jakarta.
+ */
+export function pjpDayInJakarta(now: Date = new Date()): PjpDay {
+    const weekday = new Intl.DateTimeFormat("id-ID", {
+        weekday: "long",
+        timeZone: "Asia/Jakarta",
+    }).format(now);
+
+    return PJP_DAYS.find((day) => day.toLowerCase() === weekday.toLowerCase()) ?? DEFAULT_PJP_DAY;
+}
+
 function matchOption<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
     const raw = String(value ?? "").trim();
     if (!raw) return fallback;

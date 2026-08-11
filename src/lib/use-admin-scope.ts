@@ -12,6 +12,10 @@ export interface AdminScopeView {
     roleLapangan: boolean;
     /** Boleh mengelola konfigurasi dan data lintas wilayah. */
     bolehKelola: boolean;
+    /** Boleh menginput serta memperbarui data program/produk. */
+    bolehInputData: boolean;
+    /** Boleh melakukan penghapusan permanen data master. */
+    bolehHapusData: boolean;
     /** Assignment belum lengkap, sehingga daftar apa pun akan kosong. */
     assignmentKurang: boolean;
     loading: boolean;
@@ -26,6 +30,8 @@ const AWAL: AdminScopeView = {
     // diketahui. Menyembunyikan tombol yang ternyata boleh dipakai hanya merepotkan sesaat;
     // menampilkan tombol yang ternyata tidak boleh dipakai memberi janji palsu.
     bolehKelola: false,
+    bolehInputData: false,
+    bolehHapusData: false,
     assignmentKurang: false,
     loading: true,
 };
@@ -59,6 +65,8 @@ export function useAdminScope(): AdminScopeView {
                     hasSalesforce,
                     roleLapangan,
                     bolehKelola: role === "SUPER_ADMIN" || role === "ADMIN_INPUT",
+                    bolehInputData: role === "SUPER_ADMIN" || role === "ADMIN_INPUT",
+                    bolehHapusData: role === "SUPER_ADMIN",
                     assignmentKurang: role === "SALESFORCE"
                         ? !hasSalesforce || taps.length === 0
                         : role === "SUPERVISOR" ? taps.length === 0 : false,

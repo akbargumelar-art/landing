@@ -35,7 +35,7 @@ const KOSONG = {
  * Dipisah ke komponen sendiri karena isinya -- unggahan berkas, form, dan tabel --
  * terlalu besar untuk ditumpuk langsung di berkas dashboard yang sudah panjang.
  */
-export function IndihomeOdpPanel() {
+export function IndihomeOdpPanel({ bolehInputData, bolehHapusData }: { bolehInputData: boolean; bolehHapusData: boolean }) {
     const [rows, setRows] = React.useState<OdpRow[]>([]);
     const [total, setTotal] = React.useState(0);
     const [q, setQ] = React.useState("");
@@ -133,7 +133,7 @@ export function IndihomeOdpPanel() {
                 bila kategori dikosongkan, warnanya diturunkan otomatis dari occupancy.
             </p>
 
-            <Card>
+            {bolehInputData ? <Card>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
                     <div>
                         <h2 className="font-bold">Unggah Banyak Sekaligus</h2>
@@ -153,7 +153,7 @@ export function IndihomeOdpPanel() {
                             {mengunggah ? "Memproses..." : "Pilih Berkas"}
                             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={mengunggah} onChange={unggah} />
                         </label>
-                        {total > 0 && (
+                        {total > 0 && bolehHapusData && (
                             <Button type="button" variant="outline" size="sm" onClick={hapusSemua}>
                                 <Trash2 className="h-4 w-4 text-red-600" />
                                 Hapus Semua
@@ -177,9 +177,11 @@ export function IndihomeOdpPanel() {
                         </div>
                     )}
                 </CardContent>
-            </Card>
+            </Card> : (
+                <Card><CardContent className="p-5 text-sm text-muted-foreground">Mode viewer: titik ODP hanya dapat dicari dan dilihat.</CardContent></Card>
+            )}
 
-            <Card>
+            {bolehInputData && <Card>
                 <CardContent className="p-5">
                     <form onSubmit={simpan} className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
                         <Isian label="Nama ODP" nilai={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} />
@@ -209,7 +211,7 @@ export function IndihomeOdpPanel() {
                         </div>
                     </form>
                 </CardContent>
-            </Card>
+            </Card>}
 
             <Card>
                 <CardContent className="p-5">
@@ -234,7 +236,7 @@ export function IndihomeOdpPanel() {
                                     <TableHead className="text-right"><TombolUrut kolom="port" label="Port" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
                                     <TableHead className="text-right"><TombolUrut kolom="occupancy" label="Occupancy" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
                                     <TableHead><TombolUrut kolom="kategori" label="Kategori" urut={urut} onKlik={gantiUrut} /></TableHead>
-                                    <TableHead className="text-right">Aksi</TableHead>
+                                    {bolehHapusData && <TableHead className="text-right">Aksi</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -266,11 +268,11 @@ export function IndihomeOdpPanel() {
                                                     {!row.category && <span className="text-muted-foreground">(otomatis)</span>}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            {bolehHapusData && <TableCell className="text-right">
                                                 <button onClick={() => hapus(row)} className="rounded-md border p-2" aria-label="Hapus ODP">
                                                     <Trash2 className="h-4 w-4 text-red-600" />
                                                 </button>
-                                            </TableCell>
+                                            </TableCell>}
                                         </TableRow>
                                     );
                                 }) : (

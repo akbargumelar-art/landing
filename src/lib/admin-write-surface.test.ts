@@ -62,6 +62,58 @@ test("tidak ada requireRole pada method tulis yang memuat peran lapangan", () =>
     assert.deepEqual(pelanggaran, [], "peran lapangan tidak boleh menulis lewat requireRole");
 });
 
+test("jalur tulis program dan produk hanya menerima peran admin data", () => {
+    const akarYangDiperiksa = [
+        "programs",
+        "products",
+        join("mitra", "programs"),
+        "vouchers",
+        "cuan",
+        "indihome",
+    ];
+    const pelanggaran: string[] = [];
+
+    for (const berkas of routes) {
+        const relatif = berkas.slice(AKAR_API.length + 1);
+        if (!akarYangDiperiksa.some((akar) => relatif.startsWith(`${akar}\\`) || relatif.startsWith(`${akar}/`))) continue;
+
+        const isi = readFileSync(berkas, "utf8");
+        const handlers = [...isi.matchAll(/export async function (POST|PUT|PATCH|DELETE)/g)];
+        handlers.forEach((handler, index) => {
+            const mulai = handler.index || 0;
+            const selesai = handlers[index + 1]?.index ?? isi.length;
+            const bagian = isi.slice(mulai, selesai);
+            const role = bagian.match(/requireRole\(\[([^\]]*)\]/)?.[1] || "";
+            if (/MANAGER|SUPERVISOR|SALESFORCE/.test(role)) {
+                pelanggaran.push(`${relatif}:${handler[1]}`);
+            }
+        });
+    }
+
+    assert.deepEqual(pelanggaran, [], "viewer tidak boleh masuk gerbang tulis program/produk");
+});
+
+test("penghapusan permanen program dan produk hanya untuk Super Admin", () => {
+    const pelanggaran: string[] = [];
+
+    for (const berkas of routes) {
+        const relatif = berkas.slice(AKAR_API.length + 1);
+        if (!/^(programs|products|mitra[\\/]programs|vouchers|cuan|indihome)[\\/]/.test(relatif) && !/^(programs|products|vouchers)[\\/]?route\.ts$/.test(relatif)) continue;
+
+        const isi = readFileSync(berkas, "utf8");
+        const handlers = [...isi.matchAll(/export async function (POST|PUT|PATCH|DELETE)/g)];
+        handlers.forEach((handler, index) => {
+            if (handler[1] !== "DELETE") return;
+            const mulai = handler.index || 0;
+            const selesai = handlers[index + 1]?.index ?? isi.length;
+            const role = isi.slice(mulai, selesai).match(/requireRole\(\[([^\]]*)\]/)?.[1] || "";
+            if (!/^\s*"SUPER_ADMIN"\s*$/.test(role)) pelanggaran.push(`${relatif}:DELETE`);
+        });
+    }
+
+    assert.deepEqual(pelanggaran, [], "hapus permanen harus khusus SUPER_ADMIN");
+});
+
 test("gerbang mutasi outlet hanya dipakai empat jalur yang disepakati", () => {
     const pemakai = routes
         .filter((berkas) => readFileSync(berkas, "utf8").includes("gerbangMutasiOutlet"))

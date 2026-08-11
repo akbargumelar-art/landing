@@ -33,6 +33,14 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+:root {
+  --app-card-padding: 1.5rem;
+  --app-card-radius: 0.75rem;
+  --app-table-head-height: 3rem;
+  --app-table-cell-x: 1rem;
+  --app-table-cell-y: 1rem;
+}
+
 @layer base {
 
   *,
@@ -73,4 +81,51 @@ html {
 /* ===== Pill tag/badge shape (small status tags, not primary CTA buttons) ===== */
 .btn-pill {
   border-radius: 9999px !important;
+}
+
+/* Dashboard terasa seperti aplikasi di ponsel, tanpa mengubah kepadatan desktop. */
+@media (max-width: 639px) {
+  .admin-app-shell {
+    --app-card-padding: 0.75rem;
+    --app-card-radius: 1rem;
+    --app-table-head-height: 2.5rem;
+    --app-table-cell-x: 0.75rem;
+    --app-table-cell-y: 0.625rem;
+  }
+
+  .admin-app-shell [data-slot="card"] {
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  }
+
+  /* Class padding khusus pada halaman lama tetap diringkas; p-0 dipertahankan untuk tabel. */
+  .admin-app-shell [data-slot="card-header"],
+  .admin-app-shell [data-slot="card-content"]:not(.p-0),
+  .admin-app-shell [data-slot="card-footer"] {
+    padding: var(--app-card-padding);
+  }
+
+  .admin-app-shell [data-slot="card-header"] + [data-slot="card-content"]:not(.p-0),
+  .admin-app-shell [data-slot="card-content"] + [data-slot="card-footer"] {
+    padding-top: 0;
+  }
+
+  .admin-app-shell [data-slot="table-container"] {
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    touch-action: pan-x pan-y;
+  }
+
+  .admin-app-shell [data-slot="table"] {
+    width: max-content;
+    min-width: 100%;
+    font-size: 0.75rem;
+  }
+
+  .admin-app-shell [data-slot="table-head"] {
+    white-space: nowrap;
+  }
+
+  .admin-app-shell [data-slot="table-cell"] {
+    max-width: min(18rem, 72vw);
+  }
 }

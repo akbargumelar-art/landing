@@ -88,6 +88,19 @@ interface KpiResultRow {
     benefitLabel: string;
 }
 
+interface AchievementRow {
+    participantKey: string;
+    totalPoints: number;
+    groupKey: string;
+    rank: number | null;
+    prevRank: number | null;
+    computedAt: string | null;
+    code: string;
+    name: string;
+    area: string;
+    metrics: Record<string, { raw: number; points: number }>;
+}
+
 interface Participant {
     participantKey: string;
     id: string;
@@ -238,7 +251,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
      * Seluruh endpoint konfigurasi, import, dan recompute memang sudah menolak mereka; kontrolnya
      * disembunyikan supaya layar tidak menawarkan tombol yang pasti gagal.
      */
-    const { bolehKelola } = useAdminScope();
+    const { bolehKelola, bolehHapusData } = useAdminScope();
 
     const [tab, setTab] = React.useState<MechanismType>("RACING");
     const [programs, setPrograms] = React.useState<Program[]>([]);
@@ -274,6 +287,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const [uploading, setUploading] = React.useState(false);
     const [rewards, setRewards] = React.useState<RewardPreviewRow[]>([]);
     const [kpiResults, setKpiResults] = React.useState<KpiResultRow[]>([]);
+    const [achievementRows, setAchievementRows] = React.useState<AchievementRow[]>([]);
     const [targetFile, setTargetFile] = React.useState<File | null>(null);
     const [targetUploadResult, setTargetUploadResult] = React.useState<UploadResult | null>(null);
     const [targetUploading, setTargetUploading] = React.useState(false);
@@ -317,7 +331,14 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         setLoading(true);
         fetch(`/api/admin/mitra/programs?targetType=${targetType}`)
             .then((res) => res.json())
-            .then((data) => setPrograms(Array.isArray(data.programs) ? data.programs : []))
+            .then((data) => {
+                const rows: Program[] = Array.isArray(data.programs) ? data.programs : [];
+                setPrograms(rows);
+                // Jangan membuka tab kosong jika program terbaru memakai mekanisme lain.
+                setTab((current) => rows.some((program) => program.mechanismType === current)
+                    ? current
+                    : rows[0]?.mechanismType || current);
+            })
             .finally(() => setLoading(false));
     }, [targetType]);
 
@@ -338,13 +359,15 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
 
     // Daftar wilayah untuk filter tambah massal; dipakai bersama outlet dan salesforce.
     React.useEffect(() => {
+        if (!bolehKelola) return;
         fetch("/api/admin/mitra/master")
             .then((res) => res.json())
             .then((data) => setMaster({ tap: data.tap || [], kabupaten: data.kabupaten || [], kecamatan: data.kecamatan || [] }))
             .catch(() => undefined);
-    }, []);
+    }, [bolehKelola]);
 
     React.useEffect(() => {
+        if (!bolehKelola) { setCandidates([]); return; }
         if (!query.trim()) { setCandidates([]); return; }
         setSearching(true);
         const timer = setTimeout(() => {
@@ -357,7 +380,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                 .finally(() => setSearching(false));
         }, 300);
         return () => clearTimeout(timer);
-    }, [query, targetType, isSalesforce]);
+    }, [bolehKelola, query, targetType, isSalesforce]);
 
     const daftarTampil = programs.filter((program) => program.mechanismType === tab);
 
@@ -406,6 +429,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         setCandidates([]);
         setRewards([]);
         setKpiResults(data.kpiResults || []);
+        setAchievementRows(data.leaderboard || []);
         setEditKpiComplianceMinScore(data.program.kpiComplianceMinScore || "");
         setEditKpiDefaultCap(data.program.kpiDefaultCap || "");
         setEditKpiHidePunishment(Boolean(data.program.kpiHidePunishment));
@@ -526,9 +550,11 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
         <div className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold">Program {istilahPeserta}</h1>
+                    <h1 className="text-2xl font-bold">{bolehKelola ? "Program" : "Monitoring Program"} {istilahPeserta}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Susun aturan di awal, unggah pencapaian tiap hari, papan skor dan hadiah dihitung otomatis.
+                        {bolehKelola
+                            ? "Susun aturan di awal, unggah pencapaian tiap hari, papan skor dan hadiah dihitung otomatis."
+                            : "Lihat pencapaian program sesuai cakupan akun Anda. Pengaturan program hanya tersedia untuk admin pengelola."}
                     </p>
                 </div>
                 {bolehKelola && <Button onClick={() => setShowForm((prev) => !prev)}>
@@ -691,8 +717,10 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     <TableCell>{program.params?.length || 0}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex flex-wrap justify-end gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => bukaKelola(program.id)}>Kelola</Button>
-                                            {bolehKelola && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => hapusProgram(program)}>
+                                            <Button variant="outline" size="sm" onClick={() => bukaKelola(program.id)}>
+                                                {bolehKelola ? "Kelola" : "Lihat Pencapaian"}
+                                            </Button>
+                                            {bolehHapusData && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => hapusProgram(program)}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>}
                                         </div>
@@ -721,6 +749,16 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 <X className="h-4 w-4" /> Tutup
                             </Button>
                         </div>
+
+                        {!bolehKelola && selected.mechanismType !== "KPI" && (
+                            <AchievementMonitoring
+                                key={selected.id}
+                                program={selected}
+                                params={selectedParams}
+                                rows={achievementRows}
+                                targetType={targetType}
+                            />
+                        )}
 
                         {bolehKelola && <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
                             <div className="space-y-1">
@@ -1146,13 +1184,121 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                             </div>}
 
                             {selected.mechanismType === "KPI" && <div className="space-y-3 lg:col-span-2">
-                                <div><h3 className="font-bold">Pratinjau Hasil KPI</h3><p className="text-sm text-muted-foreground">Hasil cache terakhir; tekan Hitung Ulang KPI setelah target, aktual, atau aturan berubah.</p></div>
+                                <div><h3 className="font-bold">{bolehKelola ? "Pratinjau Hasil KPI" : "Monitoring Hasil KPI"}</h3><p className="text-sm text-muted-foreground">{bolehKelola ? "Hasil cache terakhir; tekan Hitung Ulang KPI setelah target, aktual, atau aturan berubah." : "Hasil KPI terakhir sesuai Salesforce dan TAP yang boleh dilihat akun Anda."}</p></div>
                                 <div className="max-w-full overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>Salesforce</TableHead><TableHead>TAP</TableHead><TableHead>Compliance</TableHead><TableHead>Gerbang</TableHead><TableHead>Performance</TableHead><TableHead>Benefit</TableHead></TableRow></TableHeader><TableBody>{kpiResults.length ? kpiResults.map((row) => <TableRow key={row.participantKey}><TableCell className="font-medium">{row.salesforceName}</TableCell><TableCell>{row.tap || "(Tanpa TAP)"}</TableCell><TableCell>{Number(row.complianceScore).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</TableCell><TableCell className={row.compliancePassed ? "text-green-700" : "text-red-700"}>{row.compliancePassed ? "Lolos" : "Tidak lolos"}</TableCell><TableCell>{Number(row.performanceScore).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%</TableCell><TableCell>{row.benefitLabel || "Tanpa benefit"}</TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-20 text-center text-muted-foreground">Belum ada hasil. Unggah target dan pencapaian, lalu hitung ulang.</TableCell></TableRow>}</TableBody></Table></div>
                             </div>}
                         </div>
                     </CardContent>
                 </Card>
             )}
+        </div>
+    );
+}
+
+function formatAngka(value: string | number): string {
+    return Number(value || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
+
+function AchievementMonitoring({
+    program,
+    params,
+    rows,
+    targetType,
+}: {
+    program: Program;
+    params: ProgramParam[];
+    rows: AchievementRow[];
+    targetType: TargetType;
+}) {
+    const [query, setQuery] = React.useState("");
+    const kataKunci = query.trim().toLowerCase();
+    const rowsTampil = rows.filter((row) => !kataKunci || [row.name, row.code, row.area]
+        .some((value) => value.toLowerCase().includes(kataKunci)));
+    const diperbarui = rows
+        .map((row) => row.computedAt ? new Date(row.computedAt) : null)
+        .filter((value): value is Date => Boolean(value))
+        .sort((a, b) => b.getTime() - a.getTime())[0];
+    const sudahAdaData = rows.filter((row) => row.rank !== null || row.totalPoints !== 0).length;
+    const isRacing = program.mechanismType === "RACING";
+
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs text-muted-foreground">Peserta dalam cakupan</p>
+                    <p className="mt-1 text-xl font-bold">{rows.length.toLocaleString("id-ID")}</p>
+                </div>
+                <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs text-muted-foreground">Sudah ada pencapaian</p>
+                    <p className="mt-1 text-xl font-bold">{sudahAdaData.toLocaleString("id-ID")}</p>
+                </div>
+                <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs text-muted-foreground">Status program</p>
+                    <p className="mt-1 text-sm font-bold">{program.status}</p>
+                </div>
+                <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs text-muted-foreground">Pembaruan terakhir</p>
+                    <p className="mt-1 text-sm font-bold">
+                        {diperbarui ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" }).format(diperbarui) : "Belum dihitung"}
+                    </p>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h3 className="font-bold">{isRacing ? "Papan Peringkat" : "Tabel Pencapaian"}</h3>
+                    <p className="text-sm text-muted-foreground">Data baca-saja sesuai cakupan login.</p>
+                </div>
+                {rows.length > 1 && (
+                    <div className="relative w-full sm:max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={`Cari ${targetType === "SALESFORCE" ? "Salesforce" : "outlet"}`}
+                            className="pl-9"
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="max-w-full overflow-x-auto rounded-lg border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            {isRacing && <TableHead>Peringkat</TableHead>}
+                            <TableHead>{targetType === "SALESFORCE" ? "Salesforce" : "Outlet"}</TableHead>
+                            <TableHead>{targetType === "SALESFORCE" ? "TAP" : "Wilayah"}</TableHead>
+                            {params.map((param) => <TableHead key={param.id} className="text-right">{param.label}</TableHead>)}
+                            <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rowsTampil.length ? rowsTampil.map((row) => (
+                            <TableRow key={row.participantKey}>
+                                {isRacing && <TableCell className="font-bold">{row.rank ?? "—"}</TableCell>}
+                                <TableCell>
+                                    <p className="font-semibold">{row.name || "—"}</p>
+                                    <p className="text-xs text-muted-foreground">{row.code}</p>
+                                </TableCell>
+                                <TableCell>{row.area || row.groupKey || "—"}</TableCell>
+                                {params.map((param) => (
+                                    <TableCell key={param.id} className="text-right tabular-nums">
+                                        {formatAngka(row.metrics?.[param.key]?.raw ?? 0)}
+                                    </TableCell>
+                                ))}
+                                <TableCell className="text-right font-bold tabular-nums">{formatAngka(row.totalPoints)}</TableCell>
+                            </TableRow>
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={params.length + (isRacing ? 4 : 3)} className="h-24 text-center text-muted-foreground">
+                                    {query ? "Tidak ada peserta yang cocok." : "Data pencapaian belum tersedia untuk cakupan Anda."}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 }

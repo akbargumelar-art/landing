@@ -126,6 +126,19 @@ export default function AdminLayout({
     const currentPage = visibleGroups.flatMap((g) => g.links).find((l) => l.href === activeHref);
 
     /**
+     * Empat tujuan yang paling sering dipakai diletakkan di jangkauan ibu jari pada ponsel.
+     * Daftarnya tetap diambil dari menu yang sudah lolos filter role di atas, jadi navigasi
+     * bawah tidak dapat memperkenalkan tautan baru yang tidak tersedia di sidebar.
+     */
+    const mobilePrimaryHrefs = role === "SUPER_ADMIN"
+        ? ["/admin/beranda", "/admin/mitra/outlet", "/admin/mitra/monitoring", "/admin/profil"]
+        : ["/admin/mitra/outlet", "/admin/mitra/monitoring", "/admin/mitra/program-salesforce", "/admin/profil"];
+    const visibleLinks = visibleGroups.flatMap((group) => group.links);
+    const mobilePrimaryLinks = mobilePrimaryHrefs
+        .map((href) => visibleLinks.find((link) => link.href === href))
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+    /**
      * Menyembunyikan menu tidak menutup halamannya: alamatnya tetap bisa diketik, dan yang
      * muncul adalah layar penuh kontrol yang setiap aksinya akan ditolak API. Halaman yang
      * tidak boleh dibuka peran ini karena itu diganti pemberitahuan.
@@ -153,7 +166,7 @@ export default function AdminLayout({
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
+        <div className="admin-app-shell flex min-h-screen bg-gray-50">
             {/* Mobile Overlay */}
             {mobileOpen && (
                 <div
@@ -171,7 +184,7 @@ export default function AdminLayout({
                  * Daftar menunya sendiri sudah punya overflow-y-auto, jadi menu yang
                  * panjang tetap bisa digulir di dalam sidebar.
                  */
-                className={`fixed lg:sticky inset-y-0 left-0 lg:top-0 lg:h-screen z-50 bg-white border-r border-border flex flex-col transition-all duration-300 ${collapsed ? "w-16" : "w-64"
+                className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,20rem)] flex-col border-r border-border bg-white shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none ${collapsed ? "lg:w-16" : "lg:w-64"
                     } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
             >
                 {/* Sidebar Header */}
@@ -196,7 +209,8 @@ export default function AdminLayout({
                     </button>
                     <button
                         onClick={() => setMobileOpen(false)}
-                        className="lg:hidden w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground cursor-pointer"
+                        aria-label="Tutup menu dashboard"
+                        className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-muted-foreground hover:bg-muted lg:hidden"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -244,25 +258,26 @@ export default function AdminLayout({
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-h-screen">
+            <div className="flex min-h-screen min-w-0 flex-1 flex-col">
                 {/* Topbar */}
-                <header className="h-16 bg-white border-b border-border flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
-                    <div className="flex items-center gap-3">
+                <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/80 bg-white/95 px-3 backdrop-blur-md sm:h-16 sm:px-4 lg:px-6">
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                         <button
                             onClick={() => setMobileOpen(true)}
-                            className="lg:hidden w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground cursor-pointer"
+                            aria-label="Buka menu dashboard"
+                            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl text-muted-foreground hover:bg-muted lg:hidden"
                         >
                             <Menu className="h-5 w-5" />
                         </button>
-                        <div className="flex items-center gap-2">
-                            <LayoutDashboard className="h-5 w-5 text-red-600" />
-                            <h1 className="text-sm font-semibold text-foreground">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <LayoutDashboard className="hidden h-5 w-5 shrink-0 text-red-600 min-[390px]:block" />
+                            <h1 className="truncate text-sm font-semibold text-foreground">
                                 {currentPage?.label || "Dashboard Admin"}
                             </h1>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+                    <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 ring-1 ring-red-100">
                             <span className="text-xs font-semibold text-red-600">AD</span>
                         </div>
                         <span className="text-sm font-medium text-foreground hidden sm:block">
@@ -272,7 +287,7 @@ export default function AdminLayout({
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 p-4 lg:p-6">
+                <main className="min-w-0 flex-1 overflow-x-hidden p-3 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:p-4 md:pb-4 lg:p-6">
                     {halamanDitutup ? (
                         <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center shadow-sm">
                             <Lock className="mx-auto h-10 w-10 text-red-600" />
@@ -290,6 +305,49 @@ export default function AdminLayout({
                     ) : children}
                 </main>
             </div>
+
+            {/* Navigasi utama ala aplikasi. Tablet/desktop tetap memakai sidebar. */}
+            <nav
+                aria-label="Navigasi dashboard mobile"
+                className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white/95 backdrop-blur-md md:hidden"
+            >
+                <ul className="mx-auto flex max-w-lg items-stretch pb-[env(safe-area-inset-bottom)]">
+                    {mobilePrimaryLinks.map((link) => {
+                        const active = link.href === activeHref;
+                        const label = link.label
+                            .replace("Database ", "")
+                            .replace("Monitoring Visit", "Monitor")
+                            .replace("Program Salesforce", "Program")
+                            .replace("Profil Admin", "Profil")
+                            .replace("Kelola Beranda", "Beranda");
+
+                        return (
+                            <li key={link.href} className="min-w-0 flex-1">
+                                <Link
+                                    href={link.href}
+                                    aria-current={active ? "page" : undefined}
+                                    className={`flex h-16 flex-col items-center justify-center gap-1 px-1 transition-colors active:bg-gray-50 ${active ? "text-red-600" : "text-gray-500"}`}
+                                >
+                                    <link.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                                    <span className="max-w-full truncate text-[10px] font-semibold leading-none">{label}</span>
+                                </Link>
+                            </li>
+                        );
+                    })}
+                    <li className="min-w-0 flex-1">
+                        <button
+                            type="button"
+                            onClick={() => setMobileOpen(true)}
+                            aria-label="Buka semua menu dashboard"
+                            aria-expanded={mobileOpen}
+                            className="flex h-16 w-full flex-col items-center justify-center gap-1 px-1 text-gray-500 transition-colors active:bg-gray-50"
+                        >
+                            <Menu className="h-5 w-5" />
+                            <span className="text-[10px] font-semibold leading-none">Menu</span>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
         </div>
     );
 }

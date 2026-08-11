@@ -26,6 +26,7 @@ import {
     PJP_DAYS,
     PJP_TYPES,
     buildOutletMapsUrl,
+    pjpDayInJakarta,
 } from "@/lib/mitra-outlet-options";
 
 interface MasterOption {
@@ -42,6 +43,7 @@ interface Outlet {
     ownerPhone: string;
     kabupaten: string;
     kecamatan: string;
+    pjpDay: string;
     status: string;
 }
 
@@ -63,6 +65,13 @@ export default function AdminMitraOutletPage() {
     const scope = useAdminScope();
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
     const [salesforces, setSalesforces] = React.useState<SalesforceOption[]>([]);
+    const [filterOptions, setFilterOptions] = React.useState<{ taps: string[]; salesforces: SalesforceOption[] }>({
+        taps: [], salesforces: [],
+    });
+    const [filter, setFilter] = React.useState({ pjpDay: "", tap: "", salesforceId: "" });
+    const [filterReady, setFilterReady] = React.useState(false);
+    const [autoPjpToday, setAutoPjpToday] = React.useState(false);
+    const filterInitialized = React.useRef(false);
     const [q, setQ] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
@@ -113,19 +122,52 @@ export default function AdminMitraOutletPage() {
             .catch(() => undefined);
     }, []);
 
+    React.useEffect(() => {
+        if (scope.loading || filterInitialized.current) return;
+        filterInitialized.current = true;
+        setFilter((current) => ({
+            ...current,
+            pjpDay: scope.role === "SALESFORCE" ? pjpDayInJakarta() : "",
+        }));
+        setAutoPjpToday(scope.role === "SALESFORCE");
+        setFilterReady(true);
+    }, [scope.loading, scope.role]);
+
+    // Bila halaman dibiarkan terbuka melewati tengah malam WIB, filter ikut berganti hari
+    // selama petugas belum memilih hari lain secara manual.
+    React.useEffect(() => {
+        if (scope.role !== "SALESFORCE" || !autoPjpToday) return;
+        const sinkronkanHari = () => setFilter((current) => {
+            const today = pjpDayInJakarta();
+            return current.pjpDay === today ? current : { ...current, pjpDay: today };
+        });
+        sinkronkanHari();
+        const interval = window.setInterval(sinkronkanHari, 60_000);
+        return () => window.clearInterval(interval);
+    }, [autoPjpToday, scope.role]);
+
     const load = React.useCallback(() => {
         setLoading(true);
         setSelectedIds([]);
-        fetch(`/api/admin/mitra/outlets?q=${encodeURIComponent(q)}&pageSize=50`)
+        const params = new URLSearchParams({ q, pageSize: "50" });
+        if (filter.pjpDay) params.set("pjpDay", filter.pjpDay);
+        if (filter.tap) params.set("tap", filter.tap);
+        if (filter.salesforceId) params.set("salesforceId", filter.salesforceId);
+
+        fetch(`/api/admin/mitra/outlets?${params.toString()}`)
             .then((res) => res.json())
             .then((data) => {
                 setOutlets(Array.isArray(data.outlets) ? data.outlets : []);
                 setSalesforces(Array.isArray(data.salesforces) ? data.salesforces : []);
+                setFilterOptions({
+                    taps: Array.isArray(data.filters?.taps) ? data.filters.taps : [],
+                    salesforces: Array.isArray(data.filters?.salesforces) ? data.filters.salesforces : [],
+                });
             })
             .finally(() => setLoading(false));
-    }, [q]);
+    }, [filter, q]);
 
-    React.useEffect(() => { load(); }, [load]);
+    React.useEffect(() => { if (filterReady) load(); }, [filterReady, load]);
 
     /**
      * Panel edit dirender di atas tabel dan baru ada setelah datanya dimuat, jadi
@@ -408,6 +450,8 @@ export default function AdminMitraOutletPage() {
         : scope.role === "SUPERVISOR" ? "Outlet TAP Saya"
         : "Database Outlet";
     const { roleLapangan, assignmentKurang } = scope;
+    const tampilFilterTap = scope.role !== "SALESFORCE" && filterOptions.taps.length > 1;
+    const tampilFilterSalesforce = scope.role !== "SALESFORCE" && filterOptions.salesforces.length > 1;
     const bolehUploadFoto = ["SUPER_ADMIN", "ADMIN_INPUT", "SUPERVISOR", "SALESFORCE"].includes(scope.role || "");
     const namaSalesforceEdit = editOutlet
         ? salesforces.find((item) => item.id === editOutlet.salesforceId)?.name || "—"
@@ -799,11 +843,74 @@ export default function AdminMitraOutletPage() {
 
             <Card>
                 <CardContent className="p-5">
-                    <div className="mb-4 flex gap-2">
-                        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Cari outlet, kode, wilayah, nomor" />
-                        <Button onClick={load} size="icon" aria-label="Cari">
-                            <Search className="h-4 w-4" />
-                        </Button>
+                    <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="space-y-1.5 md:col-span-2">
+                            <Label>Cari Outlet</Label>
+                            <div className="flex gap-2">
+                                <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Nama, kode, wilayah, nomor" />
+                                <Button onClick={load} size="icon" aria-label="Cari">
+                                    <Search className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Hari PJP</Label>
+                            <select
+                                value={filter.pjpDay}
+                                onChange={(event) => {
+                                    setAutoPjpToday(false);
+                                    setFilter((current) => ({ ...current, pjpDay: event.target.value }));
+                                }}
+                                className="h-10 w-full rounded-md border bg-white px-3 text-sm"
+                            >
+                                <option value="">Semua hari</option>
+                                {PJP_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
+                            </select>
+                            {scope.role === "SALESFORCE" && autoPjpToday && (
+                                <p className="text-xs font-medium text-red-600">Otomatis: PJP hari ini</p>
+                            )}
+                        </div>
+                        {tampilFilterTap && (
+                            <div className="space-y-1.5">
+                                <Label>TAP</Label>
+                                <select
+                                    value={filter.tap}
+                                    onChange={(event) => setFilter((current) => ({ ...current, tap: event.target.value }))}
+                                    className="h-10 w-full rounded-md border bg-white px-3 text-sm"
+                                >
+                                    <option value="">Semua TAP</option>
+                                    {filterOptions.taps.map((tap) => <option key={tap} value={tap}>{tap}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        {tampilFilterSalesforce && (
+                            <div className="space-y-1.5">
+                                <Label>Salesforce</Label>
+                                <select
+                                    value={filter.salesforceId}
+                                    onChange={(event) => setFilter((current) => ({ ...current, salesforceId: event.target.value }))}
+                                    className="h-10 w-full rounded-md border bg-white px-3 text-sm"
+                                >
+                                    <option value="">Semua Salesforce</option>
+                                    {filterOptions.salesforces.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        {(filter.pjpDay || filter.tap || filter.salesforceId) && (
+                            <div className="flex items-end">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        const ikutiHariIni = scope.role === "SALESFORCE";
+                                        setAutoPjpToday(ikutiHariIni);
+                                        setFilter({ pjpDay: ikutiHariIni ? pjpDayInJakarta() : "", tap: "", salesforceId: "" });
+                                    }}
+                                    className="w-full md:w-auto"
+                                >
+                                    <X className="h-4 w-4" /> Reset Filter
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {selectedIds.length > 0 && !roleLapangan && (
@@ -851,7 +958,7 @@ export default function AdminMitraOutletPage() {
                                     </TableCell>
                                     <TableCell>
                                         <p className="font-semibold">{outlet.name}</p>
-                                        <p className="text-xs text-muted-foreground">{outlet.outletCode}</p>
+                                        <p className="text-xs text-muted-foreground">{outlet.outletCode} · PJP {outlet.pjpDay || "-"}</p>
                                     </TableCell>
                                     <TableCell className="text-sm">{outlet.kecamatan}, {outlet.kabupaten}</TableCell>
                                     <TableCell className="text-sm">{outlet.ownerName || "-"}<br /><span className="text-xs text-muted-foreground">{outlet.ownerPhone}</span></TableCell>

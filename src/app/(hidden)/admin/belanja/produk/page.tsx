@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload } from "lucide-react";
 import Image from "next/image";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface Product {
     id: string;
@@ -31,6 +32,7 @@ const emptyProduct: Partial<Product> = {
 };
 
 export default function ProdukBelanjaPage() {
+    const { loading: scopeLoading, bolehInputData, bolehHapusData } = useAdminScope();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -138,7 +140,7 @@ export default function ProdukBelanjaPage() {
         ? products.filter((p) => p.type === filterType)
         : products;
 
-    if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading || scopeLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
     const formatRupiah = (val: string | number) => {
         return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(val));
@@ -147,8 +149,11 @@ export default function ProdukBelanjaPage() {
     return (
         <div className="max-w-5xl space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Kelola Produk Belanja</h2>
-                <Button onClick={openAdd} className="cursor-pointer"><Plus className="mr-1 h-4 w-4" /> Bikin Produk</Button>
+                <div>
+                    <h2 className="text-2xl font-bold">{bolehInputData ? "Kelola Produk Belanja" : "Produk Belanja"}</h2>
+                    {!bolehInputData && <p className="mt-1 text-sm text-muted-foreground">Mode viewer: data produk hanya dapat dilihat.</p>}
+                </div>
+                {bolehInputData && <Button onClick={openAdd} className="cursor-pointer"><Plus className="mr-1 h-4 w-4" /> Bikin Produk</Button>}
             </div>
 
             {/* Category Filter */}
@@ -189,13 +194,13 @@ export default function ProdukBelanjaPage() {
                                     <p className="text-xs text-muted-foreground mb-1 text-emerald-600 font-semibold">{formatRupiah(product.price)} &bull; Stok: {product.stock}</p>
                                     <p className="text-xs text-muted-foreground truncate">{product.description}</p>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
+                                {bolehInputData && <div className="flex items-center gap-1 shrink-0">
                                     <button onClick={() => toggleStatus(product)} className="p-2 rounded-lg hover:bg-muted cursor-pointer" title={product.isActive ? "Nonaktifkan" : "Aktifkan"}>
                                         {product.isActive ? <Eye className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                                     </button>
                                     <button onClick={() => openEdit(product)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer"><Pencil className="h-4 w-4" /></button>
-                                    <button onClick={() => handleDelete(product.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer"><Trash2 className="h-4 w-4" /></button>
-                                </div>
+                                    {bolehHapusData && <button onClick={() => handleDelete(product.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer"><Trash2 className="h-4 w-4" /></button>}
+                                </div>}
                             </CardContent>
                         </Card>
                     ))}
@@ -203,7 +208,7 @@ export default function ProdukBelanjaPage() {
             )}
 
             {/* Product Dialog */}
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            {bolehInputData && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{isEditing ? "Edit Produk Belanja" : "Tambah Produk Baru"}</DialogTitle>
@@ -286,7 +291,7 @@ export default function ProdukBelanjaPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
     );
 }

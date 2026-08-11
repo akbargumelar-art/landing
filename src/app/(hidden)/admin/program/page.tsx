@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Upload, ImageIcon, MessageSquare } from "lucide-react";
 import Image from "next/image";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface Program {
     id: string;
@@ -44,6 +45,7 @@ const emptyProgram: Partial<Program> = {
 };
 
 export default function ProgramPage() {
+    const { loading: scopeLoading, bolehInputData, bolehHapusData } = useAdminScope();
     const [programs, setPrograms] = useState<Program[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -177,13 +179,16 @@ export default function ProgramPage() {
         ? programs.filter((p) => p.category === filterCategory)
         : programs;
 
-    if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading || scopeLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
     return (
         <div className="max-w-5xl space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Kelola Program</h2>
-                <Button onClick={openAdd} className="cursor-pointer"><Plus className="mr-1 h-4 w-4" /> Tambah Program</Button>
+                <div>
+                    <h2 className="text-2xl font-bold">{bolehInputData ? "Kelola Program" : "Program"}</h2>
+                    {!bolehInputData && <p className="mt-1 text-sm text-muted-foreground">Mode viewer: pengaturan program hanya dapat dilihat.</p>}
+                </div>
+                {bolehInputData && <Button onClick={openAdd} className="cursor-pointer"><Plus className="mr-1 h-4 w-4" /> Tambah Program</Button>}
             </div>
 
             {/* Category Filter */}
@@ -223,13 +228,13 @@ export default function ProgramPage() {
                                     <p className="text-xs text-muted-foreground truncate">{program.period}</p>
                                     <p className="text-xs text-muted-foreground truncate">{program.description}</p>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
+                                {bolehInputData && <div className="flex items-center gap-1 shrink-0">
                                     <button onClick={() => toggleStatus(program)} className="p-2 rounded-lg hover:bg-muted cursor-pointer" title={program.status === "published" ? "Nonaktifkan" : "Publikasikan"}>
                                         {program.status === "published" ? <Eye className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                                     </button>
                                     <button onClick={() => openEdit(program)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer"><Pencil className="h-4 w-4" /></button>
-                                    <button onClick={() => handleDelete(program.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer"><Trash2 className="h-4 w-4" /></button>
-                                </div>
+                                    {bolehHapusData && <button onClick={() => handleDelete(program.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500 cursor-pointer"><Trash2 className="h-4 w-4" /></button>}
+                                </div>}
                             </CardContent>
                         </Card>
                     ))}
@@ -237,7 +242,7 @@ export default function ProgramPage() {
             )}
 
             {/* Program Dialog */}
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            {bolehInputData && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{isEditing ? "Edit Program" : "Tambah Program"}</DialogTitle>
@@ -393,7 +398,7 @@ export default function ProgramPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
     );
 }

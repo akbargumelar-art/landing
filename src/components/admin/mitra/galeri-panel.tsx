@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { pjpDayInJakarta } from "@/lib/mitra-outlet-options";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface GalleryPhoto {
     id: string;
@@ -51,6 +53,7 @@ function formatWaktu(value: string | null): string {
 }
 
 export function GaleriPanel() {
+    const scope = useAdminScope();
     const [data, setData] = React.useState<GalleryResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
@@ -66,8 +69,21 @@ export function GaleriPanel() {
         kecamatan: "",
         photoSlot: "ALL",
     });
+    const [filterReady, setFilterReady] = React.useState(false);
+    const filterInitialized = React.useRef(false);
 
     React.useEffect(() => {
+        if (scope.loading || filterInitialized.current) return;
+        filterInitialized.current = true;
+        setFilter((current) => ({
+            ...current,
+            pjpDay: scope.role === "SALESFORCE" ? pjpDayInJakarta() : "",
+        }));
+        setFilterReady(true);
+    }, [scope.loading, scope.role]);
+
+    React.useEffect(() => {
+        if (!filterReady) return;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             setLoading(true);
@@ -98,12 +114,17 @@ export function GaleriPanel() {
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [filter, page]);
+    }, [filter, filterReady, page]);
 
     const ubahFilter = (key: keyof typeof filter, value: string) => {
         setPage(1);
         setFilter((current) => ({ ...current, [key]: value }));
     };
+
+    const tampilFilterTap = scope.role !== "SALESFORCE" && (data?.filters.taps.length || 0) > 1;
+    const tampilFilterSalesforce = scope.role !== "SALESFORCE" && (data?.filters.salesforces.length || 0) > 1;
+    const tampilFilterKabupaten = (data?.filters.kabupatens.length || 0) > 1;
+    const tampilFilterKecamatan = (data?.filters.kecamatans.length || 0) > 1;
 
     return (
         <div className="space-y-6">
@@ -112,8 +133,8 @@ export function GaleriPanel() {
                 
                 <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                     Semua foto outlet dalam bentuk galeri, tanpa status kepatuhan -- untuk itu buka Monitoring Foto.
-                    Gunakan filter untuk menelusuri foto berdasarkan tanggal unggah, TAP, jadwal PJP, salesforce,
-                    atau wilayah.
+                    Gunakan filter yang tersedia untuk menelusuri foto berdasarkan tanggal unggah, jadwal PJP,
+                    atau cakupan wilayah akun Anda.
                 </p>
             </div>
 
@@ -132,26 +153,31 @@ export function GaleriPanel() {
                             <option value="ALL">Semua kategori foto</option>
                             {(data?.filters.photoSlots || []).map((slot) => <option key={slot.key} value={slot.key}>{slot.label}</option>)}
                         </FilterSelect>
-                        <FilterSelect label="TAP" value={filter.tap} onChange={(value) => ubahFilter("tap", value)}>
+                        {tampilFilterTap && <FilterSelect label="TAP" value={filter.tap} onChange={(value) => ubahFilter("tap", value)}>
                             <option value="">Semua TAP</option>
                             {(data?.filters.taps || []).map((item) => <option key={item} value={item}>{item}</option>)}
-                        </FilterSelect>
+                        </FilterSelect>}
                         <FilterSelect label="Hari PJP" value={filter.pjpDay} onChange={(value) => ubahFilter("pjpDay", value)}>
                             <option value="">Semua hari</option>
                             {(data?.filters.pjpDays || []).map((item) => <option key={item} value={item}>{item}</option>)}
                         </FilterSelect>
-                        <FilterSelect label="Salesforce" value={filter.salesforceId} onChange={(value) => ubahFilter("salesforceId", value)}>
+                        {tampilFilterSalesforce && <FilterSelect label="Salesforce" value={filter.salesforceId} onChange={(value) => ubahFilter("salesforceId", value)}>
                             <option value="">Semua Salesforce</option>
                             {(data?.filters.salesforces || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                        </FilterSelect>
-                        <FilterSelect label="Kabupaten" value={filter.kabupaten} onChange={(value) => ubahFilter("kabupaten", value)}>
+                        </FilterSelect>}
+                        {tampilFilterKabupaten && <FilterSelect label="Kabupaten" value={filter.kabupaten} onChange={(value) => ubahFilter("kabupaten", value)}>
                             <option value="">Semua kabupaten</option>
                             {(data?.filters.kabupatens || []).map((item) => <option key={item} value={item}>{item}</option>)}
-                        </FilterSelect>
-                        <FilterSelect label="Kecamatan" value={filter.kecamatan} onChange={(value) => ubahFilter("kecamatan", value)}>
+                        </FilterSelect>}
+                        {tampilFilterKecamatan && <FilterSelect label="Kecamatan" value={filter.kecamatan} onChange={(value) => ubahFilter("kecamatan", value)}>
                             <option value="">Semua kecamatan</option>
                             {(data?.filters.kecamatans || []).map((item) => <option key={item} value={item}>{item}</option>)}
-                        </FilterSelect>
+                        </FilterSelect>}
+                        {scope.role === "SALESFORCE" && filter.pjpDay === pjpDayInJakarta() && (
+                            <p className="self-end rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                                PJP hari ini aktif otomatis
+                            </p>
+                        )}
                     </div>
 
                     <p className="mt-4 text-sm text-muted-foreground">

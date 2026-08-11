@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import {
     mitraProgramParams,
     mitraProgramParticipants,
+    mitraProgramLeaderboard,
     mitraProgramRewardRules,
     mitraPrograms,
     mitraProgramWinners,
@@ -15,6 +16,7 @@ import { getAdminKpiResults } from "@/lib/mitra-kpi";
 import { canAccessParticipant, getAdminActorScope } from "@/lib/admin-scope";
 import {
     buildRewardRuleValues,
+    computeParticipantParamAggregates,
     groupValueOf,
     listProgramParticipants,
     normalizeGroupBy,
@@ -62,6 +64,69 @@ export async function GET(
     const pesertaTampil = participants.filter((item) => canAccessParticipant(scope, item));
     const kunciTampil = new Set(pesertaTampil.map((item) => item.participantKey));
 
+    /**
+     * Racing/Reward belum memiliki cache hasil sekaya KPI pada respons admin. Bentuk baris
+     * monitoring dibangun dari leaderboard dan agregat skor yang sama dengan halaman publik,
+     * tetapi query skor hanya menerima participantKey yang sudah lolos scope aktor.
+     */
+    let leaderboard: Array<Record<string, unknown>> = [];
+    if (program.mechanismType !== "KPI") {
+        const participantKeys = [...kunciTampil];
+        const [leaderboardRows, aggregates] = await Promise.all([
+            participantKeys.length > 0
+                ? db.select({
+                    participantKey: mitraProgramLeaderboard.participantKey,
+                    totalPoints: mitraProgramLeaderboard.totalPoints,
+                    groupKey: mitraProgramLeaderboard.groupKey,
+                    rank: mitraProgramLeaderboard.rank,
+                    prevRank: mitraProgramLeaderboard.prevRank,
+                    computedAt: mitraProgramLeaderboard.computedAt,
+                })
+                    .from(mitraProgramLeaderboard)
+                    .where(and(
+                        eq(mitraProgramLeaderboard.programId, id),
+                        inArray(mitraProgramLeaderboard.participantKey, participantKeys),
+                    ))
+                    .orderBy(asc(mitraProgramLeaderboard.groupKey), asc(mitraProgramLeaderboard.rank))
+                : Promise.resolve([]),
+            computeParticipantParamAggregates(id, programParams, participantKeys),
+        ]);
+
+        const pesertaByKeyTampil = new Map(pesertaTampil.map((item) => [item.participantKey, item]));
+        const adaDiPeringkat = new Set(leaderboardRows.map((row) => row.participantKey));
+        const rows = [
+            ...leaderboardRows.map((row) => ({
+                ...row,
+                totalPoints: Number(row.totalPoints),
+                rank: row.rank as number | null,
+            })),
+            ...pesertaTampil
+                .filter((item) => !adaDiPeringkat.has(item.participantKey))
+                .map((item) => ({
+                    participantKey: item.participantKey,
+                    totalPoints: 0,
+                    groupKey: groupValueOf(item, program.groupBy as ProgramGroupBy),
+                    rank: null as number | null,
+                    prevRank: null as number | null,
+                    computedAt: null as Date | null,
+                })),
+        ];
+
+        leaderboard = rows.map((row) => {
+            const info = pesertaByKeyTampil.get(row.participantKey);
+            return {
+                ...row,
+                code: info?.code || "",
+                name: info?.name || "",
+                area: info?.area || "",
+                metrics: Object.fromEntries(programParams.map((param) => [
+                    param.key,
+                    aggregates.get(row.participantKey, param.id),
+                ])),
+            };
+        });
+    }
+
     // Nama dan kode pemenang diambil dari daftar peserta LENGKAP supaya baris yang boleh
     // dilihat tetap punya identitas, lalu barisnya sendiri disaring menurut wewenang.
     const pesertaByKey = new Map(participants.map((item) => [item.participantKey, item]));
@@ -84,6 +149,7 @@ export async function GET(
         participants: pesertaTampil,
         rewardRules,
         winners,
+        leaderboard,
         kpiResults: kpiResults.filter((row) => kunciTampil.has(row.participantKey)),
     });
 }

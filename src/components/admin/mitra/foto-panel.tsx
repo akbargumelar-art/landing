@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MITRA_PHOTO_SLOTS } from "@/lib/mitra-outlet-photos";
-import { PJP_DAYS } from "@/lib/mitra-outlet-options";
+import { PJP_DAYS, pjpDayInJakarta } from "@/lib/mitra-outlet-options";
 import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface PhotoRow {
     id: string;
@@ -92,6 +93,7 @@ function persenClass(percentage: number): string {
 }
 
 export function FotoPanel() {
+    const scope = useAdminScope();
     const [data, setData] = React.useState<ReportResponse | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
@@ -109,6 +111,18 @@ export function FotoPanel() {
         salesforceId: "",
         pjpDay: "",
     });
+    const [filterReady, setFilterReady] = React.useState(false);
+    const filterInitialized = React.useRef(false);
+
+    React.useEffect(() => {
+        if (scope.loading || filterInitialized.current) return;
+        filterInitialized.current = true;
+        setFilter((current) => ({
+            ...current,
+            pjpDay: scope.role === "SALESFORCE" ? pjpDayInJakarta() : "",
+        }));
+        setFilterReady(true);
+    }, [scope.loading, scope.role]);
 
     const buatParams = React.useCallback((includePage = true) => {
         const params = new URLSearchParams({
@@ -126,6 +140,7 @@ export function FotoPanel() {
     }, [filter, page]);
 
     React.useEffect(() => {
+        if (!filterReady) return;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             setLoading(true);
@@ -156,7 +171,7 @@ export function FotoPanel() {
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [buatParams, page]);
+    }, [buatParams, filterReady, page]);
 
     const ubahFilter = (key: keyof typeof filter, value: string) => {
         setPage(1);
@@ -196,6 +211,11 @@ export function FotoPanel() {
             return "";
         });
     }, [data, urut]);
+
+    const tampilFilterTap = scope.role !== "SALESFORCE"
+        && (data?.filters.taps.length || 0) > 1;
+    const tampilFilterSalesforce = scope.role !== "SALESFORCE"
+        && (data?.filters.salesforces.length || 0) > 1;
 
     return (
         <div className="space-y-6">
@@ -265,18 +285,23 @@ export function FotoPanel() {
                             <option value="">Semua kategori outlet</option>
                             {(data?.filters.categories || []).map((item) => <option key={item} value={item}>{item}</option>)}
                         </FilterSelect>
-                        <FilterSelect label="TAP" value={filter.tap} onChange={(value) => ubahFilter("tap", value)}>
+                        {tampilFilterTap && <FilterSelect label="TAP" value={filter.tap} onChange={(value) => ubahFilter("tap", value)}>
                             <option value="">Semua TAP</option>
                             {(data?.filters.taps || []).map((item) => <option key={item} value={item}>{item}</option>)}
-                        </FilterSelect>
-                        <FilterSelect label="Salesforce" value={filter.salesforceId} onChange={(value) => ubahFilter("salesforceId", value)}>
+                        </FilterSelect>}
+                        {tampilFilterSalesforce && <FilterSelect label="Salesforce" value={filter.salesforceId} onChange={(value) => ubahFilter("salesforceId", value)}>
                             <option value="">Semua Salesforce</option>
                             {(data?.filters.salesforces || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                        </FilterSelect>
+                        </FilterSelect>}
                         <FilterSelect label="Hari PJP" value={filter.pjpDay} onChange={(value) => ubahFilter("pjpDay", value)}>
                             <option value="">Semua hari</option>
                             {PJP_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
                         </FilterSelect>
+                        {scope.role === "SALESFORCE" && filter.pjpDay === pjpDayInJakarta() && (
+                            <p className="self-end rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                                PJP hari ini aktif otomatis
+                            </p>
+                        )}
                     </div>
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

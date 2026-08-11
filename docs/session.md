@@ -1236,3 +1236,99 @@ Verifikasi: ESLint terarah pada halaman outlet dan kartu foto lulus; `npx tsc --
 `npm run build` lulus pada Next.js 15.5.12. Build tetap hanya menampilkan dua warning `<img>` lama
 di halaman Pengaturan. Belum ada screenshot/browser smoke dengan sesi Salesforce dan viewport
 perangkat nyata karena database/login runtime belum tersedia pada sesi ini.
+
+## Shell dashboard seperti aplikasi mobile - 11 Agustus 2026
+
+- Seluruh halaman setelah login di bawah `/admin/*` kini memakai shell mobile yang lebih rapat:
+  top bar setinggi 56 px, padding konten 12 px, judul aman dipotong pada layar sempit, drawer
+  selebar maksimal 88% viewport, dan ruang bawah mengikuti safe-area perangkat.
+- Navigasi bawah ala aplikasi tampil di bawah breakpoint `md`. Empat tujuan utama dipilih dari
+  menu yang sudah lolos filter role, lalu tombol Menu membuka sidebar lengkap. Super Admin
+  mendapat Beranda/Outlet/Monitor/Profil; role lain mendapat Outlet/Monitor/Program/Profil.
+  Karena sumbernya sama dengan sidebar, bottom navigation tidak memperluas hak akses.
+- Primitive `Card` dan `Table` mendapat `data-slot` serta token ukuran. Pada shell admin di layar
+  kurang dari 640 px, kartu memakai radius 16 px dan padding 12 px. Tampilan publik serta desktop
+  mempertahankan nilai bawaan 12 px/24 px yang lama.
+- Tabel dashboard pada ponsel memakai font 12 px, header dan sel lebih pendek, lebar isi tidak
+  dipaksa masuk ke viewport, dan scroll horizontal berhenti di kontainer tabel. Halaman tidak
+  ikut melebar; kolom tetap dapat dibaca dengan menggeser tabel.
+- Tidak ada perubahan API, database, role, scope outlet, atau migrasi.
+
+Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah pada layout admin dan primitive kartu/tabel
+lulus; `npm test` lulus 22/22; `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 68
+halaman statis. Dua warning `<img>` lama di halaman Pengaturan tetap ada dan tidak terkait.
+Browser smoke dengan akun login dan viewport perangkat nyata belum dilakukan karena sesi/database
+runtime tidak tersedia, sehingga kenyamanan visual akhir masih perlu dicek pada ponsel nyata.
+
+## Filter role-aware dan monitoring pencapaian program - 11 Agustus 2026
+
+### Database Outlet
+
+- `GET /api/admin/mitra/outlets` menerima filter `pjpDay`, `tap`, dan `salesforceId`. Seluruh
+  filter digabung dengan `outletScopeCondition()` di SQL, sehingga total dan 50 baris halaman
+  pertama tidak dihitung dari data di luar wewenang lalu disaring terlambat di browser.
+- Opsi TAP/Salesforce diturunkan dari outlet yang sudah masuk scope. Akun Supervisor/Salesforce
+  tidak menerima master global melalui payload. Super Admin/Admin Input tetap menerima seluruh
+  master Salesforce, termasuk yang belum memiliki outlet, agar form assignment tidak regresi.
+- Halaman daftar memiliki filter Hari PJP untuk semua role. TAP dan Salesforce hanya muncul bila
+  bukan akun Salesforce dan pilihannya lebih dari satu. Baris outlet menampilkan hari PJP di
+  bawah ID Digipos agar jadwal mudah dipindai sebelum membuka editor foto.
+- Untuk akun Salesforce, default Hari PJP mengikuti hari aktual di `Asia/Jakarta`. Nilainya
+  diperiksa ulang tiap 60 detik dan otomatis berganti bila halaman dibiarkan terbuka melewati
+  tengah malam WIB. Memilih hari lain mematikan mode otomatis; Reset Filter mengaktifkan kembali
+  PJP hari ini.
+
+### Monitoring Visit
+
+- Monitoring Foto dan Galeri Foto menunggu role selesai dimuat sebelum request pertama. Untuk
+  Salesforce, filter TAP dan Salesforce disembunyikan karena scope akun sudah menetapkannya;
+  PJP hari ini aktif otomatis. Role lain hanya melihat dropdown TAP/Salesforce/Kabupaten/
+  Kecamatan bila tersedia lebih dari satu pilihan yang benar-benar berguna.
+- Endpoint Monitoring Foto/Galeri yang sudah ada tetap menjadi batas keamanan dan membangun opsi
+  dari outlet dalam scope. Perubahan ini hanya menyelaraskan kontrol UI dengan kontrak server.
+
+### Program
+
+- `ProgramManager` kini mempunyai dua mode. SUPER_ADMIN/ADMIN_INPUT tetap melihat panel kelola;
+  MANAGER/SUPERVISOR/SALESFORCE melihat **Monitoring Program** dengan tombol **Lihat Pencapaian**,
+  tanpa form peserta, upload, parameter, aturan, pengaturan, recompute, atau publikasi pemenang.
+- Untuk Racing/Reward, detail program admin sekarang mengirim leaderboard dan nilai mentah per
+  parameter. Participant key difilter lewat `canAccessParticipant()` sebelum query skor dijalankan,
+  sehingga Salesforce hanya memperoleh dirinya, Supervisor hanya peserta pada TAP-nya, dan Manager
+  memperoleh seluruh cakupan baca. Peserta tanpa skor tetap tampil dengan nilai nol/belum ada data.
+- Mode monitoring menampilkan kartu jumlah peserta, jumlah yang sudah memiliki pencapaian, status,
+  pembaruan terakhir, pencarian peserta, peringkat Racing, nilai per indikator, dan total. KPI tetap
+  memakai hasil KPI tersaring dan judulnya berubah menjadi Monitoring Hasil KPI untuk role baca-saja.
+- Bila tab mekanisme awal kosong, halaman otomatis memilih mekanisme program terbaru yang tersedia.
+
+Tidak ada perubahan schema atau migrasi. Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah pada
+seluruh UI/API/helper yang berubah lulus; `npm test` lulus 24/24 termasuk dua test zona waktu PJP;
+`npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 68 halaman statis. Dua warning `<img>`
+lama di halaman Pengaturan tetap ada dan tidak terkait. Runtime dengan MySQL hidup dan akun nyata
+Salesforce/Supervisor/Manager belum diuji, jadi hasil filter/pencapaian database belum diverifikasi
+end-to-end pada sesi ini.
+
+## Program dan produk role-aware - 11 Agustus 2026
+
+- Hak UI program/produk sekarang memakai satu sumber dari `useAdminScope`: SUPER_ADMIN dan
+  ADMIN_INPUT boleh input serta memperbarui data, sedangkan MANAGER, SUPERVISOR, dan SALESFORCE
+  hanya mendapat tampilan baca. Nilai awal seluruh izin adalah `false`, sehingga kontrol tulis
+  tidak berkedip muncul selama role masih dimuat.
+- Mode viewer diterapkan pada Program Outlet/Salesforce, Program Undian, Produk Belanja, stok
+  voucher, Kalkulator Cuan, serta katalog/lokasi/banner/ODP/pengajuan IndiHome. Tombol tambah,
+  upload, edit, bulk action, toggle status, dan dialog input tidak dirender untuk viewer; pencarian,
+  filter, tabel, detail, status, serta data pencapaian tetap dapat dibaca.
+- Program Outlet dan Program Salesforce tetap mengikuti kontrak sebelumnya: role viewer membuka
+  **Monitoring Program** dan **Lihat Pencapaian**, bukan form peserta, parameter, aturan, upload,
+  recompute, publikasi, atau pengaturan program.
+- Penghapusan permanen hanya tersedia untuk SUPER_ADMIN. UI Admin Input tidak menampilkan tombol
+  hapus, dan `DELETE /api/admin/indihome/odp` diperketat dari SUPER_ADMIN/ADMIN_INPUT menjadi hanya
+  SUPER_ADMIN agar konsisten dengan route hapus program/produk lainnya.
+- Test kontrak `admin-write-surface.test.ts` kini memindai handler tulis area program/produk dan
+  menggagalkan build bila MANAGER/SUPERVISOR/SALESFORCE masuk ke gerbang mutasi, atau bila route
+  DELETE menerima role selain SUPER_ADMIN.
+
+Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah lulus; `npm test` lulus 26/26; `npm run build`
+lulus pada Next.js 15.5.12 dan menghasilkan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan sesi riil masing-masing role
+belum dilakukan karena database/login runtime tidak tersedia pada sesi ini.
