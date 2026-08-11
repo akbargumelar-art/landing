@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, like, or } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import {
+    mitraDetailSessions,
     mitraOutlets,
     mitraProgramLeaderboard,
     mitraProgramParams,
@@ -13,7 +14,7 @@ import {
     mitraProgramWinners,
     mitraSalesforces,
 } from "@/db/schema";
-import { toDecimalString } from "@/lib/mitra-utils";
+import { hashSessionToken, toDecimalString } from "@/lib/mitra-utils";
 
 export type ProgramTargetType = "OUTLET" | "SALESFORCE";
 export type ProgramMechanismType = "RACING" | "REWARD";
@@ -677,6 +678,27 @@ export async function getPublicProgramDetail(slug: string, targetType: ProgramTa
         : Array.from(new Set(peserta.map((item) => groupValueOf(item, groupBy)))).sort((a, b) => a.localeCompare(b, "id"));
 
     return { program, params, leaderboard, winners, rewardRules, groups };
+}
+
+/**
+ * Memastikan sesi OTP yang dibawa pengunjung memang untuk program ini. Satu cookie hanya
+ * memuat satu token, jadi membuka program lain menuntut verifikasi ulang -- itu disengaja:
+ * hak akses diberikan per program, bukan sekali untuk semuanya.
+ */
+export async function hasValidProgramSession(programId: string, sessionToken: string | undefined) {
+    if (!sessionToken) return false;
+
+    const [session] = await db
+        .select({ id: mitraDetailSessions.id })
+        .from(mitraDetailSessions)
+        .where(and(
+            eq(mitraDetailSessions.tokenHash, hashSessionToken(sessionToken)),
+            eq(mitraDetailSessions.programId, programId),
+            gt(mitraDetailSessions.expiresAt, new Date())
+        ))
+        .limit(1);
+
+    return Boolean(session);
 }
 
 /** Pencarian peserta untuk picker di halaman admin, seragam untuk kedua jenis program. */

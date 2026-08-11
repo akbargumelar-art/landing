@@ -277,7 +277,8 @@ export async function findMatchingWhitelist(phone: string, outlet: { id: string;
 export async function writeWhitelistUsage(input: {
     whitelistId?: string | null;
     phoneE164: string;
-    outletId: string;
+    outletId?: string | null;
+    programId?: string | null;
     action: "OTP_REQUESTED" | "OTP_VERIFIED" | "OTP_REJECTED";
     ip?: string | null;
 }) {
@@ -285,11 +286,33 @@ export async function writeWhitelistUsage(input: {
         id: uuid(),
         whitelistId: input.whitelistId || null,
         phoneE164: input.phoneE164,
-        outletId: input.outletId,
+        outletId: input.outletId || null,
+        programId: input.programId || null,
         action: input.action,
         ip: input.ip || null,
         createdAt: new Date(),
     });
+}
+
+/**
+ * Nomor yang berhak membuka halaman yang tidak terikat outlet tertentu -- misalnya
+ * program salesforce. Cakupan whitelist (ALL/OUTLET/TAP) tidak diperiksa di sini karena
+ * tidak ada outlet pembanding: yang dituntut hanya nomor itu benar terdaftar dan masih
+ * berlaku.
+ */
+export async function findActiveWhitelistNumber(phone: string) {
+    const phoneE164 = normalizePhoneE164(phone);
+    if (!phoneE164) return null;
+
+    const candidates = await db
+        .select()
+        .from(mitraWhitelistNumbers)
+        .where(and(
+            eq(mitraWhitelistNumbers.phoneE164, phoneE164),
+            eq(mitraWhitelistNumbers.isActive, true)
+        ));
+
+    return candidates.find((candidate) => !candidate.expiresAt || isFuture(candidate.expiresAt)) || null;
 }
 
 export async function getMitraAdminSummary() {

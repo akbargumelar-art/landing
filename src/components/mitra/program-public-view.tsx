@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import React from "react";
-import { ArrowLeft, ArrowRight, Award, Crown, Filter, Gift, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, Crown, Filter, Gift, Lock, Minus, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,13 +106,27 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
     // null = belum pernah mencari; array kosong = sudah dicari tapi tidak ketemu.
     const [hasilCari, setHasilCari] = React.useState<LeaderboardRow[] | null>(null);
 
-    React.useEffect(() => {
+    // 401 pada program salesforce berarti belum terverifikasi OTP, bukan gagal memuat --
+    // isinya tetap dikembalikan sebagian (nama dan periode) untuk memperkenalkan program.
+    const [locked, setLocked] = React.useState(false);
+
+    const muat = React.useCallback(() => {
         setLoading(true);
         fetch(`/api/public/mitra/programs/${slug}?targetType=${targetType}`)
-            .then((res) => res.ok ? res.json() : null)
-            .then(setData)
+            .then(async (res) => {
+                const isi = await res.json().catch(() => null);
+                if (res.status === 401 && isi?.locked) {
+                    setLocked(true);
+                    setData({ program: isi.program, leaderboard: [], winners: [] });
+                    return;
+                }
+                setLocked(false);
+                setData(res.ok ? isi : null);
+            })
             .finally(() => setLoading(false));
     }, [slug, targetType]);
+
+    React.useEffect(() => { muat(); }, [muat]);
 
     /**
      * Pencarian mengisi panel di atas tabel, bukan menyaring tabelnya. Peserta ingin tahu
@@ -232,6 +246,13 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                     )}
                 </div>
             </section>
+
+            {locked ? (
+                <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+                    <GerbangOtp slug={slug} onVerified={muat} />
+                </section>
+            ) : (
+            <>
 
             <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Kartu pencarian menumpuk hero supaya jadi hal pertama yang dilihat peserta
@@ -467,7 +488,107 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                     </Link>
                 </p>
             </section>
+            </>
+            )}
         </main>
+    );
+}
+
+/**
+ * Gerbang OTP untuk program salesforce. Isi program menyangkut pencapaian dan insentif
+ * per orang, jadi hanya nomor yang terdaftar di whitelist yang boleh membukanya.
+ */
+function GerbangOtp({ slug, onVerified }: { slug: string; onVerified: () => void }) {
+    const [phone, setPhone] = React.useState("");
+    const [code, setCode] = React.useState("");
+    const [tahap, setTahap] = React.useState<"nomor" | "kode">("nomor");
+    const [busy, setBusy] = React.useState(false);
+    const [pesan, setPesan] = React.useState<{ ok: boolean; teks: string } | null>(null);
+
+    const mintaOtp = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setBusy(true);
+        setPesan(null);
+        const res = await fetch(`/api/public/mitra/programs/${slug}/otp/request`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setBusy(false);
+        setPesan({ ok: res.ok, teks: data.message || "Permintaan OTP gagal diproses." });
+        if (res.ok) setTahap("kode");
+    };
+
+    const verifikasi = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setBusy(true);
+        setPesan(null);
+        const res = await fetch(`/api/public/mitra/programs/${slug}/otp/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone, code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setBusy(false);
+        if (res.ok) { onVerified(); return; }
+        setPesan({ ok: false, teks: data.error || "Kode OTP tidak valid." });
+    };
+
+    return (
+        <div className="mx-auto max-w-md rounded-lg border bg-white p-6 shadow-sm">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+                <Lock className="h-6 w-6 text-red-600" />
+            </div>
+            <h2 className="text-center font-bold text-gray-950">Halaman Khusus Salesforce</h2>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+                {tahap === "nomor"
+                    ? "Masukkan nomor WhatsApp Anda yang terdaftar untuk menerima kode verifikasi."
+                    : `Kode dikirim ke ${phone}. Masukkan 6 digit yang Anda terima.`}
+            </p>
+
+            <form onSubmit={tahap === "nomor" ? mintaOtp : verifikasi} className="mt-5 space-y-3">
+                {tahap === "nomor" ? (
+                    <Input
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        placeholder="081234567890"
+                        inputMode="tel"
+                        aria-label="Nomor WhatsApp"
+                    />
+                ) : (
+                    <Input
+                        value={code}
+                        onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="123456"
+                        inputMode="numeric"
+                        className="text-center text-lg tracking-[0.4em]"
+                        aria-label="Kode OTP"
+                    />
+                )}
+
+                <Button type="submit" className="w-full" disabled={busy || (tahap === "nomor" ? !phone.trim() : code.length !== 6)}>
+                    {busy ? "Memproses..." : tahap === "nomor" ? "Kirim Kode OTP" : "Buka Program"}
+                </Button>
+
+                {tahap === "kode" && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => { setTahap("nomor"); setCode(""); setPesan(null); }}
+                    >
+                        Ganti nomor
+                    </Button>
+                )}
+            </form>
+
+            {pesan && (
+                <p className={`mt-4 rounded-lg p-3 text-sm ${pesan.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                    {pesan.teks}
+                </p>
+            )}
+        </div>
     );
 }
 

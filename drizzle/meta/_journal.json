@@ -232,6 +232,13 @@
       "when": 1786396695241,
       "tag": "0032_program_param_info_only",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1786397225145,
+      "tag": "0033_otp_for_program_access",
+      "breakpoints": true
     }
   ]
 }

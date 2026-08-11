@@ -2,6 +2,11 @@ import { createHash, randomBytes, randomInt } from "crypto";
 import { NextResponse } from "next/server";
 
 export const MITRA_DETAIL_SESSION_COOKIE = "mitra_detail_session";
+/**
+ * Sesi program dipisah dari sesi detail outlet: keduanya memberi akses ke hal berbeda,
+ * jadi membuka satu tidak boleh diam-diam membuka yang lain.
+ */
+export const MITRA_PROGRAM_SESSION_COOKIE = "mitra_program_session";
 
 /**
  * Batas waktu hanya berlaku pada kode OTP (5 menit untuk dimasukkan ke web).

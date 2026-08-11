@@ -731,11 +731,16 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
 export const mitraOtpRequests = mysqlTable("mitra_otp_requests", {
     id: varchar("id", { length: 36 }).primaryKey(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    /**
+     * Persis satu dari outletId/programId terisi, sesuai purpose. OTP kini melayani dua
+     * hal: membuka detail outlet, dan membuka halaman program salesforce yang tertutup.
+     */
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     whitelistId: varchar("whitelist_id", { length: 36 }).references(() => mitraWhitelistNumbers.id, { onDelete: "set null" }),
     codeHash: varchar("code_hash", { length: 255 }).notNull(),
     codeSalt: varchar("code_salt", { length: 255 }).notNull(),
-    purpose: mysqlEnum("purpose", ["OUTLET_DETAIL"]).notNull().default("OUTLET_DETAIL"),
+    purpose: mysqlEnum("purpose", ["OUTLET_DETAIL", "PROGRAM_DETAIL"]).notNull().default("OUTLET_DETAIL"),
     attempts: int("attempts").notNull().default(0),
     expiresAt: datetime("expires_at").notNull(),
     verifiedAt: datetime("verified_at"),
@@ -752,11 +757,13 @@ export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
     id: varchar("id", { length: 36 }).primaryKey(),
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     expiresAt: datetime("expires_at").notNull(),
     createdAt: datetime("created_at").notNull(),
 }, (table) => [
     index("mitra_detail_sessions_outlet_idx").on(table.outletId),
+    index("mitra_detail_sessions_program_idx").on(table.programId),
     index("mitra_detail_sessions_expiry_idx").on(table.expiresAt),
 ]);
 
@@ -826,7 +833,9 @@ export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", 
     // panjangnya 69 karakter, melewati batas 64 karakter identifier MySQL.
     whitelistId: varchar("whitelist_id", { length: 36 }),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    // Kosong untuk OTP program, yang tidak terikat outlet mana pun.
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     action: mysqlEnum("action", ["OTP_REQUESTED", "OTP_VERIFIED", "OTP_REJECTED"]).notNull(),
     ip: varchar("ip", { length: 120 }),
     createdAt: datetime("created_at").notNull(),
