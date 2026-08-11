@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
-import { ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +133,8 @@ export function KpiPublicView({ slug, initial }: { slug: string; initial: KpiPub
     const searchParams = useSearchParams();
     const [data, setData] = React.useState(initial);
     const [loading, setLoading] = React.useState(false);
+    const [expandedTaps, setExpandedTaps] = React.useState<Set<string>>(() => new Set());
+    const [expandedSalesforces, setExpandedSalesforces] = React.useState<Set<string>>(() => new Set());
     const [filters, setFilters] = React.useState({
         tap: searchParams.get("tap") || "",
         sf: searchParams.get("sf") || "",
@@ -156,6 +158,14 @@ export function KpiPublicView({ slug, initial }: { slug: string; initial: KpiPub
     };
 
     const sfOptions = data.filters.salesforces.filter((sf) => !filters.tap || sf.tap === filters.tap);
+    const toggleExpanded = (key: string, setter: React.Dispatch<React.SetStateAction<Set<string>>>) => {
+        setter((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
     return (
         <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -171,22 +181,95 @@ export function KpiPublicView({ slug, initial }: { slug: string; initial: KpiPub
 
             <div className="rounded-lg border bg-white p-4 shadow-sm">
                 <h2 className="mb-3 font-bold">Ringkasan per TAP</h2>
-                <div className="space-y-2">{data.taps.map((tap) => <details key={tap.tap} className="rounded-lg border">
-                    <summary className="cursor-pointer list-none p-3"><div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-6"><strong>{tap.tap}</strong><span>{tap.salesforceCount} SF</span><span>C {number(tap.complianceScore)}%</span><span>P {number(tap.performanceScore)}%</span><span>{tap.rewardCount} reward</span><span>{tap.punishmentCount} punishment</span></div></summary>
-                    <div className="max-w-full overflow-x-auto border-t"><table className="w-full min-w-[620px] text-sm"><tbody>{tap.participants.map((sf) => <tr key={sf.id} className="border-b last:border-0"><td className="px-3 py-2 font-medium">{sf.name}</td><td className="px-3 py-2">C {number(sf.complianceScore)}%</td><td className="px-3 py-2">P {number(sf.performanceScore)}%</td><td className="px-3 py-2"><Benefit type={sf.benefitType} label={sf.benefitLabel} /></td></tr>)}</tbody></table></div>
-                </details>)}</div>
+                <div className="max-w-full overflow-x-auto rounded-lg border">
+                    <table className="w-full min-w-[840px] text-sm">
+                        <thead className="bg-gray-50 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th className="w-12 px-3 py-3 text-center"><span className="sr-only">Buka detail</span></th>
+                                <th className="px-3 py-3 text-left">TAP</th>
+                                <th className="px-3 py-3 text-center">Jumlah Salesforce</th>
+                                <th className="px-3 py-3 text-right">Skor Compliance</th>
+                                <th className="px-3 py-3 text-right">Skor Performance</th>
+                                <th className="px-3 py-3 text-center">Reward</th>
+                                <th className="px-3 py-3 text-center">Punishment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.taps.map((tap) => {
+                                const expanded = expandedTaps.has(tap.tap);
+                                return <React.Fragment key={tap.tap}>
+                                    <tr className="border-t hover:bg-red-50/40">
+                                        <td className="px-3 py-3 text-center">
+                                            <button type="button" onClick={() => toggleExpanded(tap.tap, setExpandedTaps)} aria-expanded={expanded} aria-label={`${expanded ? "Tutup" : "Buka"} detail TAP ${tap.tap}`} className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100">
+                                                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                            </button>
+                                        </td>
+                                        <td className="px-3 py-3 font-bold text-gray-950">{tap.tap}</td>
+                                        <td className="px-3 py-3 text-center tabular-nums">{tap.salesforceCount}</td>
+                                        <td className="px-3 py-3 text-right font-semibold tabular-nums">{number(tap.complianceScore)}%</td>
+                                        <td className="px-3 py-3 text-right font-semibold tabular-nums">{number(tap.performanceScore)}%</td>
+                                        <td className="px-3 py-3 text-center tabular-nums text-green-700">{tap.rewardCount}</td>
+                                        <td className="px-3 py-3 text-center tabular-nums text-red-700">{tap.punishmentCount}</td>
+                                    </tr>
+                                    {expanded && <tr className="border-t bg-gray-50/70">
+                                        <td colSpan={7} className="p-3 sm:p-4">
+                                            <div className="overflow-x-auto rounded-lg border bg-white">
+                                                <table className="w-full min-w-[620px] text-sm">
+                                                    <thead className="bg-gray-50 text-xs font-bold uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2 text-left">Salesforce</th><th className="px-3 py-2 text-right">Skor Compliance</th><th className="px-3 py-2 text-right">Skor Performance</th><th className="px-3 py-2 text-left">Benefit</th></tr></thead>
+                                                    <tbody>{tap.participants.map((sf) => <tr key={sf.id} className="border-t"><td className="px-3 py-2 font-medium">{sf.name}</td><td className="px-3 py-2 text-right tabular-nums">{number(sf.complianceScore)}%</td><td className="px-3 py-2 text-right tabular-nums">{number(sf.performanceScore)}%</td><td className="px-3 py-2"><Benefit type={sf.benefitType} label={sf.benefitLabel} /></td></tr>)}</tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>}
+                                </React.Fragment>;
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div className="rounded-lg border bg-white p-4 shadow-sm">
                 <h2 className="mb-3 font-bold">Ringkasan per Salesforce</h2>
-                <div className="space-y-2">{data.participants.map((sf) => <details key={sf.id} className="rounded-lg border">
-                    <summary className="cursor-pointer list-none p-3"><div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5"><strong>{sf.name}</strong><span>{sf.tap}</span><span>C {number(sf.complianceScore)}%</span><span>P {number(sf.performanceScore)}%</span><span><Benefit type={sf.benefitType} label={sf.benefitLabel} /></span></div></summary>
-                    <div className="space-y-5 border-t p-3">
-                        {!sf.compliancePassed && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Skor performance tidak menghasilkan reward karena compliance di bawah {number(data.complianceMinScore)}%.</p>}
-                        <ParamTable title="Compliance" rows={sf.params.filter((row) => row.category === "COMPLIANCE")} />
-                        <ParamTable title="Performance" rows={sf.params.filter((row) => row.category === "PERFORMANCE")} />
-                    </div>
-                </details>)}</div>
+                <div className="max-w-full overflow-x-auto rounded-lg border">
+                    <table className="w-full min-w-[780px] text-sm">
+                        <thead className="bg-gray-50 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th className="w-12 px-3 py-3 text-center"><span className="sr-only">Buka detail</span></th>
+                                <th className="px-3 py-3 text-left">Salesforce</th>
+                                <th className="px-3 py-3 text-left">TAP</th>
+                                <th className="px-3 py-3 text-right">Skor Compliance</th>
+                                <th className="px-3 py-3 text-right">Skor Performance</th>
+                                <th className="px-3 py-3 text-left">Benefit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.participants.map((sf) => {
+                                const expanded = expandedSalesforces.has(sf.id);
+                                return <React.Fragment key={sf.id}>
+                                    <tr className="border-t hover:bg-red-50/40">
+                                        <td className="px-3 py-3 text-center">
+                                            <button type="button" onClick={() => toggleExpanded(sf.id, setExpandedSalesforces)} aria-expanded={expanded} aria-label={`${expanded ? "Tutup" : "Buka"} detail Salesforce ${sf.name}`} className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100">
+                                                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                            </button>
+                                        </td>
+                                        <td className="px-3 py-3 font-bold text-gray-950">{sf.name}</td>
+                                        <td className="px-3 py-3 text-muted-foreground">{sf.tap}</td>
+                                        <td className="px-3 py-3 text-right font-semibold tabular-nums">{number(sf.complianceScore)}%</td>
+                                        <td className="px-3 py-3 text-right font-semibold tabular-nums">{number(sf.performanceScore)}%</td>
+                                        <td className="px-3 py-3"><Benefit type={sf.benefitType} label={sf.benefitLabel} /></td>
+                                    </tr>
+                                    {expanded && <tr className="border-t bg-gray-50/70">
+                                        <td colSpan={6} className="space-y-5 p-3 sm:p-4">
+                                            {!sf.compliancePassed && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Skor performance tidak menghasilkan reward karena compliance di bawah {number(data.complianceMinScore)}%.</p>}
+                                            <ParamTable title="Compliance" rows={sf.params.filter((row) => row.category === "COMPLIANCE")} />
+                                            <ParamTable title="Performance" rows={sf.params.filter((row) => row.category === "PERFORMANCE")} />
+                                        </td>
+                                    </tr>}
+                                </React.Fragment>;
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div className="rounded-lg border bg-white p-4 shadow-sm">
