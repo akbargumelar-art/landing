@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import { Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
+import { Crosshair, Download, ExternalLink, Loader2, Pencil, Plus, QrCode, Save, Search, Trash2, X } from "lucide-react";
 
 import { ImportPanel } from "@/components/admin/mitra/import-panel";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,8 @@ export default function AdminMitraOutletPage() {
     // Status simpan ditampilkan menempel di panel dan bertahan sampai penyimpanan berikutnya --
     // alert() hilang begitu ditutup, sehingga hasil kerja lapangan tidak sempat terbaca.
     const [editStatus, setEditStatus] = React.useState<{ ok: boolean; teks: string } | null>(null);
+    const [menandaiLokasi, setMenandaiLokasi] = React.useState(false);
+    const [lokasiStatus, setLokasiStatus] = React.useState<{ ok: boolean; teks: string } | null>(null);
     const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
     const editRef = React.useRef<HTMLDivElement>(null);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -200,6 +202,7 @@ export default function AdminMitraOutletPage() {
         if (!res.ok) return alert(data.error || "Gagal memuat outlet");
         setEditOutlet(data.outlet);
         setEditStatus(null);
+        setLokasiStatus(null);
         setEditLogs(Array.isArray(data.editLogs) ? data.editLogs : []);
         setEditDetails({
             sellthruDigiposJson: data.details?.sellthruDigiposJson || {},
@@ -261,15 +264,67 @@ export default function AdminMitraOutletPage() {
 
         await kirim("branding", { branding: outlet.branding });
 
-        // Koordinat hanya dikirim bila benar-benar terisi; mengirim string kosong akan
-        // ditolak endpoint sebagai koordinat tidak valid padahal tidak ada yang diubah.
-        const lat = Number(outlet.latitude);
-        const lng = Number(outlet.longitude);
-        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
-            await kirim("location", { latitude: lat, longitude: lng });
+        // Koordinat sengaja TIDAK ikut di sini. Titik outlet hanya boleh berasal dari GPS
+        // perangkat lewat tombol Update Lokasi, yang menyimpannya sendiri beserta ketelitian
+        // pembacaannya -- lihat tandaiLokasi().
+        return gagal;
+    };
+
+    /**
+     * Membaca koordinat dari GPS perangkat lalu menyimpannya langsung. Server menolak
+     * pembacaan yang ketelitiannya di atas 200 m, karena angka setengah yakin lebih
+     * menyesatkan daripada titik yang belum diisi.
+     */
+    const tandaiLokasi = () => {
+        if (!editOutlet?.id) return;
+        if (!navigator.geolocation) {
+            setLokasiStatus({ ok: false, teks: "Perangkat atau browser ini tidak mendukung penanda lokasi." });
+            return;
         }
 
-        return gagal;
+        const id = String(editOutlet.id);
+        setMenandaiLokasi(true);
+        setLokasiStatus(null);
+
+        navigator.geolocation.getCurrentPosition(
+            async (posisi) => {
+                try {
+                    const res = await fetch(`/api/admin/mitra/outlets/${id}/location`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            latitude: posisi.coords.latitude,
+                            longitude: posisi.coords.longitude,
+                            accuracy: posisi.coords.accuracy,
+                        }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        setLokasiStatus({ ok: false, teks: data.error || "Lokasi gagal disimpan." });
+                        return;
+                    }
+                    setLokasiStatus({ ok: true, teks: `Lokasi tersimpan (ketelitian ±${Math.round(posisi.coords.accuracy)} m).` });
+                    // Panel dimuat ulang supaya koordinat dan tautan Maps yang tampil berasal
+                    // dari yang benar-benar tersimpan, bukan dari nilai di layar.
+                    await openEdit(id);
+                    load();
+                } catch {
+                    setLokasiStatus({ ok: false, teks: "Koneksi bermasalah saat menyimpan lokasi." });
+                } finally {
+                    setMenandaiLokasi(false);
+                }
+            },
+            (error) => {
+                setMenandaiLokasi(false);
+                setLokasiStatus({
+                    ok: false,
+                    teks: error.code === error.PERMISSION_DENIED
+                        ? "Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini lalu coba lagi."
+                        : "Lokasi tidak terbaca. Pastikan GPS aktif dan Anda berada di depan outlet.",
+                });
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
     };
 
     const saveEdit = async () => {
@@ -442,6 +497,10 @@ export default function AdminMitraOutletPage() {
                                 ["ownerPhone", "Nomor Owner"], ["tap", "TAP (nama cabang)"], ["kabupaten", "Kabupaten"],
                                 ["kecamatan", "Kecamatan"], ["longitude", "Longitude"], ["latitude", "Latitude"], ["photoUrl", "URL Foto"],
                             ] as [string, string][]).map(([key, label]) => {
+                                // Koordinat punya kontrol GPS tersendiri di bawah; menampilkannya
+                                // sebagai isian teks akan mengundang pengetikan manual yang justru
+                                // hendak dicegah.
+                                if (roleLapangan && (key === "longitude" || key === "latitude")) return null;
                                 const terkunci = roleLapangan && ["outletCode", "rsNumber", "tap", "photoUrl"].includes(key);
                                 return (
                                     <Field
@@ -473,9 +532,11 @@ export default function AdminMitraOutletPage() {
                                             </option>
                                         ))}
                                 </select>
-                                <Link href="/admin/mitra/salesforce" className="text-xs font-semibold text-red-600 hover:underline">
-                                    Kelola nama & foto salesforce
-                                </Link>
+                                {!roleLapangan && (
+                                    <Link href="/admin/mitra/salesforce" className="text-xs font-semibold text-red-600 hover:underline">
+                                        Kelola nama & foto salesforce
+                                    </Link>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Kategori Outlet</Label>
@@ -503,8 +564,8 @@ export default function AdminMitraOutletPage() {
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <Label>Status</Label>
-                                <select value={String(editOutlet.status || "ACTIVE")} onChange={(event) => updateEditField("status", event.target.value)} className="h-10 w-full rounded-md border px-3 text-sm">
+                                <Label>Status{roleLapangan ? " (dikelola admin)" : ""}</Label>
+                                <select value={String(editOutlet.status || "ACTIVE")} onChange={(event) => updateEditField("status", event.target.value)} disabled={roleLapangan} className="h-10 w-full rounded-md border px-3 text-sm disabled:bg-gray-100 disabled:text-muted-foreground">
                                     <option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="SUSPENDED">SUSPENDED</option>
                                 </select>
                             </div>
@@ -515,10 +576,56 @@ export default function AdminMitraOutletPage() {
                                         {mapsPreview}
                                     </a>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground">Isi Longitude dan Latitude untuk membuat tautan otomatis.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {roleLapangan
+                                            ? "Outlet ini belum punya titik lokasi."
+                                            : "Isi Longitude dan Latitude untuk membuat tautan otomatis."}
+                                    </p>
                                 )}
                                 <p className="text-xs text-muted-foreground">Dibuat otomatis dari koordinat, tidak perlu diketik.</p>
                             </div>
+
+                            {/**
+                              * Koordinat diambil dari GPS perangkat, bukan diketik. Mengetik
+                              * lintang/bujur manual adalah sumber titik outlet yang meleset --
+                              * satu digit tertukar sudah memindahkan penanda belasan kilometer,
+                              * dan tidak ada cara memverifikasinya dari layar ini.
+                              *
+                              * Disimpan langsung saat tombol ditekan, terpisah dari tombol Simpan
+                              * Perubahan: petugas menekannya sambil berdiri di depan outlet, dan
+                              * pembacaan GPS tidak boleh menunggu isian lain selesai diperiksa.
+                              */}
+                            {roleLapangan && (
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label>Titik Lokasi Outlet</Label>
+                                    <div className="rounded-lg border bg-gray-50 p-3">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
+                                        <p className="mt-1 font-mono text-sm text-gray-950">
+                                            {editOutlet.latitude && editOutlet.longitude
+                                                ? `${Number(editOutlet.latitude).toFixed(6)}, ${Number(editOutlet.longitude).toFixed(6)}`
+                                                : "Belum ditandai"}
+                                        </p>
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            <Button type="button" variant="outline" size="sm" onClick={tandaiLokasi} disabled={menandaiLokasi}>
+                                                {menandaiLokasi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                                                {menandaiLokasi ? "Membaca lokasi..." : "Update Lokasi Sekarang"}
+                                            </Button>
+                                            {lokasiStatus && (
+                                                <span
+                                                    role="status"
+                                                    className={`rounded-lg px-3 py-1.5 text-xs ${lokasiStatus.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                                                >
+                                                    {lokasiStatus.teks}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                            Tekan tombol ini <strong>saat berada di depan outlet</strong>. Koordinat diambil dari GPS
+                                            perangkat dan langsung tersimpan; ketelitian di atas 200 m akan ditolak.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {MITRA_DETAIL_FIELD_GROUPS.map((group) => (
