@@ -359,8 +359,16 @@ export async function recomputeKpiResults(programId: string) {
     if (!data) throw new Error("Program KPI Salesforce tidak ditemukan");
 
     const computedAt = new Date();
-    const rows = data.participants.map((participant) => {
-        const result = evaluateRuntimeParticipant(data, participant);
+    // Dievaluasi sekali lalu dipakai dua kali (baris hasil dan hitungan target kosong).
+    // Memanggil ulang evaluateRuntimeParticipant untuk rekapnya berarti menghitung seluruh
+    // agregasi dua kali -- pada program berisi ratusan SF itu menggandakan biaya recompute,
+    // operasi paling berat di modul ini.
+    const evaluations = data.participants.map((participant) => ({
+        participant,
+        result: evaluateRuntimeParticipant(data, participant),
+    }));
+
+    const rows = evaluations.map(({ participant, result }) => {
         return {
             id: uuid(),
             programId,
@@ -382,7 +390,10 @@ export async function recomputeKpiResults(programId: string) {
         if (rows.length > 0) await tx.insert(mitraKpiResults).values(rows);
     });
 
-    return { computed: rows.length, missingTargets: data.participants.reduce((sum, participant) => sum + evaluateRuntimeParticipant(data, participant).missingTargetCount, 0) };
+    return {
+        computed: rows.length,
+        missingTargets: evaluations.reduce((sum, item) => sum + item.result.missingTargetCount, 0),
+    };
 }
 
 export interface KpiPublicFilters {
