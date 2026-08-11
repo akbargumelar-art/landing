@@ -254,10 +254,78 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
             ) : (
             <>
 
-            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                {/* Kartu pencarian menumpuk hero supaya jadi hal pertama yang dilihat peserta
-                    ketika membuka halaman dari tautan atau QR. */}
-                <div className="-mt-6 rounded-lg border bg-white p-5 shadow-md">
+            <section className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+                {isRacing
+                    ? podium.length > 0 && <PodiumPemenang winners={podium} sementara={!adaPemenangResmi} />
+                    : adaPemenangResmi && <DaftarPenerima winners={winners} />}
+
+                {rewardRules.length > 0 && (
+                    <DaftarHadiah rules={rewardRules} isRacing={isRacing} params={programParams} />
+                )}
+
+                {(programParams.length > 0 || program?.mechanismMd) && (
+                    <div className="rounded-lg border bg-white p-4 shadow-sm sm:p-5">
+                        <h2 className="text-sm font-bold sm:text-base">Mekanisme &amp; Parameter Penilaian</h2>
+                        {program?.mechanismMd && (
+                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">{program.mechanismMd}</p>
+                        )}
+                        {programParams.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
+                                {programParams.map((param) => (
+                                    <span key={param.id} className="inline-flex items-center gap-1.5 rounded-full border bg-gray-50 px-2.5 py-1 text-[11px] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+                                        <span className="font-semibold text-gray-950">{param.label}</span>
+                                        {param.unit && <span className="text-muted-foreground">({param.unit})</span>}
+                                        {/* Parameter informasi tidak punya bobot -- menampilkan "bobot 0"
+                                            akan terbaca seolah nilainya dihitung tapi tidak berarti. */}
+                                        {param.isScored === false ? (
+                                            <span className="rounded-full bg-gray-200 px-2 py-0.5 font-bold text-gray-600">
+                                                informasi
+                                            </span>
+                                        ) : (
+                                            <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">
+                                                bobot {Number(param.weight).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                            </span>
+                                        )}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {groups.length > 0 && (
+                    <div className="rounded-lg border bg-white p-3 shadow-sm sm:p-4">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-950">
+                                <Filter className="h-4 w-4 text-red-600" />
+                                Pilih {groupBy === "TAP" ? "TAP" : groupBy === "KABUPATEN" ? "Kabupaten" : "Kecamatan"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                Peringkat dan pemenang dihitung terpisah di tiap wilayah.
+                            </span>
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap gap-1.5 sm:gap-2">
+                            {groups.map((item) => (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => setGroup(item)}
+                                    className={`rounded-full px-3 py-1 text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
+                                        group === item
+                                            ? "bg-red-600 text-white"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    }`}
+                                >
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Pencarian berada tepat di atas tabel: yang dicari peserta adalah barisnya
+                    sendiri, jadi hasilnya muncul berdampingan dengan daftar lengkapnya. */}
+                <div className="rounded-lg border bg-white p-4 shadow-sm sm:p-5">
                     <h2 className="text-sm font-bold text-gray-950">Cari Pencapaian {istilah}</h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                         {isSalesforce ? "Masukkan nama salesforce atau TAP." : "Masukkan kode outlet, nama outlet, atau kecamatan."}
@@ -335,82 +403,12 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                         )
                     )}
                 </div>
-            </section>
-
-            <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-                {groups.length > 0 && (
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-950">
-                                <Filter className="h-4 w-4 text-red-600" />
-                                Pilih {groupBy === "TAP" ? "TAP" : groupBy === "KABUPATEN" ? "Kabupaten" : "Kecamatan"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                Peringkat dan pemenang dihitung terpisah di tiap wilayah.
-                            </span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {groups.map((item) => (
-                                <button
-                                    key={item}
-                                    type="button"
-                                    onClick={() => setGroup(item)}
-                                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                                        group === item
-                                            ? "bg-red-600 text-white"
-                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                    }`}
-                                >
-                                    {item}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {isRacing
-                    ? podium.length > 0 && <PodiumPemenang winners={podium} sementara={!adaPemenangResmi} />
-                    : adaPemenangResmi && <DaftarPenerima winners={winners} />}
-
-                {rewardRules.length > 0 && (
-                    <DaftarHadiah rules={rewardRules} isRacing={isRacing} params={programParams} />
-                )}
-
-                {(programParams.length > 0 || program?.mechanismMd) && (
-                    <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <h2 className="font-bold">Mekanisme &amp; Parameter Penilaian</h2>
-                        {program?.mechanismMd && (
-                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">{program.mechanismMd}</p>
-                        )}
-                        {programParams.length > 0 && (
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                {programParams.map((param) => (
-                                    <span key={param.id} className="inline-flex items-center gap-2 rounded-full border bg-gray-50 px-3 py-1.5 text-xs">
-                                        <span className="font-semibold text-gray-950">{param.label}</span>
-                                        {param.unit && <span className="text-muted-foreground">({param.unit})</span>}
-                                        {/* Parameter informasi tidak punya bobot -- menampilkan "bobot 0"
-                                            akan terbaca seolah nilainya dihitung tapi tidak berarti. */}
-                                        {param.isScored === false ? (
-                                            <span className="rounded-full bg-gray-200 px-2 py-0.5 font-bold text-gray-600">
-                                                informasi
-                                            </span>
-                                        ) : (
-                                            <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">
-                                                bobot {Number(param.weight).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
-                                            </span>
-                                        )}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5 sm:py-4">
                         <div>
-                            <h2 className="font-bold">{isRacing ? "Papan Peringkat Peserta" : "Tabel Pencapaian Peserta"}</h2>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
+                            <h2 className="text-sm font-bold sm:text-base">{isRacing ? "Papan Peringkat Peserta" : "Tabel Pencapaian Peserta"}</h2>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">
                                 {leaderboard.length > 0
                                     ? `${leaderboard.length.toLocaleString("id-ID")} peserta${diperbarui ? ` · diperbarui ${formatTanggal(diperbarui)}` : ""}`
                                     : "Pencapaian dihitung ulang setiap kali data baru diunggah."}
@@ -419,24 +417,24 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table className="w-full border-collapse text-sm" style={{ minWidth: `${520 + programParams.length * 120}px` }}>
+                        <table className="w-full border-collapse text-xs sm:text-sm" style={{ minWidth: `${360 + programParams.length * 92}px` }}>
                             <thead>
                                 {/* Kolom parameter dibangun dari konfigurasi program, jadi tiap
                                     program otomatis punya kolom pencapaiannya sendiri. */}
-                                <tr className="border-b bg-gray-50 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    {isRacing && <th className="w-24 px-4 py-3 text-left">Rangking</th>}
-                                    <th className="px-4 py-3 text-left">{isSalesforce ? "Salesforce" : "Kode Outlet"}</th>
-                                    {!isSalesforce && <th className="px-4 py-3 text-left">Nama Outlet</th>}
-                                    <th className="px-4 py-3 text-left">{isSalesforce ? "TAP" : "Kecamatan"}</th>
+                                <tr className="border-b bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">
+                                    {isRacing && <th className="w-16 px-3 py-2.5 text-left sm:w-24 sm:px-4 sm:py-3">Rank</th>}
+                                    <th className="px-3 py-2.5 text-left sm:px-4 sm:py-3">{isSalesforce ? "Salesforce" : "Kode"}</th>
+                                    {!isSalesforce && <th className="px-3 py-2.5 text-left sm:px-4 sm:py-3">Nama Outlet</th>}
+                                    <th className="px-3 py-2.5 text-left sm:px-4 sm:py-3">{isSalesforce ? "TAP" : "Kecamatan"}</th>
                                     {programParams.map((param) => (
-                                        <th key={param.id} className="px-4 py-3 text-right">
+                                        <th key={param.id} className="px-3 py-2.5 text-right sm:px-4 sm:py-3">
                                             {param.label}{param.unit ? ` (${param.unit})` : ""}
                                             {param.isScored === false && (
                                                 <span className="ml-1 font-normal normal-case text-gray-400">(info)</span>
                                             )}
                                         </th>
                                     ))}
-                                    <th className="px-4 py-3 text-right">Total Poin</th>
+                                    <th className="px-3 py-2.5 text-right sm:px-4 sm:py-3">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -445,33 +443,33 @@ export function ProgramPublicView({ targetType }: { targetType: TargetType }) {
                                 ) : leaderboard.length ? leaderboard.map((row) => (
                                     <tr key={row.participantKey} className="border-b last:border-0 odd:bg-gray-50/50 hover:bg-red-50/40">
                                         {isRacing && (
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-extrabold ring-1 ${gayaPeringkat(row.rank)}`}>
+                                            <td className="px-3 py-2 sm:px-4 sm:py-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold ring-1 ${gayaPeringkat(row.rank)}`}>
                                                         {row.rank ?? "-"}
                                                     </span>
                                                     <PergerakanPeringkat rank={row.rank} prevRank={row.prevRank} ringkas />
                                                 </div>
                                             </td>
                                         )}
-                                        <td className={`px-4 py-3 ${isSalesforce ? "font-semibold text-gray-950" : "font-mono text-xs text-muted-foreground"}`}>
+                                        <td className={`px-3 py-2 sm:px-4 sm:py-3 ${isSalesforce ? "font-semibold text-gray-950" : "font-mono text-[11px] text-muted-foreground sm:text-xs"}`}>
                                             {isSalesforce ? row.name : row.code}
                                         </td>
                                         {!isSalesforce && (
-                                            <td className="px-4 py-3">
-                                                <span className="font-semibold text-gray-950">{row.name}</span>
+                                            <td className="max-w-[11rem] px-3 py-2 sm:max-w-none sm:px-4 sm:py-3">
+                                                <span className="block truncate font-semibold text-gray-950 sm:inline sm:whitespace-normal" title={row.name}>{row.name}</span>
                                                 {row.rank === null && (
-                                                    <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-muted-foreground">belum ada data</span>
+                                                    <span className="mt-0.5 inline-block rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-muted-foreground sm:ml-2 sm:mt-0">belum ada data</span>
                                                 )}
                                             </td>
                                         )}
-                                        <td className="px-4 py-3 text-muted-foreground">{row.area || "-"}</td>
+                                        <td className="px-3 py-2 text-muted-foreground sm:px-4 sm:py-3">{row.area || "-"}</td>
                                         {programParams.map((param) => (
-                                            <td key={param.id} className="px-4 py-3 text-right tabular-nums text-gray-700">
+                                            <td key={param.id} className="px-3 py-2 text-right tabular-nums text-gray-700 sm:px-4 sm:py-3">
                                                 {formatPoin(row.metrics?.[param.key]?.raw ?? 0)}
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-right font-extrabold tabular-nums text-gray-950">{formatPoin(row.totalPoints)}</td>
+                                        <td className="px-3 py-2 text-right font-extrabold tabular-nums text-gray-950 sm:px-4 sm:py-3">{formatPoin(row.totalPoints)}</td>
                                     </tr>
                                 )) : (
                                     <tr><td colSpan={jumlahKolom} className="h-24 text-center text-muted-foreground">Data pencapaian belum tersedia.</td></tr>
@@ -613,15 +611,15 @@ function DaftarHadiah({ rules, isRacing, params }: { rules: RewardRuleRow[]; isR
     };
 
     return (
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-                <Gift className="h-5 w-5 text-red-600" />
-                <h2 className="font-bold">Hadiah Program</h2>
+        <div className="rounded-lg border bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
+                <Gift className="h-4 w-4 text-red-600 sm:h-5 sm:w-5" />
+                <h2 className="text-sm font-bold sm:text-base">Hadiah Program</h2>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {rules.map((rule) => (
-                    <div key={rule.id} className="flex items-center gap-3 rounded-lg border bg-gray-50 px-4 py-3">
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-red-700 ring-1 ring-red-200">
+                    <div key={rule.id} className="flex items-center gap-2.5 rounded-lg border bg-gray-50 px-3 py-2">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-extrabold text-red-700 ring-1 ring-red-200">
                             {syarat(rule)}
                         </span>
                         <p className="min-w-0 truncate text-sm font-semibold text-gray-950">{rule.rewardLabel}</p>
@@ -670,46 +668,59 @@ function PodiumPemenang({ winners, sementara }: { winners: WinnerRow[]; sementar
     const urutanPodium = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
 
     return (
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
-            <div className="mb-5 flex flex-wrap items-center gap-2">
-                <Trophy className="h-5 w-5 text-amber-500" />
-                <h2 className="font-bold">{sementara ? "Pemenang Sementara" : "Pemenang Program"}</h2>
+        <div className="rounded-lg border bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 sm:mb-5">
+                <Trophy className="h-4 w-4 text-amber-500 sm:h-5 sm:w-5" />
+                <h2 className="text-sm font-bold sm:text-base">{sementara ? "Pemenang Sementara" : "Pemenang Program"}</h2>
                 {sementara && (
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
-                        Belum final — mengikuti data terakhir yang masuk
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 sm:text-xs">
+                        Belum final
                     </span>
                 )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
                 {urutanPodium.map((winner) => {
                     const juara = winner.rank === 1;
                     return (
                         <div
                             key={`${winner.participantKey}-${winner.rank}`}
-                            // order-first hanya berlaku di layar sempit: di sana kolomnya
-                            // menumpuk, jadi juara 1 harus naik ke atas. Kelasnya ditulis
-                            // utuh, bukan dirangkai dari variabel, supaya ikut ter-generate.
-                            className={`${juara ? "order-first sm:order-none" : ""} rounded-lg border-2 p-4 text-center ${
+                            /**
+                             * Di layar sempit kartunya jadi baris mendatar -- podium bertingkat
+                             * hanya masuk akal saat ketiganya berjajar. order-first menaikkan
+                             * juara 1 ke atas di sana; kelasnya ditulis utuh, bukan dirangkai
+                             * dari variabel, supaya ikut ter-generate.
+                             */
+                            className={`${juara ? "order-first sm:order-none" : ""} flex items-center gap-3 rounded-lg border-2 p-2.5 text-left sm:block sm:p-4 sm:text-center ${
                                 juara
-                                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white sm:-mt-3 sm:pb-7"
+                                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white sm:-mt-3 sm:pb-6"
                                     : winner.rank === 2
                                         ? "border-slate-200 bg-slate-50/60"
                                         : "border-orange-200 bg-orange-50/50"
                             }`}
                         >
-                            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
-                                {juara ? <Crown className="h-5 w-5 text-amber-500" /> : <Award className={`h-5 w-5 ${winner.rank === 2 ? "text-slate-400" : "text-orange-400"}`} />}
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm sm:mx-auto sm:mb-2 sm:h-10 sm:w-10">
+                                {juara
+                                    ? <Crown className="h-4 w-4 text-amber-500 sm:h-5 sm:w-5" />
+                                    : <Award className={`h-4 w-4 sm:h-5 sm:w-5 ${winner.rank === 2 ? "text-slate-400" : "text-orange-400"}`} />}
                             </div>
-                            <p className={`text-xs font-extrabold uppercase tracking-wide ${juara ? "text-amber-600" : "text-muted-foreground"}`}>
-                                Juara {winner.rank}
-                            </p>
-                            <p className="mt-1 font-bold text-gray-950">{winner.name}</p>
-                            <p className="text-xs text-muted-foreground">{winner.code}</p>
-                            {winner.prizeLabel && (
-                                <p className="mt-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                                    {winner.prizeLabel}
+
+                            <div className="min-w-0 flex-1 sm:flex-none">
+                                <p className={`text-[10px] font-extrabold uppercase tracking-wide sm:text-xs ${juara ? "text-amber-600" : "text-muted-foreground"}`}>
+                                    Juara {winner.rank}
                                 </p>
+                                {/* Nama peserta bisa sangat panjang (kode + nomor + nama pemilik),
+                                    jadi dipotong alih-alih memanjangkan kartu berlipat-lipat. */}
+                                <p className="truncate text-sm font-bold text-gray-950 sm:mt-1 sm:whitespace-normal sm:text-base" title={winner.name}>
+                                    {winner.name}
+                                </p>
+                                <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{winner.code}</p>
+                            </div>
+
+                            {winner.prizeLabel && (
+                                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200 sm:mt-2 sm:inline-block sm:text-xs">
+                                    {winner.prizeLabel}
+                                </span>
                             )}
                         </div>
                     );
@@ -717,15 +728,15 @@ function PodiumPemenang({ winners, sementara }: { winners: WinnerRow[]; sementar
             </div>
 
             {sisanya.length > 0 && (
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-2 grid gap-2 sm:mt-4 sm:grid-cols-2 lg:grid-cols-3">
                     {sisanya.map((winner) => (
-                        <div key={`${winner.participantKey}-${winner.rank}`} className="flex items-center gap-3 rounded-lg border bg-gray-50 px-4 py-3">
-                            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-extrabold text-gray-600 ring-1 ring-gray-200">
+                        <div key={`${winner.participantKey}-${winner.rank}`} className="flex items-center gap-3 rounded-lg border bg-gray-50 px-3 py-2">
+                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-extrabold text-gray-600 ring-1 ring-gray-200">
                                 {winner.rank}
                             </span>
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-gray-950">{winner.name}</p>
-                                <p className="text-xs text-muted-foreground">{winner.prizeLabel || winner.code}</p>
+                                <p className="truncate text-[11px] text-muted-foreground">{winner.prizeLabel || winner.code}</p>
                             </div>
                         </div>
                     ))}
