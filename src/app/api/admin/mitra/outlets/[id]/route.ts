@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
-import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { findOutletInScope, getAdminActorScope } from "@/lib/admin-scope";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
@@ -26,17 +27,18 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const [outlet] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
-    if (!outlet) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
 
-    // The list endpoint filters by TAP, so this one must too - otherwise a scoped role
-    // could read any outlet's sensitive performance detail just by knowing its id.
-    if (auth.session && isTapScopedRole(auth.session.role)) {
-        const taps = await getUserTaps(auth.session.userId);
-        if (!outlet.tap || !taps.includes(outlet.tap)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-    }
+    /**
+     * Daftar sudah dibatasi wewenang, jadi detail wajib dibatasi juga -- kalau tidak, cukup
+     * menebak id untuk membaca performance outlet mana pun. Dijawab 404, bukan 403, supaya
+     * keberadaan record di luar wewenang tidak bisa dipetakan dengan mencoba id satu per satu.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const akses = await findOutletInScope(scope, id);
+    if (akses.error) return akses.error;
+    const outlet = akses.outlet;
 
     const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
     const editLogs = await getOutletEditLogs(id, 30);

@@ -232,6 +232,19 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
     const isSalesforce = targetType === "SALESFORCE";
     const istilahPeserta = isSalesforce ? "Salesforce" : "Outlet";
 
+    /**
+     * Role lapangan membuka halaman ini untuk MELIHAT pencapaiannya, bukan mengelola program.
+     * Seluruh endpoint konfigurasi, import, dan recompute memang sudah menolak mereka; kontrolnya
+     * disembunyikan supaya layar tidak menawarkan tombol yang pasti gagal.
+     */
+    const [bolehKelola, setBolehKelola] = React.useState(true);
+    React.useEffect(() => {
+        fetch("/api/admin/me")
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => setBolehKelola(["SUPER_ADMIN", "ADMIN_INPUT"].includes(data?.session?.role)))
+            .catch(() => setBolehKelola(false));
+    }, []);
+
     const [tab, setTab] = React.useState<MechanismType>("RACING");
     const [programs, setPrograms] = React.useState<Program[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -523,10 +536,10 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                         Susun aturan di awal, unggah pencapaian tiap hari, papan skor dan hadiah dihitung otomatis.
                     </p>
                 </div>
-                <Button onClick={() => setShowForm((prev) => !prev)}>
+                {bolehKelola && <Button onClick={() => setShowForm((prev) => !prev)}>
                     <Plus className="h-4 w-4" />
                     {showForm ? "Tutup Form" : `Program ${copy.judul} Baru`}
-                </Button>
+                </Button>}
             </div>
 
             <div className="inline-flex rounded-lg border bg-white p-1">
@@ -546,7 +559,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
             </div>
             <p className="-mt-3 text-sm text-muted-foreground">{copy.ringkas}</p>
 
-            {showForm && (
+            {showForm && bolehKelola && (
                 <Card>
                     <CardContent className="p-5">
                         <form onSubmit={simpanProgram} className="grid gap-3 lg:grid-cols-4">
@@ -684,9 +697,9 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     <TableCell className="text-right">
                                         <div className="flex flex-wrap justify-end gap-2">
                                             <Button variant="outline" size="sm" onClick={() => bukaKelola(program.id)}>Kelola</Button>
-                                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => hapusProgram(program)}>
+                                            {bolehKelola && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => hapusProgram(program)}>
                                                 <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            </Button>}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -704,14 +717,17 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
                             <div>
                                 <h2 className="text-lg font-bold">{selected.name}</h2>
-                                <p className="text-sm text-muted-foreground">{MECHANISM_COPY[selected.mechanismType].judul} · {participants.length} peserta</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {MECHANISM_COPY[selected.mechanismType].judul} · {participants.length} peserta
+                                    {!bolehKelola && " · hanya lihat"}
+                                </p>
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setSelected(null)}>
                                 <X className="h-4 w-4" /> Tutup
                             </Button>
                         </div>
 
-                        <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
+                        {bolehKelola && <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
                             <div className="space-y-1">
                                 <Label className="text-xs">Status</Label>
                                 <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="h-10 rounded-md border px-3 text-sm">
@@ -795,9 +811,9 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                             }}>
                                 <RefreshCw className="h-4 w-4" /> {selected.mechanismType === "KPI" ? "Hitung Ulang KPI" : "Hitung Ulang Papan Skor"}
                             </Button>
-                        </div>
+                        </div>}
 
-                        <div className="grid gap-5 lg:grid-cols-2">
+                        {bolehKelola && <div className="grid gap-5 lg:grid-cols-2">
                             <div className="space-y-3">
                                 <div>
                                     <h3 className="font-bold">Peserta</h3>
@@ -1024,10 +1040,10 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </div>}
 
                         <div className="grid gap-5 lg:grid-cols-2">
-                            <div className="space-y-3">
+                            {bolehKelola && <div className="space-y-3">
                                 <div>
                                     <h3 className="font-bold">Parameter Penilaian</h3>
                                     <p className="text-xs text-muted-foreground">
@@ -1068,9 +1084,9 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                     const weight = performance.reduce((sum, param) => sum + Number(param.weight || 0), 0);
                                     return <p className={`text-xs ${weight === 100 ? "text-green-700" : "text-amber-700"}`}>{parsed.filter((param) => param.kpiCategory === "COMPLIANCE").length} compliance · {performance.length} performance · bobot performance {weight}%{weight !== 100 ? " (disarankan 100%)" : ""}</p>;
                                 })()}
-                            </div>
+                            </div>}
 
-                            <div className="space-y-3">
+                            {bolehKelola && <div className="space-y-3">
                                 <div>
                                     <h3 className="font-bold">{MECHANISM_COPY[selected.mechanismType].aturan}</h3>
                                     {selectedParams.length > 0 && selected.mechanismType === "REWARD" && (
@@ -1087,9 +1103,9 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
                                 )}>
                                     <Save className="h-4 w-4" /> Simpan Aturan
                                 </Button>
-                            </div>
+                            </div>}
 
-                            {selected.mechanismType !== "KPI" && <div className="space-y-3">
+                            {selected.mechanismType !== "KPI" && bolehKelola && <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-bold">Hadiah Otomatis</h3>
                                     <Button variant="outline" size="sm" disabled={busy} onClick={hitungReward}>

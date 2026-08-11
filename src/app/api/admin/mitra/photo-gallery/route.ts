@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces } from "@/db/schema";
-import { getUserTaps, isTapScopedRole, requireRole } from "@/lib/admin-auth";
+import { requireRole } from "@/lib/admin-auth";
+import { getAdminActorScope, outletScopeCondition, type AdminActorScope } from "@/lib/admin-scope";
 import { MITRA_PHOTO_SLOTS } from "@/lib/mitra-outlet-photos";
 import { PJP_DAYS } from "@/lib/mitra-outlet-options";
 
@@ -14,8 +15,7 @@ const PAGE_SIZE_MAKS = 120;
 
 type OutletRow = Awaited<ReturnType<typeof ambilOutletDalamScope>>[number];
 
-async function ambilOutletDalamScope(taps: string[] | null) {
-    if (taps?.length === 0) return [];
+async function ambilOutletDalamScope(scope: AdminActorScope) {
 
     return db
         .select({
@@ -39,7 +39,7 @@ async function ambilOutletDalamScope(taps: string[] | null) {
         })
         .from(mitraOutlets)
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
-        .where(taps ? inArray(mitraOutlets.tap, taps) : undefined)
+        .where(outletScopeCondition(scope) ?? undefined)
         .orderBy(mitraOutlets.name);
 }
 
@@ -98,12 +98,13 @@ export async function GET(request: Request) {
     const page = Math.max(Number(params.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(params.get("pageSize") || String(PAGE_SIZE_DEFAULT)), 1), PAGE_SIZE_MAKS);
 
-    let scopeTaps: string[] | null = null;
-    if (auth.session && isTapScopedRole(auth.session.role)) {
-        scopeTaps = await getUserTaps(auth.session.userId);
-    }
+    // Cakupan dibatasi di query, bukan disaring setelah baris terbaca: seluruh opsi filter,
+    // cacah, dan ringkasan di bawah diturunkan dari daftar ini, jadi menyaring belakangan akan
+    // membocorkan keberadaan outlet di luar wewenang lewat angka-angkanya.
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const scopedOutlets = await ambilOutletDalamScope(scopeTaps);
+    const scopedOutlets = await ambilOutletDalamScope(scope);
 
     // Opsi filter mencerminkan seluruh cakupan pemanggil, bukan hasil yang sedang tersaring --
     // supaya memilih satu filter tidak diam-diam menyembunyikan pilihan filter yang lain.

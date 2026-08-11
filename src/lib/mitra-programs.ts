@@ -92,6 +92,12 @@ export interface ProgramParticipantInfo {
     tap: string;
     kabupaten: string;
     kecamatan: string;
+    /**
+     * Petugas yang membina peserta ini: id salesforce pembina untuk peserta outlet, dan id
+     * dirinya sendiri untuk peserta salesforce. Dipakai membatasi data program menurut
+     * wewenang pemanggil, memakai aturan yang sama dengan pembatasan outlet.
+     */
+    salesforceId: string | null;
 }
 
 export function normalizeGroupBy(nilai: unknown): ProgramGroupBy {
@@ -140,6 +146,7 @@ export async function listProgramParticipants(programId: string, targetType: Pro
             tap: row.tap || "",
             kabupaten: "",
             kecamatan: "",
+            salesforceId: row.id,
         }));
     }
 
@@ -152,6 +159,7 @@ export async function listProgramParticipants(programId: string, targetType: Pro
             tap: mitraOutlets.tap,
             kabupaten: mitraOutlets.kabupaten,
             kecamatan: mitraOutlets.kecamatan,
+            salesforceId: mitraOutlets.salesforceId,
         })
         .from(mitraProgramParticipants)
         .innerJoin(mitraOutlets, eq(mitraProgramParticipants.outletId, mitraOutlets.id))
@@ -167,6 +175,7 @@ export async function listProgramParticipants(programId: string, targetType: Pro
         tap: row.tap || "",
         kabupaten: row.kabupaten || "",
         kecamatan: row.kecamatan || "",
+        salesforceId: row.salesforceId,
     }));
 }
 

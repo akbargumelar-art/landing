@@ -32,6 +32,16 @@ import {
 
 type AdminRole = "SUPER_ADMIN" | "ADMIN_INPUT" | "MANAGER" | "SUPERVISOR" | "SALESFORCE";
 
+/**
+ * Role kantor: mengelola data lintas wilayah dan konfigurasi sistem.
+ *
+ * Role lapangan (Supervisor dan Salesforce) sengaja tidak masuk daftar ini. Keduanya login
+ * untuk memelihara outlet binaannya, bukan untuk membuka seluruh dashboard -- menu yang
+ * muncul hanya karena seseorang berhasil masuk adalah cara paling mudah orang tersesat ke
+ * layar yang API-nya akan menolaknya.
+ */
+const ROLE_KANTOR: AdminRole[] = ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER"];
+
 const sidebarGroups = [
     {
         // Seluruh grup ini khusus Admin Super: berisi konfigurasi sistem, gateway WhatsApp,
@@ -47,21 +57,21 @@ const sidebarGroups = [
     {
         title: "Layanan & Portal",
         links: [
-            { href: "/admin/mitra/salesforce", label: "Database Salesforce", icon: BadgeCheck },
+            { href: "/admin/mitra/salesforce", label: "Database Salesforce", icon: BadgeCheck, roles: ROLE_KANTOR },
             { href: "/admin/mitra/outlet", label: "Database Outlet", icon: Store },
             { href: "/admin/mitra/monitoring", label: "Monitoring Visit", icon: Route },
-            { href: "/admin/mitra/program", label: "Program Outlet", icon: Trophy },
+            { href: "/admin/mitra/program", label: "Program Outlet", icon: Trophy, roles: ROLE_KANTOR },
             { href: "/admin/mitra/program-salesforce", label: "Program Salesforce", icon: Gift },
-            { href: "/admin/indihome", label: "IndiHome", icon: Wifi },
-            { href: "/admin/cuan", label: "Kalkulator Cuan", icon: Calculator },
+            { href: "/admin/indihome", label: "IndiHome", icon: Wifi, roles: ROLE_KANTOR },
+            { href: "/admin/cuan", label: "Kalkulator Cuan", icon: Calculator, roles: ROLE_KANTOR },
         ]
     },
     {
         title: "E-Commerce",
         links: [
-            { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart },
-            { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket },
-            { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox },
+            { href: "/admin/belanja/produk", label: "Produk Belanja", icon: ShoppingCart, roles: ROLE_KANTOR },
+            { href: "/admin/belanja/voucher", label: "Stok Voucher", icon: Ticket, roles: ROLE_KANTOR },
+            { href: "/admin/belanja/pesanan", label: "Pesanan Masuk", icon: Inbox, roles: ROLE_KANTOR },
         ]
     },
     {
@@ -69,10 +79,10 @@ const sidebarGroups = [
         // Layanan & Portal bersama data yang dinilainya.
         title: "Event & Form",
         links: [
-            { href: "/admin/program", label: "Program Undian", icon: FileText },
-            { href: "/admin/form-builder", label: "Form Pengajuan", icon: FormInput },
-            { href: "/admin/peserta", label: "Data Peserta", icon: Users },
-            { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle },
+            { href: "/admin/program", label: "Program Undian", icon: FileText, roles: ROLE_KANTOR },
+            { href: "/admin/form-builder", label: "Form Pengajuan", icon: FormInput, roles: ROLE_KANTOR },
+            { href: "/admin/peserta", label: "Data Peserta", icon: Users, roles: ROLE_KANTOR },
+            { href: "/admin/undi", label: "Undi Pemenang", icon: Shuffle, roles: ROLE_KANTOR },
         ]
     },
     {
@@ -103,7 +113,7 @@ export default function AdminLayout({
 
     const visibleGroups = sidebarGroups.map((group) => ({
         ...group,
-        links: group.links.filter((link) => !("roles" in link) || !role || (link.roles as AdminRole[]).includes(role)),
+        links: group.links.filter((link) => !("roles" in link) || (role !== null && (link.roles as AdminRole[]).includes(role))),
     })).filter((group) => group.links.length > 0);
 
     // Match the most specific href: /admin/mitra/program must not resolve to /admin/mitra.

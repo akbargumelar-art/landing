@@ -4,7 +4,8 @@ import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets, mitraSalesforces } from "@/db/schema";
-import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getAdminActorScope, outletScopeCondition } from "@/lib/admin-scope";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
@@ -42,13 +43,19 @@ export async function GET(request: Request) {
         filters.push(eq(mitraOutlets.status, status as "ACTIVE" | "INACTIVE" | "SUSPENDED"));
     }
 
-    if (auth.session && isTapScopedRole(auth.session.role)) {
-        const taps = await getUserTaps(auth.session.userId);
-        if (taps.length === 0) {
-            return NextResponse.json({ outlets: [], total: 0, page, pageSize });
-        }
-        filters.push(inArray(mitraOutlets.tap, taps));
-    }
+    /**
+     * Pembatasan wewenang masuk ke KONDISI QUERY, bukan menyaring hasil setelahnya: nilai
+     * `total` dihitung dari where yang sama, jadi menyaring belakangan akan membocorkan
+     * cacah outlet di luar wewenang lewat angka totalnya sendiri.
+     *
+     * Sebelumnya pembatasan hanya memakai TAP, sehingga seorang salesforce ikut melihat --
+     * dan lewat endpoint detail, membaca -- seluruh outlet binaan rekan setimnya.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const kondisiScope = outletScopeCondition(scope);
+    if (kondisiScope) filters.push(kondisiScope);
 
     const where = filters.length > 0 ? and(...filters) : undefined;
 

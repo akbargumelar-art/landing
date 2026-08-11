@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 
 import { db } from "@/db";
 import { mitraOutlets, mitraSalesforces } from "@/db/schema";
-import { getUserTaps, isTapScopedRole, requireRole } from "@/lib/admin-auth";
+import { requireRole } from "@/lib/admin-auth";
+import { getAdminActorScope, outletScopeCondition, type AdminActorScope } from "@/lib/admin-scope";
 import { BATAS_SEGAR_HARI, MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
 import { OUTLET_CATEGORIES, PJP_DAYS } from "@/lib/mitra-outlet-options";
 
@@ -17,8 +18,7 @@ type Kondisi = (typeof KONDISI)[number];
 
 type OutletRow = Awaited<ReturnType<typeof ambilOutletDalamScope>>[number];
 
-async function ambilOutletDalamScope(taps: string[] | null) {
-    if (taps?.length === 0) return [];
+async function ambilOutletDalamScope(scope: AdminActorScope) {
 
     return db
         .select({
@@ -43,7 +43,7 @@ async function ambilOutletDalamScope(taps: string[] | null) {
         })
         .from(mitraOutlets)
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
-        .where(taps ? inArray(mitraOutlets.tap, taps) : undefined)
+        .where(outletScopeCondition(scope) ?? undefined)
         .orderBy(mitraOutlets.name);
 }
 
@@ -115,12 +115,13 @@ export async function GET(request: Request) {
     const page = Math.max(Number(params.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(params.get("pageSize") || "50"), 1), 100);
 
-    let scopeTaps: string[] | null = null;
-    if (auth.session && isTapScopedRole(auth.session.role)) {
-        scopeTaps = await getUserTaps(auth.session.userId);
-    }
+    // Cakupan dibatasi di query, bukan disaring setelah baris terbaca: seluruh opsi filter,
+    // cacah, dan ringkasan di bawah diturunkan dari daftar ini, jadi menyaring belakangan akan
+    // membocorkan keberadaan outlet di luar wewenang lewat angka-angkanya.
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const scopedOutlets = await ambilOutletDalamScope(scopeTaps);
+    const scopedOutlets = await ambilOutletDalamScope(scope);
     const taps = [...new Set(scopedOutlets.map((row) => row.tap).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id"));
     const salesforces = [...new Map(scopedOutlets
         .filter((row) => row.salesforceId && row.salesforce)

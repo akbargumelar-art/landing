@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import { mitraMetricDefs, mitraOutletMetrics, mitraOutlets } from "@/db/schema";
-import { getUserTaps, isTapScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getAdminActorScope, outletScopeCondition } from "@/lib/admin-scope";
 import { getClientIp, toDecimalString } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +23,11 @@ export async function GET(request: Request) {
     const filters = [];
     if (outletId) filters.push(eq(mitraOutletMetrics.outletId, outletId));
     if (periodYm) filters.push(eq(mitraOutletMetrics.periodYm, periodYm));
-    if (auth.session && isTapScopedRole(auth.session.role)) {
-        const taps = await getUserTaps(auth.session.userId);
-        filters.push(taps.length > 0 ? inArray(mitraOutlets.tap, taps) : eq(mitraOutlets.tap, "__none__"));
-    }
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const kondisiScope = outletScopeCondition(scope);
+    if (kondisiScope) filters.push(kondisiScope);
 
     const rows = await db
         .select({

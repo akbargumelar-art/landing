@@ -58,6 +58,7 @@ interface SalesforceOption {
 }
 
 export default function AdminMitraOutletPage() {
+    const [scope, setScope] = React.useState<{ role: string; taps: string[]; hasSalesforce: boolean } | null>(null);
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
     const [salesforces, setSalesforces] = React.useState<SalesforceOption[]>([]);
     const [q, setQ] = React.useState("");
@@ -66,6 +67,9 @@ export default function AdminMitraOutletPage() {
     const [editOutlet, setEditOutlet] = React.useState<Record<string, unknown> | null>(null);
     const [editDetails, setEditDetails] = React.useState<Record<string, Record<string, string | number>>>({});
     const [editSaving, setEditSaving] = React.useState(false);
+    // Status simpan ditampilkan menempel di panel dan bertahan sampai penyimpanan berikutnya --
+    // alert() hilang begitu ditutup, sehingga hasil kerja lapangan tidak sempat terbaca.
+    const [editStatus, setEditStatus] = React.useState<{ ok: boolean; teks: string } | null>(null);
     const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
     const editRef = React.useRef<HTMLDivElement>(null);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -101,6 +105,13 @@ export default function AdminMitraOutletPage() {
                 kecamatan: data.kecamatan || [],
             }))
             .catch(() => undefined);
+    }, []);
+
+    React.useEffect(() => {
+        fetch("/api/admin/me")
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => setScope(data?.scope || null))
+            .catch(() => setScope(null));
     }, []);
 
     const load = React.useCallback(() => {
@@ -194,6 +205,7 @@ export default function AdminMitraOutletPage() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return alert(data.error || "Gagal memuat outlet");
         setEditOutlet(data.outlet);
+        setEditStatus(null);
         setEditLogs(Array.isArray(data.editLogs) ? data.editLogs : []);
         setEditDetails({
             sellthruDigiposJson: data.details?.sellthruDigiposJson || {},
@@ -219,10 +231,72 @@ export default function AdminMitraOutletPage() {
         }));
     };
 
+    /**
+     * Role lapangan menyimpan lewat endpoint tersegmentasi, bukan PUT master.
+     *
+     * Ketiganya dikirim terpisah karena masing-masing punya allowlist field sendiri di
+     * server -- itulah yang menjaga agar kebutuhan mengubah nama outlet tidak sekaligus
+     * memberi kemampuan menulis TAP, status, atau penugasan salesforce.
+     */
+    const simpanLewatSegmen = async (id: string) => {
+        const outlet = editOutlet as Record<string, unknown>;
+        const gagal: string[] = [];
+
+        const kirim = async (jalur: string, muatan: Record<string, unknown>) => {
+            const res = await fetch(`/api/admin/mitra/outlets/${id}/${jalur}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(muatan),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                gagal.push(data.error || `Gagal menyimpan ${jalur}`);
+            }
+        };
+
+        await kirim("profile", {
+            name: outlet.name,
+            ownerName: outlet.ownerName,
+            ownerPhone: outlet.ownerPhone,
+            kabupaten: outlet.kabupaten,
+            kecamatan: outlet.kecamatan,
+            category: outlet.category,
+            pjpDay: outlet.pjpDay,
+            pjpType: outlet.pjpType,
+        });
+
+        await kirim("branding", { branding: outlet.branding });
+
+        // Koordinat hanya dikirim bila benar-benar terisi; mengirim string kosong akan
+        // ditolak endpoint sebagai koordinat tidak valid padahal tidak ada yang diubah.
+        const lat = Number(outlet.latitude);
+        const lng = Number(outlet.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+            await kirim("location", { latitude: lat, longitude: lng });
+        }
+
+        return gagal;
+    };
+
     const saveEdit = async () => {
         if (!editOutlet?.id) return;
+        const id = String(editOutlet.id);
         setEditSaving(true);
-        const res = await fetch(`/api/admin/mitra/outlets/${editOutlet.id}`, {
+        setEditStatus(null);
+
+        if (roleLapangan) {
+            const gagal = await simpanLewatSegmen(id);
+            setEditSaving(false);
+            if (gagal.length > 0) {
+                setEditStatus({ ok: false, teks: gagal.join(" · ") });
+                return;
+            }
+            setEditStatus({ ok: true, teks: "Perubahan tersimpan." });
+            load();
+            return;
+        }
+
+        const res = await fetch(`/api/admin/mitra/outlets/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -234,7 +308,10 @@ export default function AdminMitraOutletPage() {
         });
         const data = await res.json().catch(() => ({}));
         setEditSaving(false);
-        if (!res.ok) return alert(data.error || "Gagal memperbarui outlet");
+        if (!res.ok) {
+            setEditStatus({ ok: false, teks: data.error || "Gagal memperbarui outlet" });
+            return;
+        }
         setEditOutlet(null);
         load();
     };
@@ -247,27 +324,57 @@ export default function AdminMitraOutletPage() {
         return "";
     });
 
+    // Judul menyebut cakupan yang sebenarnya berlaku, supaya daftar yang pendek terbaca
+    // sebagai "memang hanya ini bagian saya" -- bukan sebagai data yang hilang.
+    const judul = scope?.role === "SALESFORCE" ? "Outlet Binaan Saya"
+        : scope?.role === "SUPERVISOR" ? "Outlet TAP Saya"
+        : "Database Outlet";
+    const roleLapangan = scope?.role === "SALESFORCE" || scope?.role === "SUPERVISOR";
+    const assignmentKurang = scope?.role === "SALESFORCE"
+        ? !scope.hasSalesforce || scope.taps.length === 0
+        : scope?.role === "SUPERVISOR" ? scope.taps.length === 0 : false;
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold">Database Outlet</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">Kelola data outlet mitra, unggah massal, dan token QR publik.</p>
+                    <h1 className="text-2xl font-bold">{judul}</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {scope?.role === "SALESFORCE"
+                            ? `Outlet yang ditugaskan kepada Anda${scope.taps.length > 0 ? ` di ${scope.taps.join(", ")}` : ""}.`
+                            : scope?.role === "SUPERVISOR"
+                                ? `Seluruh outlet pada TAP ${scope.taps.join(", ") || "yang ditugaskan"}.`
+                                : "Kelola data outlet mitra, unggah massal, dan token QR publik."}
+                    </p>
                 </div>
-                <Link href="/admin/mitra/qr">
-                    <Button variant="outline">
-                        <QrCode className="h-4 w-4" /> Cetak QR Massal
-                    </Button>
-                </Link>
+                {!roleLapangan && (
+                    <Link href="/admin/mitra/qr">
+                        <Button variant="outline">
+                            <QrCode className="h-4 w-4" /> Cetak QR Massal
+                        </Button>
+                    </Link>
+                )}
             </div>
 
-            <ImportPanel
+            {/* Assignment yang belum lengkap membuat daftar SELALU kosong. Tanpa penjelasan ini
+                layarnya terbaca seperti "belum punya outlet", padahal masalahnya di penugasan. */}
+            {assignmentKurang && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Akun Anda belum lengkap penugasannya
+                    {scope?.role === "SALESFORCE" && !scope.hasSalesforce ? " (belum ditautkan ke master Salesforce)" : ""}
+                    {scope && scope.taps.length === 0 ? " (belum punya TAP)" : ""}
+                    , sehingga belum ada outlet yang bisa ditampilkan. Hubungi Super Admin untuk melengkapinya.
+                </p>
+            )}
+
+            {!roleLapangan && <ImportPanel
                 type="outlet"
                 title="Unggah Outlet Massal"
                 description="Tambah outlet baru sekaligus memperbarui yang sudah ada. Baris dengan kode outlet yang sudah terdaftar akan diperbarui, sisanya ditambahkan."
                 onCommitted={load}
-            />
+            />}
 
+            {!roleLapangan && (
             <Card>
                 <CardContent className="p-5">
                     <form onSubmit={save} className="grid gap-3 md:grid-cols-4">
@@ -320,6 +427,7 @@ export default function AdminMitraOutletPage() {
                     </form>
                 </CardContent>
             </Card>
+            )}
 
             {editOutlet && (
                 <Card ref={editRef} className="scroll-mt-20">
@@ -335,13 +443,25 @@ export default function AdminMitraOutletPage() {
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
-                            {[
+                            {/* Kolom master dikunci untuk role lapangan supaya layar tidak
+                                menjanjikan sesuatu yang akan ditolak server -- allowlist
+                                endpoint tersegmentasi memang tidak memuat keenamnya. */}
+                            {([
                                 ["outletCode", "ID Digipos"], ["rsNumber", "Nomor RS"], ["name", "Nama Outlet"], ["ownerName", "Nama Owner"],
                                 ["ownerPhone", "Nomor Owner"], ["tap", "TAP (nama cabang)"], ["kabupaten", "Kabupaten"],
                                 ["kecamatan", "Kecamatan"], ["longitude", "Longitude"], ["latitude", "Latitude"], ["photoUrl", "URL Foto"],
-                            ].map(([key, label]) => (
-                                <Field key={key} label={label} value={String(editOutlet[key] ?? "")} onChange={(value) => updateEditField(key, value)} />
-                            ))}
+                            ] as [string, string][]).map(([key, label]) => {
+                                const terkunci = roleLapangan && ["outletCode", "rsNumber", "tap", "photoUrl"].includes(key);
+                                return (
+                                    <Field
+                                        key={key}
+                                        label={terkunci ? `${label} (dikelola admin)` : label}
+                                        value={String(editOutlet[key] ?? "")}
+                                        onChange={(value) => updateEditField(key, value)}
+                                        disabled={terkunci}
+                                    />
+                                );
+                            })}
                             {/* Salesforce kini master tersendiri: nama dan fotonya diurus di
                                 menu Salesforce, outlet tinggal menautkannya. Foto tidak lagi
                                 diunggah per outlet supaya tidak ada dua sumber kebenaran. */}
@@ -350,7 +470,8 @@ export default function AdminMitraOutletPage() {
                                 <select
                                     value={String(editOutlet.salesforceId || "")}
                                     onChange={(event) => updateEditField("salesforceId", event.target.value)}
-                                    className="h-10 w-full rounded-md border px-3 text-sm"
+                                    disabled={roleLapangan}
+                                    className="h-10 w-full rounded-md border px-3 text-sm disabled:bg-gray-100 disabled:text-muted-foreground"
                                 >
                                     <option value="">Tanpa salesforce</option>
                                     {salesforces
@@ -482,10 +603,26 @@ export default function AdminMitraOutletPage() {
                             )}
                         </details>
 
-                        <Button onClick={saveEdit} disabled={editSaving}>
-                            {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            Simpan Perubahan
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button onClick={saveEdit} disabled={editSaving}>
+                                {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                Simpan Perubahan
+                            </Button>
+                            {editStatus && (
+                                <span
+                                    role="status"
+                                    className={`rounded-lg px-3 py-2 text-sm ${editStatus.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                                >
+                                    {editStatus.teks}
+                                </span>
+                            )}
+                        </div>
+                        {roleLapangan && (
+                            <p className="text-xs text-muted-foreground">
+                                Kode outlet, Nomor RS, TAP, Salesforce, dan status outlet dikelola admin dan tidak
+                                ikut tersimpan dari layar ini.
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             )}
@@ -499,7 +636,7 @@ export default function AdminMitraOutletPage() {
                         </Button>
                     </div>
 
-                    {selectedIds.length > 0 && (
+                    {selectedIds.length > 0 && !roleLapangan && (
                         <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3">
                             <span className="text-sm font-semibold text-red-700">{selectedIds.length} outlet dipilih</span>
                             <Button variant="outline" size="sm" onClick={deleteSelected} disabled={deleting}>
@@ -563,7 +700,7 @@ export default function AdminMitraOutletPage() {
                                             <Link href={`/api/public/mitra/outlets/${outlet.publicToken}/qr?format=card`} target="_blank" className="rounded-md border p-2" title="Kartu QR 90 x 55 mm">
                                                 <Download className="h-4 w-4" />
                                             </Link>
-                                            <button onClick={() => deleteOne(outlet)} className="rounded-md border p-2" title="Hapus outlet" aria-label="Hapus outlet">
+                                            <button onClick={() => deleteOne(outlet)} className={`rounded-md border p-2 ${roleLapangan ? "hidden" : ""}`} title="Hapus outlet" aria-label="Hapus outlet">
                                                 <Trash2 className="h-4 w-4 text-red-600" />
                                             </button>
                                         </div>
@@ -580,11 +717,21 @@ export default function AdminMitraOutletPage() {
     );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Field({ label, value, onChange, disabled = false }: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+}) {
     return (
         <div className="space-y-2">
             <Label>{label}</Label>
-            <Input value={value} onChange={(event) => onChange(event.target.value)} />
+            <Input
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                disabled={disabled}
+                className={disabled ? "bg-gray-100 text-muted-foreground" : undefined}
+            />
         </div>
     );
 }

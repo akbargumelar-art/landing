@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getAdminKpiResults } from "@/lib/mitra-kpi";
+import { canAccessParticipant, getAdminActorScope } from "@/lib/admin-scope";
 import {
     buildRewardRuleValues,
     groupValueOf,
@@ -47,21 +48,44 @@ export async function GET(
         program.mechanismType === "KPI" ? getAdminKpiResults(id) : Promise.resolve([]),
     ]);
 
-    // Pemenang disimpan berbasis participantKey; nama dan kodenya diambil dari daftar
-    // peserta supaya tampilan admin tidak perlu menebak dari tabel mana identitasnya.
-    const pesertaByKey = new Map(participants.map((item) => [item.participantKey, item]));
-    const winners = winnerRows.map((row) => ({
-        id: row.id,
-        participantKey: row.participantKey,
-        code: pesertaByKey.get(row.participantKey)?.code || "",
-        name: pesertaByKey.get(row.participantKey)?.name || "",
-        groupKey: row.groupKey,
-        rank: row.rank,
-        prizeLabel: row.prizeLabel,
-        isPublished: row.isPublished,
-    }));
+    /**
+     * Data per-orang dibatasi wewenang pemanggil SEBELUM respons dibentuk.
+     *
+     * Peserta, pemenang, dan hasil KPI menyangkut pencapaian dan insentif individu; menyaringnya
+     * di React tidak menutup apa pun, karena payload-nya sudah terkirim utuh dan bisa dibaca
+     * siapa saja yang membuka tab jaringan. Konfigurasi program (parameter dan aturan hadiah)
+     * tetap dikirim penuh -- isinya aturan main yang memang perlu diketahui semua peserta.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    return NextResponse.json({ program, params: programParams, participants, rewardRules, winners, kpiResults });
+    const pesertaTampil = participants.filter((item) => canAccessParticipant(scope, item));
+    const kunciTampil = new Set(pesertaTampil.map((item) => item.participantKey));
+
+    // Nama dan kode pemenang diambil dari daftar peserta LENGKAP supaya baris yang boleh
+    // dilihat tetap punya identitas, lalu barisnya sendiri disaring menurut wewenang.
+    const pesertaByKey = new Map(participants.map((item) => [item.participantKey, item]));
+    const winners = winnerRows
+        .filter((row) => kunciTampil.has(row.participantKey))
+        .map((row) => ({
+            id: row.id,
+            participantKey: row.participantKey,
+            code: pesertaByKey.get(row.participantKey)?.code || "",
+            name: pesertaByKey.get(row.participantKey)?.name || "",
+            groupKey: row.groupKey,
+            rank: row.rank,
+            prizeLabel: row.prizeLabel,
+            isPublished: row.isPublished,
+        }));
+
+    return NextResponse.json({
+        program,
+        params: programParams,
+        participants: pesertaTampil,
+        rewardRules,
+        winners,
+        kpiResults: kpiResults.filter((row) => kunciTampil.has(row.participantKey)),
+    });
 }
 
 export async function PUT(
