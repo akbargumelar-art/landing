@@ -999,3 +999,195 @@ ditetapkan per Salesforce/parameter, kemudian hasil di-rollup ke Salesforce dan 
   `ECONNREFUSED`. Karena itu migrasi SQL, upload Excel terhadap MySQL nyata, OTP, serta QA visual
   360 px belum diverifikasi end-to-end pada sesi ini. Jangan deploy kode sebelum migrasi `0034`
   berhasil diterapkan dan alur tersebut diuji pada database staging/lokal yang hidup.
+
+## Header kolom dan collapse/expand ringkasan KPI - 11 Agustus 2026
+
+- Ringkasan per TAP dan per Salesforce pada `KpiPublicView` kini memakai tabel semantik dengan
+  judul kolom yang eksplisit, bukan susunan grid tanpa header.
+- Setiap baris mempunyai tombol chevron untuk membuka atau menutup detail; seluruh baris tetap
+  tertutup saat halaman pertama kali dimuat. Tombol membawa `aria-expanded` dan label aksesibel.
+- Detail TAP mempunyai header Salesforce, Skor Compliance, Skor Performance, dan Benefit.
+  Detail Salesforce tetap menampilkan tabel parameter Compliance dan Performance.
+- Tabel memakai `overflow-x-auto` pada kontainernya supaya layar ponsel menggulir di dalam tabel,
+  bukan membuat seluruh halaman melebar.
+
+## PRD akses login operasional dan OTP baca-saja - 11 Agustus 2026
+
+PRD baru `docs/prd-akses-login-operasional-mitra.md` menetapkan bahwa OTP hanya membuka seluruh
+data outlet/program yang saat ini dilindungi OTP dalam mode baca-saja. UI publik tidak boleh
+menampilkan kontrol edit, dan seluruh endpoint mutasi publik wajib menolak sesi OTP meskipun nomor
+whitelist sebelumnya mempunyai peran yang boleh mengedit. Semua perubahan outlet selanjutnya
+wajib menggunakan sesi login Better Auth yang aktif.
+
+Salesforce hanya dapat melihat dan mengubah outlet yang `salesforce_id`-nya sama dengan akun serta
+berada dalam TAP yang ditugaskan. Supervisor dapat melihat dan mengubah outlet dalam seluruh TAP
+yang ditugaskan. Keduanya dapat mengubah profil operasional, lokasi, branding, dan empat slot foto
+tanpa approval; field master seperti kode outlet, public token, RS number, TAP, assignment
+Salesforce, status, serta data/config program tetap dilarang. Program Salesforce bersifat
+read-only untuk role lapangan: Salesforce hanya melihat hasil sendiri dan Supervisor hanya data
+TAP-nya.
+
+PRD mensyaratkan relasi unik `admin_user_profiles.salesforce_id`, helper scope terpusat, endpoint
+admin tersegmentasi per kelompok field, menu role-aware, dan audit dengan `actorUserId` serta diff.
+`docs/prd-kpi-salesforce.md` telah diberi referensi kebijakan baru dan menegaskan bahwa tampilan
+KPI publik setelah OTP tetap baca-saja. Sesi ini hanya mengubah dokumentasi; belum ada schema,
+migrasi, API, UI, test, build, atau runtime database yang dijalankan.
+
+## Test runner KPI dan evaluasi ganda pada recompute - 11 Agustus 2026
+
+Audit terhadap implementasi KPI yang sudah ada menemukan dua hal yang belum selesai.
+
+`src/lib/mitra-kpi.test.ts` memakai `node:test`, tetapi tidak ada skrip untuk menjalankannya dan
+percobaan lewat vitest gagal seluruhnya (`Cannot find package '@/db'` karena alias `@/` tidak
+terkonfigurasi di sana). Ditambahkan skrip `test` pada `package.json` yang menjalankan
+`tsx --test` terhadap seluruh `src/**/*.test.ts`; `tsx` menghormati path alias `tsconfig`,
+sehingga test berjalan tanpa konfigurasi tambahan dan tanpa koneksi database (pool `mysql2`
+dibuat lazy).
+
+`recomputeKpiResults()` memanggil `evaluateRuntimeParticipant()` dua kali untuk setiap peserta:
+sekali untuk baris hasil, sekali lagi hanya untuk menjumlah `missingTargetCount`. Pada program
+berisi ratusan salesforce ini menggandakan biaya operasi terberat di modul tersebut. Evaluasi kini
+dilakukan sekali lalu dipakai untuk kedua keperluan.
+
+### Verifikasi
+
+- `npm test`: 5/5 lulus saat perubahan ini dibuat, kemudian 15/15 setelah test scope ditambahkan.
+- `npx tsc --noEmit`, ESLint terarah, dan `npm run build`: lulus.
+
+## Keterangan kebaruan data market share - 11 Agustus 2026
+
+Kartu Market Share Kecamatan pada halaman detail outlet kini menampilkan
+"Data diperbarui <tanggal>" di bawah nama wilayah. Nilainya berasal dari kolom `updated_at` tabel
+`mitra_market_shares` yang selama ini sudah ikut terkirim oleh API — `getOutletDetailBySession()`
+memakai `db.select()` tanpa memilih kolom, sehingga seluruh baris terbawa. Yang kurang hanya
+deklarasi tipe di halaman dan tampilannya. Format tanggal memakai `formatWaktu()` yang sudah
+dipakai kartu Data Detail Outlet pada halaman yang sama.
+
+Catatan arti: `updated_at` memakai `onUpdateNow()`, sehingga angkanya berarti "kapan baris ini
+terakhir disunting admin", bukan "periode survei market share". Bila yang dibutuhkan periode
+survei sebenarnya, tabel perlu kolom periode tersendiri.
+
+## Review dan penajaman PRD akses login operasional - 11 Agustus 2026
+
+Seluruh klaim `docs/prd-akses-login-operasional-mitra.md` diperiksa terhadap kode. Fondasinya
+cocok: kontrak audit sesuai tabel `mitra_outlet_edit_logs` yang sudah ada, dan inventaris route
+mutasi publik benar (empat route, seluruhnya POST). Enam hal diperbaiki.
+
+- Klaim "lockout yang sudah didukung profil admin" tidak benar. Kolom `failed_login_attempts`,
+  `last_failed_login_at`, dan `locked_until` ada di `admin_user_profiles` tetapi tidak pernah
+  dibaca kode mana pun; `requireRole()` hanya memeriksa `isActive`. Ditulis ulang sebagai
+  pekerjaan baru pada MVP.
+- Ditambahkan lubang yang sebelumnya tidak disebut sama sekali: `getAdminSession()` memberi
+  `SUPER_ADMIN` kepada pengguna login tanpa baris `admin_user_profiles` selama emailnya cocok
+  dengan email bootstrap, yang jatuh ke nilai terdokumentasi `admin@abkciraya.com`.
+- Ditambahkan syarat TTL sesi OTP; nilai berjalan setara sepuluh tahun.
+- Kontradiksi `salesforce_id` UNIQUE versus "satu akun aktif" diselesaikan. MySQL tidak mengenal
+  partial unique index, jadi aturannya diubah menjadi "tepat satu akun" dan penggantian pemegang
+  dilakukan dengan memindahkan tautan pada akun yang ada.
+- Ditambahkan sub-bagian urutan aman penonaktifan tulis-OTP beserta tabel rollback, karena PRD
+  melarang fase transisi sehingga penyangga harus berada sebelum rilis, bukan sesudahnya.
+- Deferensi melingkar dengan `prd-kpi-salesforce.md` dipatahkan: tampilan publik ber-OTP diatur
+  PRD KPI, tampilan dashboard diatur PRD akses login.
+
+Empat route mutasi publik kini disebut satu per satu di dokumen agar inventarisnya bisa diaudit,
+dan pensiun `bolehEditOutlet()` beserta `keterangan` sebagai penentu hak tulis masuk cakupan MVP.
+Success criteria adopsi diberi sumber ukuran (`mitra_outlet_edit_logs.actorType`) sehingga tidak
+menunggu telemetri v2.0. Salinan versi asli sebelum penyuntingan disimpan di scratchpad sesi.
+
+## Implementasi akses login operasional Mitra: MVP, v1.1, v1.2 - 11 Agustus 2026
+
+Tiga fase implementasi PRD dikerjakan berurutan. Fase v2.0 (telemetri adopsi, notifikasi foto
+jatuh tempo, opsi approval) memang di luar cakupan dan tidak disentuh.
+
+### MVP - fondasi keamanan
+
+- Migrasi `drizzle/0035_admin_salesforce_assignment.sql` menambah
+  `admin_user_profiles.salesforce_id` (nullable, UNIQUE, FK ke `mitra_salesforces`
+  ON DELETE SET NULL). Aditif murni.
+- `src/lib/admin-scope.ts` menjadi satu-satunya sumber aturan wewenang: `getAdminActorScope()`,
+  `canAccessOutlet()`, `canMutateOutlet()`, `outletScopeCondition()`, `findOutletInScope()`, dan
+  `canAccessParticipant()`. Scope dibaca dari database pada setiap pemanggilan, bukan dari cookie,
+  sehingga pencabutan role atau perubahan TAP berlaku pada request berikutnya.
+- `getAdminSession()` menutup jalur bootstrap begitu ada satu SUPER_ADMIN aktif, menolak login
+  tanpa profil setelah kondisi itu terpenuhi, dan menulis audit `BOOTSTRAP_ACCESS` setiap kali
+  jalur itu terpakai. Akun dengan `locked_until` di masa depan diperlakukan sama dengan akun
+  nonaktif dan ditolak sebelum peran maupun scope diperiksa.
+- `MITRA_DETAIL_SESSION_TTL_MINUTES` diubah dari sepuluh tahun menjadi 30 hari. Endpoint baru
+  `/api/admin/mitra/sessions` (GET/DELETE) mendaftar sesi aktif dengan nomor tersamar dan mencabut
+  seluruh sesi satu nomor.
+- Tulis-OTP ditutup di satu gerbang. `pastikanBolehEdit()` selalu menolak dengan 403 dan kode
+  stabil `LOGIN_REQUIRED_FOR_WRITE`. Keempat route mutasi publik (`profile`, `photo`, `location`,
+  `branding`) diringkas menjadi penolak murni; logika mutasinya dihapus, bukan disisakan di balik
+  satu pemeriksaan, karena jalur tulis yang masih utuh adalah jalur yang bisa hidup lagi tanpa
+  disengaja. Riwayatnya tetap ada di git commit `a7fd13a` dan dipakai ulang saat membangun
+  endpoint admin di v1.1.
+- `bolehEditOutlet()` dan `PERAN_BOLEH_EDIT` dihapus; `SARAN_KETERANGAN` dipertahankan sebagai
+  saran isian form. Respons detail publik mengirim `bolehEdit: false` selama masa kompatibilitas
+  dan tidak lagi mengirim daftar wilayah.
+- Halaman detail publik dicabut seluruh state draft, handler mutasi, dan kontrol editnya. Lencana
+  peran menjadi "hanya lihat" dan pemberitahuan mengarahkan ke `/portal-admin`.
+- `src/lib/admin-assignment.ts` memvalidasi assignment sebelum akun dibuat atau disunting. Master
+  yang sudah tertaut menghasilkan 409 yang menyebut akun pemiliknya, bukan galat unique constraint
+  mentah. Form akun menampilkan pemilih master Salesforce, dan akun SALESFORCE tanpa tautan
+  ditandai merah pada daftar.
+
+### v1.1 - edit dashboard
+
+- `GET /api/admin/mitra/outlets` dan `/outlets/[id]` sebelumnya hanya membatasi lewat TAP,
+  sehingga seorang Salesforce ikut melihat dan membaca performance seluruh outlet binaan rekan
+  setimnya. Kondisi salesforce kini ikut masuk query. Pembatasan yang sama diterapkan pada
+  `performance`, `photo-gallery`, dan `photo-monitoring`.
+- Empat endpoint tersegmentasi baru: PATCH `/outlets/[id]/profile`, `/location`, `/branding`, dan
+  POST/DELETE `/outlets/[id]/photos`. Semuanya melewati `gerbangMutasiOutlet()` yang memeriksa
+  ulang sesi, role, dan wewenang atas outlet — tidak mengandalkan hasil daftar yang tadi dibuka.
+  Outlet di luar wewenang dijawab 404 agar keberadaannya tidak bisa dipetakan; MANAGER dijawab 403
+  karena outletnya memang boleh dilihat.
+- `src/lib/mitra-outlet-mutations.ts` menyimpan allowlist field per aksi, bukan daftar larangan,
+  sehingga kolom baru pada tabel outlet otomatis tertutup sampai sengaja dibuka. Payload yang
+  memuat field asing ditolak seluruhnya dengan 400. Setiap perubahan menulis ke
+  `mitra_outlet_edit_logs` dan `admin_audit_logs`, keduanya ber-`actorUserId`.
+- Kunci notifikasi kunjungan diganti. Satu kunjungan dulu ditandai satu sesi OTP; sesi login
+  berumur panjang tidak lagi menandai batas kunjungan, jadi dipakai hash petugas + outlet +
+  tanggal yang dipotong 36 karakter mengikuti lebar kolom `session_id`.
+- Sidebar menyembunyikan seluruh menu kantor dari role lapangan lewat konstanta `ROLE_KANTOR`, dan
+  tautan terbatas tidak lagi tampil sekilas selama role belum diketahui.
+- Halaman Database Outlet menamai cakupannya ("Outlet Binaan Saya" / "Outlet TAP Saya"),
+  memperingatkan assignment yang belum lengkap, menyembunyikan unggah massal, tambah outlet,
+  hapus, dan cetak QR dari role lapangan, serta mengunci kolom master di panel edit. Penyimpanan
+  role lapangan diarahkan ke endpoint tersegmentasi, dan status simpan menempel di panel alih-alih
+  memakai `alert()` yang hilang begitu ditutup.
+
+### v1.2 - program scoped
+
+- Seluruh endpoint mutasi program sudah menolak role lapangan sejak awal, sehingga tidak ada
+  perubahan izin yang diperlukan di sana.
+- `GET /api/admin/mitra/programs/[id]` sebelumnya mengirim peserta, pemenang, dan hasil KPI secara
+  penuh. Ketiganya kini disaring sebelum respons dibentuk. Parameter program dan aturan
+  hadiah/benefit tetap dikirim penuh karena isinya aturan main yang memang perlu diketahui peserta.
+- `ProgramParticipantInfo` membawa `salesforceId` (id pembina untuk peserta outlet, id dirinya
+  sendiri untuk peserta salesforce) sehingga `canAccessParticipant()` dapat mendelegasikan ke
+  `canAccessOutlet()`. Wewenang atas seseorang dan atas outletnya sengaja punya satu definisi agar
+  tidak bisa berselisih.
+- `ProgramManager` menyembunyikan seluruh kontrol pengelolaan dari role selain SUPER_ADMIN dan
+  ADMIN_INPUT, menandai panel dengan "hanya lihat", dan tetap menampilkan Pratinjau Hasil KPI yang
+  isinya sudah tersaring server.
+
+### Verifikasi
+
+- `npm test`: 15/15 lulus. Test baru mencakup matriks scope (salesforce versus rekan setim di TAP
+  yang sama, supervisor lintas TAP, assignment setengah jadi, manager baca-saja) dan allowlist
+  field mutasi.
+- `npx tsc --noEmit`: lulus.
+- `npm run lint`: bersih; hanya tersisa warning `<img>` lama yang tidak terkait.
+- `npm run build`: lulus, empat route outlet tersegmentasi masuk output.
+
+### Belum dikerjakan
+
+- Migrasi `0035` belum dijalankan ke database mana pun.
+- Belum ada pengujian runtime. Test yang ditulis hanya menguji logika murni (predikat scope dan
+  allowlist), bukan perilaku endpoint terhadap MySQL dan sesi login nyata. Sesuai
+  Testing Requirements pada PRD, kelulusan tidak boleh disimpulkan dari TypeScript, ESLint, atau
+  build.
+- Urutan naik wajib diikuti: migrasi, pembuatan akun, dan verifikasi login seluruh petugas
+  dilakukan lebih dulu selagi jalur lama masih hidup, baru build ini dinaikkan. Menaikkan
+  sekaligus akan menghentikan pembaruan foto lapangan pada hari yang sama.

@@ -5,6 +5,12 @@
 **Modul:** `/admin/mitra/program-salesforce` (admin) & `/mitra/program-sf/[slug]` (publik, OTP)
 **Penulis:** Tim Engineering
 
+> **Kebijakan akses terbaru:** OTP pada halaman publik hanya memberi akses baca dan tidak dapat
+> dipakai untuk mengubah data apa pun. Seluruh edit outlet wajib memakai akun login dengan scope
+> Salesforce/Supervisor. Kontrak lengkap dan matriks role berada di
+> [`prd-akses-login-operasional-mitra.md`](./prd-akses-login-operasional-mitra.md) dan mengungguli
+> bagian dokumen ini bila terdapat konflik mengenai autentikasi, otorisasi, atau mutasi data.
+
 ---
 
 ## 1. Ringkasan
@@ -21,7 +27,9 @@ Tiga bagian yang dibangun:
 | **Performance** | Parameter capaian bisnis (sales, revenue, akuisisi) dengan Target, Aktual, Achievement, GAP, Bobot *(wajib)* | Total skor Performance = Σ(Achievement × Bobot) |
 | **Benefit** | Aturan if-then-else yang ditetapkan admin di awal | Label reward (mis. `Rp 100.000`) atau punishment (mis. `Surat Peringatan`) |
 
-Tampilan publik tetap di balik OTP, dengan drill-down tiga tingkat: **ringkasan per-TAP → ringkasan per-Salesforce → pencapaian per-Outlet (berfilter)**.
+Tampilan publik tetap di balik OTP dalam mode **baca-saja**, dengan drill-down tiga tingkat:
+**ringkasan per-TAP → ringkasan per-Salesforce → pencapaian per-Outlet (berfilter)**. Salesforce
+dan Supervisor yang perlu mengubah data outlet wajib masuk menggunakan akun dashboard.
 
 ---
 
@@ -345,7 +353,7 @@ Tombol **Hitung Ulang** memanggil `PATCH /api/admin/mitra/programs` dengan `acti
 
 Rute tetap `/mitra/program-sf/[slug]`. [`ProgramPublicView`](../src/components/mitra/program-public-view.tsx) bercabang: bila `mechanismType === "KPI"` merender komponen baru `KpiPublicView`, selain itu tampilan papan peringkat yang ada. **Gate OTP tidak perlu kode baru** — [`route.ts:26`](../src/app/api/public/mitra/programs/%5Bslug%5D/route.ts#L26) sudah mengunci seluruh program bertarget `SALESFORCE` tanpa memandang mekanismenya.
 
-Urutan halaman setelah OTP terverifikasi: header program → kartu ringkasan → Tabel 1 → Tabel 2 → Tabel 3.
+Urutan halaman setelah OTP terverifikasi: header program → kartu ringkasan → Tabel 1 → Tabel 2 → Tabel 3. Halaman ini tidak menyediakan konfigurasi program, import, recompute, atau mutasi outlet.
 
 ### 7.1 Kartu ringkasan (atas)
 
@@ -409,7 +417,11 @@ Dibatasi 100 baris per halaman dengan pagination server-side; tanpa itu satu TAP
 | `/api/admin/mitra/programs/[id]/scores` | `GET`/`POST` | Template & validasi bercabang untuk KPI (kolom `outletCode`, tulis ke `mitra_kpi_outlet_scores`) |
 | `/api/public/mitra/programs/[slug]` | `GET` | Bercabang ke `getPublicKpiDetail()`; menerima query `tap`, `sf`, `param`, `q`, `page` |
 
-Peran yang berhak tidak berubah: `SUPER_ADMIN` untuk membuat/menghapus, `SUPER_ADMIN`+`ADMIN_INPUT` untuk unggah dan recompute, sesuai pola [`requireRole`](../src/app/api/admin/mitra/programs/route.ts#L22) yang berlaku sekarang.
+Hak mutasi konfigurasi tidak berubah: `SUPER_ADMIN` untuk membuat/menghapus dan
+`SUPER_ADMIN`+`ADMIN_INPUT` untuk unggah serta recompute. Akses baca dashboard untuk
+`SALESFORCE` dan `SUPERVISOR` wajib difilter server-side menurut identitas Salesforce/TAP sesuai
+[`prd-akses-login-operasional-mitra.md`](./prd-akses-login-operasional-mitra.md); menyembunyikan
+baris atau tombol di React saja tidak memenuhi persyaratan.
 
 ---
 
@@ -459,7 +471,7 @@ F0 dan F1 harus selesai berurutan; F2 dan F3 boleh berjalan paralel setelah F1 s
 12. Outlet yang salesforce-nya bukan peserta program ditolak dengan pesan jelas.
 
 **Publik**
-13. Halaman KPI tidak bisa dibuka tanpa OTP terverifikasi.
+13. Halaman KPI publik tidak bisa dibuka tanpa OTP terverifikasi dan tetap baca-saja setelah OTP berhasil.
 14. Tabel per-TAP dan per-Salesforce bisa dibuka-tutup, dan tertutup saat pertama dimuat.
 15. Tabel per-outlet menyaring benar untuk TAP, salesforce, parameter, dan pencarian teks; filter tersimpan di URL.
 16. Seluruh tabel terbaca di layar 360 px tanpa scroll horizontal pada halaman (scroll berada di dalam tabelnya).
