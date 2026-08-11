@@ -9,20 +9,34 @@ import { ImportPanel } from "@/components/admin/mitra/import-panel";
 import { MarketSharePanel } from "@/components/admin/mitra/market-share-panel";
 import { PerformancePanel } from "@/components/admin/mitra/performance-panel";
 import { PerubahanPanel } from "@/components/admin/mitra/perubahan-panel";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
+/**
+ * `kelola: true` menandai tab yang isinya mengubah data (unggah massal, input performansi,
+ * dan pangsa pasar). Ketiganya ditolak API untuk peran lapangan, jadi tabnya pun tidak
+ * ditawarkan -- tab yang selalu berakhir gagal hanya membuang waktu orang di lapangan.
+ */
 const TABS = [
-    { key: "foto", label: "Monitoring Foto", icon: Camera },
-    { key: "galeri", label: "Galeri Foto", icon: Images },
-    { key: "perubahan", label: "Perubahan Outlet", icon: History },
-    { key: "detail", label: "Detail Outlet", icon: ClipboardList },
-    { key: "performance", label: "Performance", icon: Activity },
-    { key: "market", label: "Market Share", icon: PieChart },
+    { key: "foto", label: "Monitoring Foto", icon: Camera, kelola: false },
+    { key: "galeri", label: "Galeri Foto", icon: Images, kelola: false },
+    { key: "perubahan", label: "Perubahan Outlet", icon: History, kelola: false },
+    { key: "detail", label: "Detail Outlet", icon: ClipboardList, kelola: true },
+    { key: "performance", label: "Performance", icon: Activity, kelola: true },
+    { key: "market", label: "Market Share", icon: PieChart, kelola: true },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function AdminMonitoringVisitPage() {
+    const { bolehKelola } = useAdminScope();
     const [tab, setTab] = React.useState<TabKey>("foto");
+    const tabTampil = TABS.filter((item) => bolehKelola || !item.kelola);
+
+    // Tab yang sedang aktif bisa saja ikut hilang begitu peran diketahui; kembalikan ke tab
+    // pertama supaya isinya tidak tetap tampil tanpa tab yang menyorotinya.
+    React.useEffect(() => {
+        if (!tabTampil.some((item) => item.key === tab)) setTab("foto");
+    }, [tabTampil, tab]);
 
     return (
         <div className="space-y-6">
@@ -35,7 +49,7 @@ export default function AdminMonitoringVisitPage() {
             </div>
 
             <div className="inline-flex flex-wrap rounded-lg border bg-white p-1">
-                {TABS.map((item) => (
+                {tabTampil.map((item) => (
                     <button
                         key={item.key}
                         type="button"

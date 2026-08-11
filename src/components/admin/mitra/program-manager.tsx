@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 type TargetType = "OUTLET" | "SALESFORCE";
 type MechanismType = "RACING" | "REWARD" | "KPI";
@@ -237,13 +238,7 @@ export function ProgramManager({ targetType }: { targetType: TargetType }) {
      * Seluruh endpoint konfigurasi, import, dan recompute memang sudah menolak mereka; kontrolnya
      * disembunyikan supaya layar tidak menawarkan tombol yang pasti gagal.
      */
-    const [bolehKelola, setBolehKelola] = React.useState(true);
-    React.useEffect(() => {
-        fetch("/api/admin/me")
-            .then((res) => res.ok ? res.json() : null)
-            .then((data) => setBolehKelola(["SUPER_ADMIN", "ADMIN_INPUT"].includes(data?.session?.role)))
-            .catch(() => setBolehKelola(false));
-    }, []);
+    const { bolehKelola } = useAdminScope();
 
     const [tab, setTab] = React.useState<MechanismType>("RACING");
     const [programs, setPrograms] = React.useState<Program[]>([]);

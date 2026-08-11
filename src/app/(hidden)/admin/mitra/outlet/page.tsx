@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { MITRA_PHOTO_SLOTS, statusFoto } from "@/lib/mitra-outlet-photos";
 import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
+import { useAdminScope } from "@/lib/use-admin-scope";
 import {
     DEFAULT_OUTLET_BRANDING,
     DEFAULT_OUTLET_CATEGORY,
@@ -58,7 +59,7 @@ interface SalesforceOption {
 }
 
 export default function AdminMitraOutletPage() {
-    const [scope, setScope] = React.useState<{ role: string; taps: string[]; hasSalesforce: boolean } | null>(null);
+    const scope = useAdminScope();
     const [outlets, setOutlets] = React.useState<Outlet[]>([]);
     const [salesforces, setSalesforces] = React.useState<SalesforceOption[]>([]);
     const [q, setQ] = React.useState("");
@@ -105,13 +106,6 @@ export default function AdminMitraOutletPage() {
                 kecamatan: data.kecamatan || [],
             }))
             .catch(() => undefined);
-    }, []);
-
-    React.useEffect(() => {
-        fetch("/api/admin/me")
-            .then((res) => res.ok ? res.json() : null)
-            .then((data) => setScope(data?.scope || null))
-            .catch(() => setScope(null));
     }, []);
 
     const load = React.useCallback(() => {
@@ -326,13 +320,10 @@ export default function AdminMitraOutletPage() {
 
     // Judul menyebut cakupan yang sebenarnya berlaku, supaya daftar yang pendek terbaca
     // sebagai "memang hanya ini bagian saya" -- bukan sebagai data yang hilang.
-    const judul = scope?.role === "SALESFORCE" ? "Outlet Binaan Saya"
-        : scope?.role === "SUPERVISOR" ? "Outlet TAP Saya"
+    const judul = scope.role === "SALESFORCE" ? "Outlet Binaan Saya"
+        : scope.role === "SUPERVISOR" ? "Outlet TAP Saya"
         : "Database Outlet";
-    const roleLapangan = scope?.role === "SALESFORCE" || scope?.role === "SUPERVISOR";
-    const assignmentKurang = scope?.role === "SALESFORCE"
-        ? !scope.hasSalesforce || scope.taps.length === 0
-        : scope?.role === "SUPERVISOR" ? scope.taps.length === 0 : false;
+    const { roleLapangan, assignmentKurang } = scope;
 
     return (
         <div className="space-y-6">
@@ -340,9 +331,9 @@ export default function AdminMitraOutletPage() {
                 <div>
                     <h1 className="text-2xl font-bold">{judul}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        {scope?.role === "SALESFORCE"
+                        {scope.role === "SALESFORCE"
                             ? `Outlet yang ditugaskan kepada Anda${scope.taps.length > 0 ? ` di ${scope.taps.join(", ")}` : ""}.`
-                            : scope?.role === "SUPERVISOR"
+                            : scope.role === "SUPERVISOR"
                                 ? `Seluruh outlet pada TAP ${scope.taps.join(", ") || "yang ditugaskan"}.`
                                 : "Kelola data outlet mitra, unggah massal, dan token QR publik."}
                     </p>
@@ -361,8 +352,8 @@ export default function AdminMitraOutletPage() {
             {assignmentKurang && (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                     Akun Anda belum lengkap penugasannya
-                    {scope?.role === "SALESFORCE" && !scope.hasSalesforce ? " (belum ditautkan ke master Salesforce)" : ""}
-                    {scope && scope.taps.length === 0 ? " (belum punya TAP)" : ""}
+                    {scope.role === "SALESFORCE" && !scope.hasSalesforce ? " (belum ditautkan ke master Salesforce)" : ""}
+                    {scope.taps.length === 0 ? " (belum punya TAP)" : ""}
                     , sehingga belum ada outlet yang bisa ditampilkan. Hubungi Super Admin untuk melengkapinya.
                 </p>
             )}

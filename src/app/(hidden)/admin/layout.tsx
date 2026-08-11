@@ -19,6 +19,7 @@ import {
     ShoppingCart,
     Ticket,
     Inbox,
+    Lock,
     Calculator,
     ClipboardList,
     Store,
@@ -123,6 +124,27 @@ export default function AdminLayout({
         .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
     const currentPage = visibleGroups.flatMap((g) => g.links).find((l) => l.href === activeHref);
+
+    /**
+     * Menyembunyikan menu tidak menutup halamannya: alamatnya tetap bisa diketik, dan yang
+     * muncul adalah layar penuh kontrol yang setiap aksinya akan ditolak API. Halaman yang
+     * tidak boleh dibuka peran ini karena itu diganti pemberitahuan.
+     *
+     * Daftar izinnya dibaca dari `sidebarGroups` yang sama dengan sumber menu, sehingga
+     * menambah halaman baru cukup dilakukan di satu tempat -- tidak ada daftar kedua yang
+     * bisa tertinggal dan diam-diam membuka kembali halaman yang sudah ditutup.
+     */
+    const semuaTautan = sidebarGroups.flatMap((group) => group.links);
+    const tautanCocok = semuaTautan
+        .filter((link) => pathname === link.href || pathname.startsWith(`${link.href}/`))
+        .sort((a, b) => b.href.length - a.href.length)[0];
+
+    const halamanDitutup = Boolean(
+        role
+        && tautanCocok
+        && "roles" in tautanCocok
+        && !(tautanCocok.roles as AdminRole[]).includes(role)
+    );
 
     const handleLogout = async () => {
         const { signOut } = await import("@/lib/auth-client");
@@ -250,7 +272,23 @@ export default function AdminLayout({
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 p-4 lg:p-6">{children}</main>
+                <main className="flex-1 p-4 lg:p-6">
+                    {halamanDitutup ? (
+                        <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center shadow-sm">
+                            <Lock className="mx-auto h-10 w-10 text-red-600" />
+                            <h1 className="mt-4 text-lg font-bold">Halaman Ini Tidak Terbuka untuk Peran Anda</h1>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Akun Anda dapat mengelola data outlet binaan dan mengunggah fotonya. Menu lain
+                                hanya bisa dibuka oleh admin kantor.
+                            </p>
+                            <Link href="/admin/mitra/outlet" className="mt-5 inline-block">
+                                <span className="inline-flex h-10 items-center rounded-md bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700">
+                                    Buka Database Outlet
+                                </span>
+                            </Link>
+                        </div>
+                    ) : children}
+                </main>
             </div>
         </div>
     );
