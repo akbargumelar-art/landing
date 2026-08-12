@@ -1,7 +1,8 @@
 # Street View di Halaman Mitra Outlet
 
-Panel Street View di `/mitra` memakai **Google Maps Embed API**. Peta sebarannya sendiri
-tetap OpenStreetMap/Leaflet dan tidak memerlukan Google sama sekali.
+Panel Street View di `/mitra` dan di profil outlet `/mitra/o/[publicToken]` memakai
+**Google Maps Embed API**. Peta sebarannya sendiri tetap OpenStreetMap/Leaflet dan tidak
+memerlukan Google sama sekali.
 
 Alasan memilih Embed API, bukan Maps JavaScript API:
 
@@ -61,10 +62,20 @@ sekali, dan halaman `/mitra` tampil persis seperti sebelum fitur ini ada.
 
 ## Cara memakainya di halaman
 
+Di direktori `/mitra`:
+
 - Klik kartu outlet mana pun yang punya koordinat → peta memfokuskan penandanya **dan**
   panel Street View terbuka di sebelahnya.
 - Atau klik penanda di peta, lalu tekan **Lihat Street View** di dalam popup-nya.
 - Tombol **Tutup** mengembalikan peta ke lebar penuh.
+
+Di profil outlet `/mitra/o/[publicToken]`, pada kartu **Sekitar Outlet**:
+
+- Tombol **Street View** di kanan header membuka panorama outlet yang sedang dibuka.
+- Penanda outlet tetangga maupun titik ODP di peta itu juga punya **Lihat Street View**
+  di dalam popup-nya, jadi sekitar outlet bisa ditelusuri tanpa pindah halaman.
+- Semua ini tampil sebelum OTP, sama seperti petanya: yang dikirim ke Google hanya
+  koordinat, bukan nama ODP atau kapasitas portnya.
 
 ## Batasan yang perlu diketahui
 

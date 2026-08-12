@@ -3,11 +3,13 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import React from "react";
-import { MapPin, Router, Store } from "lucide-react";
+import { Eye, MapPin, Router, Store } from "lucide-react";
 
 import type { OdpMarker, OutletMarker } from "@/components/mitra/outlet-map";
+import { StreetViewPanel } from "@/components/mitra/street-view-panel";
 import { formatJarak } from "@/lib/geo";
 import { WARNA_ODP_PUBLIK } from "@/lib/indihome-odp";
+import { STREET_VIEW_ENABLED } from "@/lib/street-view";
 
 /**
  * Peta sekitar pada profil publik outlet -- bagian yang tidak menunggu OTP.
@@ -36,6 +38,8 @@ export function PetaSekitar({ outlet }: { outlet: OutletMarker }) {
     const [sekitar, setSekitar] = React.useState<OutletSekitar[]>([]);
     const [radiusMeter, setRadiusMeter] = React.useState(1500);
     const [loading, setLoading] = React.useState(true);
+    const [streetViewToken, setStreetViewToken] = React.useState<string | null>(null);
+    const [streetViewOdp, setStreetViewOdp] = React.useState<OdpMarker | null>(null);
 
     React.useEffect(() => {
         fetch(`/api/public/mitra/outlets/${outlet.publicToken}/sekitar`)
@@ -56,77 +60,142 @@ export function PetaSekitar({ outlet }: { outlet: OutletMarker }) {
     // sekitarnya: petanya tetap menjawab "outlet ini di sebelah mana".
     const markers = React.useMemo(() => [outlet, ...sekitar], [outlet, sekitar]);
 
+    /**
+     * Sama seperti di direktori /mitra: ODP hanya dikirim koordinatnya ke panorama, nama dan
+     * kapasitas portnya tetap di balik OTP. Outlet mana pun di peta ini boleh dilihat karena
+     * koordinatnya memang sudah publik.
+     */
+    const titikStreetView = React.useMemo(() => {
+        if (streetViewOdp) {
+            return {
+                id: streetViewOdp.id,
+                judul: "Titik ODP",
+                keterangan: "Lokasi sebaran ODP di sekitar outlet",
+                latitude: streetViewOdp.latitude,
+                longitude: streetViewOdp.longitude,
+            };
+        }
+
+        const dipilih = markers.find((marker) => marker.publicToken === streetViewToken);
+        if (dipilih) {
+            return {
+                id: dipilih.publicToken,
+                judul: dipilih.name,
+                keterangan: dipilih.outletCode,
+                latitude: dipilih.latitude,
+                longitude: dipilih.longitude,
+            };
+        }
+
+        return null;
+    }, [markers, streetViewOdp, streetViewToken]);
+
+    const tutupStreetView = React.useCallback(() => {
+        setStreetViewToken(null);
+        setStreetViewOdp(null);
+    }, []);
+
     return (
-        <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2 border-b px-5 py-4">
-                <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-red-600" />
-                    <div>
-                        <h2 className="font-bold">Sekitar Outlet</h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Titik ODP IndiHome dan outlet lain dalam radius {formatJarak(radiusMeter)}.
-                            Kapasitas port tiap ODP hanya terbuka setelah OTP.
-                        </p>
+        // Peta dan panorama berbagi baris hanya selama Street View terbuka; selebihnya peta
+        // tetap selebar halaman seperti sebelum fitur ini ada.
+        <div className={`grid gap-4 ${titikStreetView ? "lg:grid-cols-2" : ""}`}>
+            <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b px-5 py-4">
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-red-600" />
+                        <div>
+                            <h2 className="font-bold">Sekitar Outlet</h2>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Titik ODP IndiHome dan outlet lain dalam radius {formatJarak(radiusMeter)}.
+                                Kapasitas port tiap ODP hanya terbuka setelah OTP.
+                            </p>
+                        </div>
                     </div>
-                </div>
-                {!loading && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Warna tiap lencana disamakan dengan warna penandanya di peta, supaya
-                            legenda ini juga menjelaskan mengapa penanda outlet ini dan
-                            tetangganya tidak sewarna. */}
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold">
-                            <Store className="h-3.5 w-3.5 text-red-600" />
-                            Outlet ini
-                        </span>
-                        {sekitar.length > 0 && (
+                    {!loading && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Warna tiap lencana disamakan dengan warna penandanya di peta, supaya
+                                legenda ini juga menjelaskan mengapa penanda outlet ini dan
+                                tetangganya tidak sewarna. */}
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold">
-                                <Store className="h-3.5 w-3.5 text-slate-500" />
-                                {sekitar.length} outlet lain
+                                <Store className="h-3.5 w-3.5 text-red-600" />
+                                Outlet ini
                             </span>
-                        )}
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold">
-                            <Router className="h-3.5 w-3.5" style={{ color: WARNA_ODP_PUBLIK }} />
-                            {odp.length} titik ODP
-                        </span>
-                    </div>
-                )}
-            </div>
-
-            {loading ? (
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Memuat peta sekitar...</div>
-            ) : (
-                <>
-                    <OutletMap markers={markers} odp={odp} highlightedToken={outlet.publicToken} />
-
-                    {sekitar.length > 0 && (
-                        <div className="divide-y border-t">
-                            {sekitar.slice(0, BATAS_DAFTAR).map((tetangga) => (
-                                <Link
-                                    key={tetangga.publicToken}
-                                    href={`/mitra/o/${tetangga.publicToken}`}
-                                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-gray-50"
+                            {sekitar.length > 0 && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold">
+                                    <Store className="h-3.5 w-3.5 text-slate-500" />
+                                    {sekitar.length} outlet lain
+                                </span>
+                            )}
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold">
+                                <Router className="h-3.5 w-3.5" style={{ color: WARNA_ODP_PUBLIK }} />
+                                {odp.length} titik ODP
+                            </span>
+                            {/* Tombol langsung ke panorama outlet ini. Tanpa tombol ini pengunjung
+                                harus menemukan sendiri penandanya di peta lalu membuka popup-nya. */}
+                            {STREET_VIEW_ENABLED && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setStreetViewOdp(null); setStreetViewToken(outlet.publicToken); }}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700 transition-colors hover:bg-red-100"
                                 >
-                                    <span className="min-w-0">
-                                        <span className="block truncate text-sm font-semibold text-gray-950">{tetangga.name}</span>
-                                        <span className="block truncate text-xs text-muted-foreground">
-                                            {tetangga.outletCode} - {tetangga.kecamatan}, {tetangga.kabupaten}
-                                        </span>
-                                    </span>
-                                    <span className="shrink-0 rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
-                                        {formatJarak(tetangga.jarak)}
-                                    </span>
-                                </Link>
-                            ))}
-
-                            {sekitar.length > BATAS_DAFTAR && (
-                                <p className="px-5 py-3 text-xs text-muted-foreground">
-                                    dan {sekitar.length - BATAS_DAFTAR} outlet lain di dalam radius ini. Klik penandanya di peta.
-                                </p>
+                                    <Eye className="h-3.5 w-3.5" />
+                                    Street View
+                                </button>
                             )}
                         </div>
                     )}
-                </>
-            )}
+                </div>
+
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Memuat peta sekitar...</div>
+                ) : (
+                    <>
+                        <OutletMap
+                            markers={markers}
+                            odp={odp}
+                            highlightedToken={outlet.publicToken}
+                            onStreetView={STREET_VIEW_ENABLED ? (token) => {
+                                setStreetViewOdp(null);
+                                setStreetViewToken(token);
+                            } : undefined}
+                            onOdpStreetView={STREET_VIEW_ENABLED ? (titik) => {
+                                setStreetViewToken(null);
+                                setStreetViewOdp(titik);
+                            } : undefined}
+                        />
+
+                        {sekitar.length > 0 && (
+                            <div className="divide-y border-t">
+                                {sekitar.slice(0, BATAS_DAFTAR).map((tetangga) => (
+                                    <Link
+                                        key={tetangga.publicToken}
+                                        href={`/mitra/o/${tetangga.publicToken}`}
+                                        className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-gray-50"
+                                    >
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-sm font-semibold text-gray-950">{tetangga.name}</span>
+                                            <span className="block truncate text-xs text-muted-foreground">
+                                                {tetangga.outletCode} - {tetangga.kecamatan}, {tetangga.kabupaten}
+                                            </span>
+                                        </span>
+                                        <span className="shrink-0 rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
+                                            {formatJarak(tetangga.jarak)}
+                                        </span>
+                                    </Link>
+                                ))}
+
+                                {sekitar.length > BATAS_DAFTAR && (
+                                    <p className="px-5 py-3 text-xs text-muted-foreground">
+                                        dan {sekitar.length - BATAS_DAFTAR} outlet lain di dalam radius ini. Klik penandanya di peta.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {titikStreetView && <StreetViewPanel titik={titikStreetView} onClose={tutupStreetView} />}
         </div>
     );
 }
