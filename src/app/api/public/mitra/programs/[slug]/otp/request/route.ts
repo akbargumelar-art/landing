@@ -59,14 +59,17 @@ export async function POST(
 
     // Ambang sama seperti OTP outlet, dihitung per program supaya nomor yang sama tetap
     // bisa membuka program lain tanpa menunggu.
-    const [[recentPhone], [hourPhone], [dayPhone], [hourIp]] = await Promise.all([
+    const [[recentPhone], [hourPhone], [dayPhone], [hourIpSameProgram], [hourIpAllPrograms]] = await Promise.all([
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.programId, program.id), gt(mitraOtpRequests.createdAt, oneMinuteAgo))),
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.programId, program.id), gt(mitraOtpRequests.createdAt, oneHourAgo))),
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.programId, program.id), gt(mitraOtpRequests.createdAt, oneDayAgo))),
+        // Batas IP bertingkat (kustomisasi owner): 10x/jam untuk program yang sama,
+        // 20x/jam untuk seluruh program. Jangan diganti batas IP global tunggal.
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.ip, ip), eq(mitraOtpRequests.programId, program.id), gt(mitraOtpRequests.createdAt, oneHourAgo))),
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.ip, ip), gt(mitraOtpRequests.createdAt, oneHourAgo))),
     ]);
 
-    if ((recentPhone?.value || 0) >= 1 || (hourPhone?.value || 0) >= 5 || (dayPhone?.value || 0) >= 10 || (hourIp?.value || 0) >= 15) {
+    if ((recentPhone?.value || 0) >= 1 || (hourPhone?.value || 0) >= 5 || (dayPhone?.value || 0) >= 10 || (hourIpSameProgram?.value || 0) >= 10 || (hourIpAllPrograms?.value || 0) >= 20) {
         return NextResponse.json(
             { eligible: false, title: "Terlalu Sering Meminta OTP", message: "Permintaan OTP terlalu sering. Tunggu beberapa menit sebelum mencoba lagi." },
             { status: 429 }
