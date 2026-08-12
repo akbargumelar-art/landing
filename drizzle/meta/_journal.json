@@ -148,6 +148,111 @@
       "when": 1786261401776,
       "tag": "0020_odp_unique_name",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1786332958889,
+      "tag": "0021_mitra_visit_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1786355305700,
+      "tag": "0022_outlet_edit_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1786356883397,
+      "tag": "0023_add_admin_user_taps",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786356920893,
+      "tag": "0024_drop_territory_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1786359630092,
+      "tag": "0025_drop_market_share_axis",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1786366724175,
+      "tag": "0026_add_post_merger_market_share",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1786371129861,
+      "tag": "0027_mitra_program_reward_engine_step1",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1786371153386,
+      "tag": "0028_mitra_program_reward_engine_step2",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1786392061958,
+      "tag": "0029_drop_old_program_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1786392096097,
+      "tag": "0030_create_program_engine_and_masters",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1786395648385,
+      "tag": "0031_program_grouping_and_thumbnail",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1786396695241,
+      "tag": "0032_program_param_info_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1786397225145,
+      "tag": "0033_otp_for_program_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1786413563716,
+      "tag": "0034_kpi_salesforce",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1786440109029,
+      "tag": "0035_admin_salesforce_assignment",
+      "breakpoints": true
     }
   ]
 }

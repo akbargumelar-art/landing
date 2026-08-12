@@ -19,7 +19,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
     SALESFORCE: "Salesforce",
 };
 
-const TERRITORY_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
+const TAP_SCOPED: AdminRole[] = ["SUPERVISOR", "SALESFORCE"];
 
 interface AdminUser {
     id: string;
@@ -30,13 +30,17 @@ interface AdminUser {
     isActive: boolean;
     lastLoginAt: string | null;
     createdAt: string;
-    territoryIds: string[];
+    taps: string[];
+    salesforceId: string | null;
+    salesforceName: string | null;
 }
 
-interface Territory {
+interface SalesforceOption {
     id: string;
     name: string;
-    type: "REGION" | "CLUSTER" | "AREA";
+    tap: string;
+    /** Sudah dipakai akun lain; ditandai agar sebab tidak-bisa-dipilihnya terlihat. */
+    taken: boolean;
 }
 
 const emptyDraft = {
@@ -45,12 +49,14 @@ const emptyDraft = {
     password: "",
     phone: "",
     role: "MANAGER" as AdminRole,
-    territoryIds: [] as string[],
+    taps: [] as string[],
+    salesforceId: "",
 };
 
 export default function AdminUsersPage() {
     const [users, setUsers] = React.useState<AdminUser[]>([]);
-    const [territories, setTerritories] = React.useState<Territory[]>([]);
+    const [availableTaps, setAvailableTaps] = React.useState<string[]>([]);
+    const [salesforceOptions, setSalesforceOptions] = React.useState<SalesforceOption[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [message, setMessage] = React.useState("");
@@ -62,7 +68,10 @@ export default function AdminUsersPage() {
     const load = React.useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch("/api/admin/users");
+            const [response, tapsResponse] = await Promise.all([
+                fetch("/api/admin/users"),
+                fetch("/api/admin/mitra?resource=taps"),
+            ]);
             if (response.status === 403) {
                 setForbidden(true);
                 return;
@@ -70,7 +79,9 @@ export default function AdminUsersPage() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Gagal memuat user.");
             setUsers(data.users || []);
-            setTerritories(data.territories || []);
+            setSalesforceOptions(data.salesforceOptions || []);
+            const tapsData = tapsResponse.ok ? await tapsResponse.json().catch(() => ({})) : {};
+            setAvailableTaps(Array.isArray(tapsData.taps) ? tapsData.taps : []);
         } catch (error) {
             setMessage(error instanceof Error ? error.message : "Gagal memuat user.");
         } finally {
@@ -95,18 +106,19 @@ export default function AdminUsersPage() {
             password: "",
             phone: user.phone || "",
             role: user.role,
-            territoryIds: user.territoryIds,
+            taps: user.taps,
+            salesforceId: user.salesforceId || "",
         });
         setDialogOpen(true);
         setMessage("");
     }
 
-    function toggleTerritory(id: string) {
+    function toggleTap(tap: string) {
         setDraft((current) => ({
             ...current,
-            territoryIds: current.territoryIds.includes(id)
-                ? current.territoryIds.filter((item) => item !== id)
-                : [...current.territoryIds, id],
+            taps: current.taps.includes(tap)
+                ? current.taps.filter((item) => item !== tap)
+                : [...current.taps, tap],
         }));
     }
 
@@ -124,7 +136,8 @@ export default function AdminUsersPage() {
                         role: draft.role,
                         phone: draft.phone,
                         isActive: editingUser.isActive,
-                        territoryIds: draft.territoryIds,
+                        taps: draft.taps,
+                        salesforceId: draft.salesforceId,
                     }),
                 });
                 const data = await response.json();
@@ -151,7 +164,7 @@ export default function AdminUsersPage() {
         const response = await fetch(`/api/admin/users/${user.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: user.role, isActive: !user.isActive, territoryIds: user.territoryIds }),
+            body: JSON.stringify({ role: user.role, isActive: !user.isActive, taps: user.taps }),
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -195,11 +208,17 @@ export default function AdminUsersPage() {
                                 <div>
                                     <p className="font-semibold text-gray-950">{user.name}</p>
                                     <p className="text-xs text-muted-foreground">{user.email}</p>
-                                    {TERRITORY_SCOPED.includes(user.role) && (
+                                    {TAP_SCOPED.includes(user.role) && (
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            Wilayah: {user.territoryIds.length > 0
-                                                ? territories.filter((t) => user.territoryIds.includes(t.id)).map((t) => t.name).join(", ")
-                                                : "Belum ditetapkan"}
+                                            TAP: {user.taps.length > 0 ? user.taps.join(", ") : "Belum ditetapkan"}
+                                        </p>
+                                    )}
+                                    {/* Akun salesforce tanpa tautan master tidak akan pernah cocok
+                                        dengan outlet mana pun, jadi ditandai jelas alih-alih tampak
+                                        normal sampai petugasnya gagal bekerja. */}
+                                    {user.role === "SALESFORCE" && (
+                                        <p className={`mt-1 text-xs ${user.salesforceName ? "text-muted-foreground" : "font-semibold text-red-600"}`}>
+                                            Petugas: {user.salesforceName || "Belum ditautkan — akun ini belum bisa dipakai"}
                                         </p>
                                     )}
                                 </div>
@@ -264,19 +283,49 @@ export default function AdminUsersPage() {
                                 ))}
                             </select>
                         </div>
-                        {TERRITORY_SCOPED.includes(draft.role) && (
+                        {draft.role === "SALESFORCE" && (
                             <div className="space-y-2">
-                                <Label>Wilayah</Label>
+                                <Label htmlFor="user-salesforce">Master Salesforce</Label>
+                                <select
+                                    id="user-salesforce"
+                                    value={draft.salesforceId}
+                                    onChange={(event) => setDraft({ ...draft, salesforceId: event.target.value })}
+                                    className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
+                                >
+                                    <option value="">— Pilih petugas —</option>
+                                    {salesforceOptions.map((option) => {
+                                        // Master yang sudah dipakai akun lain tetap ditampilkan tetapi
+                                        // dimatikan, kecuali memang milik akun yang sedang disunting.
+                                        const milikSendiri = option.id === editingUser?.salesforceId;
+                                        return (
+                                            <option key={option.id} value={option.id} disabled={option.taken && !milikSendiri}>
+                                                {option.name}{option.tap ? ` · ${option.tap}` : ""}
+                                                {option.taken && !milikSendiri ? " (sudah dipakai akun lain)" : ""}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    Menentukan outlet mana yang boleh dilihat dan diubah akun ini. Satu petugas hanya
+                                    boleh tertaut ke satu akun — untuk mengganti pemegangnya, sunting akun lama itu.
+                                </p>
+                            </div>
+                        )}
+                        {TAP_SCOPED.includes(draft.role) && (
+                            <div className="space-y-2">
+                                <Label>TAP</Label>
                                 <div className="grid max-h-40 gap-2 overflow-auto rounded-lg border p-3 sm:grid-cols-2">
-                                    {territories.map((territory) => (
-                                        <label key={territory.id} className="flex items-center gap-2 text-sm">
+                                    {availableTaps.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground sm:col-span-2">Belum ada TAP pada data outlet.</p>
+                                    ) : availableTaps.map((tap) => (
+                                        <label key={tap} className="flex items-center gap-2 text-sm">
                                             <input
                                                 type="checkbox"
-                                                checked={draft.territoryIds.includes(territory.id)}
-                                                onChange={() => toggleTerritory(territory.id)}
+                                                checked={draft.taps.includes(tap)}
+                                                onChange={() => toggleTap(tap)}
                                                 className="h-4 w-4 accent-red-600"
                                             />
-                                            {territory.name}
+                                            {tap}
                                         </label>
                                     ))}
                                 </div>

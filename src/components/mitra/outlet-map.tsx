@@ -6,21 +6,21 @@ import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from "react-le
 import L from "leaflet";
 
 import { buildOutletMapsUrl } from "@/lib/mitra-outlet-options";
-import { hitungOccupancy, infoKategori, type OdpCategory } from "@/lib/indihome-odp";
+import { WARNA_ODP_PUBLIK, hitungOccupancy, infoKategori, type OdpCategory } from "@/lib/indihome-odp";
 
 import "leaflet/dist/leaflet.css";
 
 export interface OdpMarker {
     id: string;
-    name: string | null;
-    kabupaten: string;
-    kecamatan: string;
+    name?: string | null;
+    kabupaten?: string;
+    kecamatan?: string;
     latitude: number;
     longitude: number;
-    portTotal: number;
-    portUsed: number;
-    portAvailable: number;
-    category: OdpCategory | null;
+    portTotal?: number;
+    portUsed?: number;
+    portAvailable?: number;
+    category?: OdpCategory | null;
 }
 
 export interface OutletMarker {
@@ -40,23 +40,31 @@ export interface OutletMarker {
  * di-bundle dan diberi hash oleh Next.js -- gejalanya penanda hilang tanpa error. divIcon
  * berbasis HTML menghindari masalah itu sepenuhnya dan sekaligus mengikuti warna merek.
  */
-function pinOutlet(fokus: boolean) {
-    const ukuran = fokus ? 40 : 32;
+const MERAH_OUTLET = "#dc2626";
+/** Abu-abu netral: sengaja tidak memakai warna merek supaya jelas-jelas terbaca sebagai "bukan yang ini". */
+const ABU_OUTLET_SEKITAR = "#64748b";
+
+function pinOutlet({ besar = false, warna = MERAH_OUTLET, berdenyut = false }: {
+    besar?: boolean;
+    warna?: string;
+    berdenyut?: boolean;
+} = {}) {
+    const ukuran = besar ? 40 : 32;
     // Bentuk toko: kanopi bergelombang di atas, badan bangunan, pintu di tengah. Dipilih
     // agar penanda outlet berbeda bentuk -- bukan hanya beda warna -- dari penanda ODP,
     // sehingga tetap terbaca oleh yang kesulitan membedakan warna.
     return L.divIcon({
         className: "",
         html: `
-            <span style="display:block;width:${ukuran}px;height:${ukuran}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));${fokus ? "animation:pulsa-marker 1.2s ease-in-out infinite;" : ""}">
+            <span style="display:block;width:${ukuran}px;height:${ukuran}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));${berdenyut ? "animation:pulsa-marker 1.2s ease-in-out infinite;" : ""}">
                 <svg viewBox="0 0 24 24" width="${ukuran}" height="${ukuran}">
                     <path d="M12 2c4.4 0 8 3.4 8 7.6 0 5.2-6.3 11.1-7.4 12.1a.9.9 0 0 1-1.2 0C10.3 20.7 4 14.8 4 9.6 4 5.4 7.6 2 12 2z"
-                          fill="#dc2626" stroke="#fff" stroke-width="1.4"/>
+                          fill="${warna}" stroke="#fff" stroke-width="1.4"/>
                     <path d="M8 7.4h8v1.3a1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0 1.3 1.3 0 0 1-2 0z" fill="#fff"/>
                     <path d="M8.7 9.6h6.6v4.6h-2.4v-2.7h-1.8v2.7H8.7z" fill="#fff"/>
                 </svg>
             </span>
-            ${fokus ? `<style>
+            ${berdenyut ? `<style>
                 @keyframes pulsa-marker {
                     0%, 100% { transform: scale(1); }
                     50%      { transform: scale(1.12); }
@@ -69,8 +77,17 @@ function pinOutlet(fokus: boolean) {
     });
 }
 
-const ikonOutlet = pinOutlet(false);
-const ikonOutletFokus = pinOutlet(true);
+const ikonOutlet = pinOutlet();
+const ikonOutletFokus = pinOutlet({ besar: true, berdenyut: true });
+/**
+ * Penanda outlet yang sedang dibuka di halaman profilnya, di antara outlet lain di
+ * sekitarnya. Dibuat besar dan merah tanpa denyut (denyut dipakai khusus untuk fokus
+ * sementara seperti Street View, bukan status permanen "ini outlet Anda"), sedangkan
+ * tetangganya diberi warna abu-abu netral supaya kontrasnya langsung terlihat tanpa
+ * perlu membaca label satu per satu.
+ */
+const ikonOutletUtama = pinOutlet({ besar: true });
+const ikonOutletSekitar = pinOutlet({ warna: ABU_OUTLET_SEKITAR });
 
 /**
  * Penanda ODP: kotak terminal dengan tiga port dan kabel menjuntai -- bentuk yang lazim
@@ -269,19 +286,29 @@ export interface PosisiPengguna {
 export default function OutletMap({
     markers,
     focusedToken = null,
+    highlightedToken = null,
     onStreetView,
     userPosition = null,
     odp = [],
+    showOdpDetails = false,
     onAreaChange,
     onOdpStreetView,
     heightClass = "h-[360px] sm:h-[460px]",
 }: {
     markers: OutletMarker[];
     focusedToken?: string | null;
+    /**
+     * Penanda yang ditonjolkan tanpa memindahkan peta. Dipakai halaman profil outlet, yang
+     * perlu membedakan outlet yang sedang dibuka dari tetangganya tetapi tetap ingin seluruh
+     * sekitarnya terlihat -- berbeda dengan focusedToken yang sengaja terbang mendekat.
+     */
+    highlightedToken?: string | null;
     /** Tidak diisi bila API key Street View belum dipasang; tombolnya ikut hilang. */
     onStreetView?: (publicToken: string) => void;
     userPosition?: PosisiPengguna | null;
     odp?: OdpMarker[];
+    /** Hanya aktif pada halaman detail outlet yang sudah melewati validasi OTP. */
+    showOdpDetails?: boolean;
     onAreaChange?: (bbox: string, zoom: number) => void;
     onOdpStreetView?: (titik: OdpMarker) => void;
     /**
@@ -338,27 +365,36 @@ export default function OutletMap({
             {/* ODP digambar sebelum outlet supaya penanda outlet berada di lapisan atas
                 ketika keduanya bertumpuk -- outlet yang lebih sering diklik. */}
             {odp.map((titik) => {
-                const kategori = infoKategori(titik.category, titik.portUsed, titik.portTotal);
-                const occupancy = hitungOccupancy(titik.portUsed, titik.portTotal);
+                const portUsed = titik.portUsed ?? 0;
+                const portTotal = titik.portTotal ?? 0;
+                const kategori = infoKategori(titik.category, portUsed, portTotal);
+                const occupancy = hitungOccupancy(portUsed, portTotal);
+                const warna = showOdpDetails ? kategori.color : WARNA_ODP_PUBLIK;
 
                 return (
-                    <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(kategori.color)}>
+                    <Marker key={titik.id} position={[titik.latitude, titik.longitude]} icon={ikonOdp(warna)}>
                         <Popup>
-                            <span className="block text-sm font-bold text-gray-950">
-                                ODP {titik.name || titik.kecamatan}
-                            </span>
-                            <span className="mt-0.5 block text-xs text-gray-600">
-                                {titik.kecamatan}, {titik.kabupaten}
-                            </span>
-                            <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: kategori.color }}>
-                                {kategori.label}
-                            </span>
-                            <span className="mt-2 block text-xs text-gray-700">
-                                Port: <strong>{titik.portTotal}</strong> total, {titik.portUsed} terpakai, {titik.portAvailable} tersedia
-                            </span>
-                            <span className="mt-0.5 block text-xs text-gray-700">
-                                Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
-                            </span>
+                            {showOdpDetails ? (
+                                <>
+                                    <span className="block text-sm font-bold text-gray-950">
+                                        ODP {titik.name || titik.kecamatan || "Tanpa Nama"}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-gray-600">
+                                        {titik.kecamatan}, {titik.kabupaten}
+                                    </span>
+                                    <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: kategori.color }}>
+                                        {kategori.label}
+                                    </span>
+                                    <span className="mt-2 block text-xs text-gray-700">
+                                        Port: <strong>{portTotal}</strong> total, {portUsed} terpakai, {titik.portAvailable ?? 0} tersedia
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-gray-700">
+                                        Occupancy: <strong>{occupancy.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</strong>
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="block text-sm font-bold text-gray-950">Titik ODP</span>
+                            )}
                             <span className="mt-2 flex flex-col gap-1">
                                 {onOdpStreetView && (
                                     <button
@@ -383,11 +419,25 @@ export default function OutletMap({
                 );
             })}
 
-            {markers.map((outlet) => (
+            {markers.map((outlet) => {
+                const adalahUtama = highlightedToken === outlet.publicToken;
+                // Ketiga ikon dipakai untuk maksud berbeda: fokus itu sorotan sementara (dipicu
+                // klik Street View di direktori), utama itu status permanen "ini outletnya",
+                // dan sekitar itu tetangga yang sengaja diredupkan supaya tidak tertukar --
+                // hanya berlaku ketika halaman memang mengirim highlightedToken.
+                const ikon = focusedToken === outlet.publicToken
+                    ? ikonOutletFokus
+                    : adalahUtama
+                        ? ikonOutletUtama
+                        : highlightedToken
+                            ? ikonOutletSekitar
+                            : ikonOutlet;
+
+                return (
                 <Marker
                     key={outlet.publicToken}
                     position={[outlet.latitude, outlet.longitude]}
-                    icon={focusedToken === outlet.publicToken ? ikonOutletFokus : ikonOutlet}
+                    icon={ikon}
                 >
                     <Popup>
                         <span className="block text-sm font-bold text-gray-950">{outlet.name}</span>
@@ -395,6 +445,11 @@ export default function OutletMap({
                         <span className="mt-1 block text-xs text-gray-600">
                             {outlet.kecamatan}, {outlet.kabupaten}
                         </span>
+                        {adalahUtama && (
+                            <span className="mt-1.5 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-700">
+                                Outlet ini
+                            </span>
+                        )}
                         <span className="mt-2 flex flex-col gap-1">
                             {onStreetView && (
                                 <button
@@ -405,12 +460,16 @@ export default function OutletMap({
                                     Lihat Street View
                                 </button>
                             )}
-                            <Link
-                                href={`/mitra/o/${outlet.publicToken}`}
-                                className="text-xs font-semibold text-red-600 hover:underline"
-                            >
-                                Lihat profil outlet
-                            </Link>
+                            {/* Tautan ke profilnya sendiri dihilangkan untuk penanda utama --
+                                pengunjung sudah berada di halaman itu. */}
+                            {!adalahUtama && (
+                                <Link
+                                    href={`/mitra/o/${outlet.publicToken}`}
+                                    className="text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                    Lihat profil outlet
+                                </Link>
+                            )}
                             <a
                                 href={buildOutletMapsUrl(outlet.latitude, outlet.longitude)}
                                 target="_blank"
@@ -422,7 +481,8 @@ export default function OutletMap({
                         </span>
                     </Popup>
                 </Marker>
-            ))}
+                );
+            })}
         </MapContainer>
     );
 }

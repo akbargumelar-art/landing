@@ -12,6 +12,14 @@ export const ODP_CATEGORIES = [
 export type OdpCategory = (typeof ODP_CATEGORIES)[number]["key"];
 
 /**
+ * Warna titik ODP pada peta publik, ketika kategori port memang tidak boleh dibocorkan.
+ * Oranye IndiHome mengikuti warna aksen halaman telkomsel.com/indihome; sebelumnya biru,
+ * yang tidak mengaitkan titiknya dengan produk mana pun dan mudah tertukar dengan penanda
+ * posisi pengguna yang juga biru.
+ */
+export const WARNA_ODP_PUBLIK = "#f26b21";
+
+/**
  * Ambang penurunan kategori dari occupancy, dipakai HANYA ketika kolom kategori kosong.
  *
  * Angka ini asumsi, bukan ketentuan resmi Telkom -- kalau standar Anda berbeda, cukup

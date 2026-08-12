@@ -3,12 +3,14 @@ import { and, asc, count, desc, eq, inArray, like, or, type SQL } from "drizzle-
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
-import { mitraOutletDetails, mitraOutlets, mitraSalesforces, mitraTerritories } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { mitraOutletDetails, mitraOutlets, mitraSalesforces } from "@/db/schema";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getAdminActorScope, isScopedRole, outletScopeCondition } from "@/lib/admin-scope";
 import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
 import {
+    PJP_DAYS,
     normalizeOutletBranding,
     normalizeOutletCategory,
     normalizePjpDay,
@@ -25,6 +27,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const q = url.searchParams.get("q") || "";
     const status = url.searchParams.get("status") || "";
+    const tap = String(url.searchParams.get("tap") || "").trim();
+    const salesforceId = String(url.searchParams.get("salesforceId") || "").trim();
+    const pjpDayInput = String(url.searchParams.get("pjpDay") || "").trim();
+    const pjpDay = (PJP_DAYS as readonly string[]).includes(pjpDayInput) ? pjpDayInput : "";
     const page = Math.max(Number(url.searchParams.get("page") || "1"), 1);
     const pageSize = Math.min(Math.max(Number(url.searchParams.get("pageSize") || "25"), 1), 100);
 
@@ -41,14 +47,58 @@ export async function GET(request: Request) {
     if (["ACTIVE", "INACTIVE", "SUSPENDED"].includes(status)) {
         filters.push(eq(mitraOutlets.status, status as "ACTIVE" | "INACTIVE" | "SUSPENDED"));
     }
+    if (tap) filters.push(eq(mitraOutlets.tap, tap));
+    if (salesforceId) filters.push(eq(mitraOutlets.salesforceId, salesforceId));
+    if (pjpDay) filters.push(eq(mitraOutlets.pjpDay, pjpDay as (typeof PJP_DAYS)[number]));
 
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        const territoryIds = await getUserTerritoryIds(auth.session.userId);
-        if (territoryIds.length === 0) {
-            return NextResponse.json({ outlets: [], total: 0, page, pageSize });
-        }
-        filters.push(inArray(mitraOutlets.territoryId, territoryIds));
-    }
+    /**
+     * Pembatasan wewenang masuk ke KONDISI QUERY, bukan menyaring hasil setelahnya: nilai
+     * `total` dihitung dari where yang sama, jadi menyaring belakangan akan membocorkan
+     * cacah outlet di luar wewenang lewat angka totalnya sendiri.
+     *
+     * Sebelumnya pembatasan hanya memakai TAP, sehingga seorang salesforce ikut melihat --
+     * dan lewat endpoint detail, membaca -- seluruh outlet binaan rekan setimnya.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const kondisiScope = outletScopeCondition(scope);
+    if (kondisiScope) filters.push(kondisiScope);
+
+    // Opsi dropdown berasal dari cakupan dasar, sebelum filter pilihan diterapkan. Dengan
+    // demikian memilih satu TAP tidak membuat pilihan TAP lain hilang, tetapi akun terbatas
+    // juga tidak pernah menerima nama Salesforce atau TAP di luar wewenangnya.
+    const optionRows = await db
+        .select({
+            tap: mitraOutlets.tap,
+            salesforceId: mitraOutlets.salesforceId,
+            salesforce: mitraSalesforces.name,
+            salesforceActive: mitraSalesforces.isActive,
+        })
+        .from(mitraOutlets)
+        .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
+        .where(kondisiScope ?? undefined);
+
+    const taps = [...new Set(optionRows.map((row) => row.tap).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "id"));
+    const filterSalesforces = [...new Map(optionRows
+        .filter((row) => row.salesforceId && row.salesforce)
+        .map((row) => [row.salesforceId as string, {
+            id: row.salesforceId as string,
+            name: row.salesforce as string,
+            isActive: Boolean(row.salesforceActive),
+        }])).values()]
+        .sort((a, b) => a.name.localeCompare(b.name, "id"));
+
+    // Form admin tetap perlu master Salesforce yang belum memiliki outlet. Role terbatas
+    // hanya menerima nama yang memang muncul dalam cakupannya; daftar global tidak ikut
+    // terkirim ke browser petugas lapangan.
+    const salesforces = isScopedRole(scope.role)
+        ? filterSalesforces
+        : await db
+            .select({ id: mitraSalesforces.id, name: mitraSalesforces.name, isActive: mitraSalesforces.isActive })
+            .from(mitraSalesforces)
+            .orderBy(asc(mitraSalesforces.name));
 
     const where = filters.length > 0 ? and(...filters) : undefined;
 
@@ -71,8 +121,6 @@ export async function GET(request: Request) {
             longitude: mitraOutlets.longitude,
             latitude: mitraOutlets.latitude,
             locationUrl: mitraOutlets.locationUrl,
-            territoryId: mitraOutlets.territoryId,
-            territoryName: mitraTerritories.name,
             category: mitraOutlets.category,
             pjpDay: mitraOutlets.pjpDay,
             pjpType: mitraOutlets.pjpType,
@@ -82,28 +130,19 @@ export async function GET(request: Request) {
             createdAt: mitraOutlets.createdAt,
         })
         .from(mitraOutlets)
-        .leftJoin(mitraTerritories, eq(mitraOutlets.territoryId, mitraTerritories.id))
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
         .where(where)
         .orderBy(desc(mitraOutlets.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize);
 
-    const territories = await db.select().from(mitraTerritories).orderBy(asc(mitraTerritories.name));
-    // Dipakai dropdown salesforce di editor outlet; hanya yang aktif yang bisa dipilih,
-    // tetapi outlet yang terlanjur menaut ke yang nonaktif tetap ditampilkan apa adanya.
-    const salesforces = await db
-        .select({ id: mitraSalesforces.id, name: mitraSalesforces.name, isActive: mitraSalesforces.isActive })
-        .from(mitraSalesforces)
-        .orderBy(asc(mitraSalesforces.name));
-
     return NextResponse.json({
         outlets,
-        territories,
         salesforces,
         total: totalRow?.value || 0,
         page,
         pageSize,
+        filters: { taps, salesforces: filterSalesforces, pjpDays: PJP_DAYS },
     });
 }
 
@@ -138,7 +177,6 @@ export async function POST(request: Request) {
         latitude,
         // Tautan lokasi diturunkan dari koordinat, bukan diketik admin.
         locationUrl: resolveOutletMapsUrl(latitude, longitude, body.locationUrl) || null,
-        territoryId: body.territoryId || null,
         category: normalizeOutletCategory(body.category),
         pjpDay: normalizePjpDay(body.pjpDay),
         pjpType: normalizePjpType(body.pjpType),

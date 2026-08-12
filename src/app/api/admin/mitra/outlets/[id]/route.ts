@@ -3,8 +3,9 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { mitraOutletDetails, mitraOutlets } from "@/db/schema";
-import { getUserTerritoryIds, isTerritoryScopedRole, requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
-import { MITRA_DETAIL_FIELD_GROUPS, sanitizeDetailGroup } from "@/lib/mitra-fields";
+import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { findOutletInScope, getAdminActorScope } from "@/lib/admin-scope";
+import { MITRA_DETAIL_FIELD_GROUPS } from "@/lib/mitra-fields";
 import { generatePublicToken, getClientIp, normalizePhoneE164 } from "@/lib/mitra-utils";
 import { resolveSalesforceId } from "@/lib/mitra-salesforce";
 import { getOutletEditLogs, writeOutletEditLog } from "@/lib/mitra-outlet-edit";
@@ -26,17 +27,18 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const [outlet] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
-    if (!outlet) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
 
-    // The list endpoint filters by territory, so this one must too - otherwise a scoped role
-    // could read any outlet's sensitive performance detail just by knowing its id.
-    if (auth.session && isTerritoryScopedRole(auth.session.role)) {
-        const territoryIds = await getUserTerritoryIds(auth.session.userId);
-        if (!outlet.territoryId || !territoryIds.includes(outlet.territoryId)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-    }
+    /**
+     * Daftar sudah dibatasi wewenang, jadi detail wajib dibatasi juga -- kalau tidak, cukup
+     * menebak id untuk membaca performance outlet mana pun. Dijawab 404, bukan 403, supaya
+     * keberadaan record di luar wewenang tidak bisa dipetakan dengan mencoba id satu per satu.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const akses = await findOutletInScope(scope, id);
+    if (akses.error) return akses.error;
+    const outlet = akses.outlet;
 
     const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
     const editLogs = await getOutletEditLogs(id, 30);
@@ -52,6 +54,18 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+
+    // Detail performance hanya boleh datang dari pipeline import admin. Tolak eksplisit
+    // alih-alih mengabaikan payload, supaya klien lama tidak mengira angkanya tersimpan.
+    const grupPerformanceDikirim = MITRA_DETAIL_FIELD_GROUPS
+        .map((group) => group.key)
+        .filter((key) => Object.prototype.hasOwnProperty.call(body, key));
+    if (grupPerformanceDikirim.length > 0) {
+        return NextResponse.json({
+            error: "Sellthru Digipos, Sellthru Nota, dan Recharge Digipos hanya dapat diperbarui melalui Upload Data admin",
+        }, { status: 400 });
+    }
+
     const [existing] = await db.select().from(mitraOutlets).where(eq(mitraOutlets.id, id)).limit(1);
 
     if (!existing) return NextResponse.json({ error: "Outlet tidak ditemukan" }, { status: 404 });
@@ -84,7 +98,6 @@ export async function PUT(
         // Koordinat adalah sumber kebenaran tautan lokasi; nilai lama hanya dipakai
         // selama koordinat masih kosong.
         locationUrl: resolveOutletMapsUrl(latitude, longitude, existing.locationUrl) || null,
-        territoryId: body.territoryId === "" ? null : body.territoryId ?? existing.territoryId,
         category: normalizeOutletCategory(body.category ?? existing.category),
         pjpDay: normalizePjpDay(body.pjpDay ?? existing.pjpDay),
         pjpType: normalizePjpType(body.pjpType ?? existing.pjpType),
@@ -118,22 +131,6 @@ export async function PUT(
             after: { latitude, longitude },
             ip: ipAdmin,
         });
-    }
-
-    if (body.sellthruDigipos || body.sellthruNota || body.rechargeDigipos) {
-        const [details] = await db.select().from(mitraOutletDetails).where(eq(mitraOutletDetails.outletId, id)).limit(1);
-        const values = {
-            outletId: id,
-            sellthruDigiposJson: sanitizeDetailGroup(body.sellthruDigipos, MITRA_DETAIL_FIELD_GROUPS[0].fields.map((field) => field.key)),
-            sellthruNotaJson: sanitizeDetailGroup(body.sellthruNota, MITRA_DETAIL_FIELD_GROUPS[1].fields.map((field) => field.key)),
-            rechargeDigiposJson: sanitizeDetailGroup(body.rechargeDigipos, MITRA_DETAIL_FIELD_GROUPS[2].fields.map((field) => field.key)),
-        };
-
-        if (details) {
-            await db.update(mitraOutletDetails).set(values).where(eq(mitraOutletDetails.outletId, id));
-        } else {
-            await db.insert(mitraOutletDetails).values(values);
-        }
     }
 
     await writeAdminAuditLog({

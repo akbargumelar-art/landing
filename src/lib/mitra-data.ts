@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { resolveOutletMapsUrl } from "@/lib/mitra-outlet-options";
@@ -12,24 +12,17 @@ import {
     mitraOutletDetails,
     mitraOutletMetrics,
     mitraOutlets,
-    mitraProgramLeaderboard,
-    mitraProgramParams,
-    mitraProgramParticipants,
-    mitraProgramScores,
     mitraPrograms,
-    mitraProgramWinners,
     mitraSalesforces,
     mitraWhitelistNumbers,
     mitraWhitelistUsageLogs,
 } from "@/db/schema";
 import { getOutletEditLogs } from "@/lib/mitra-outlet-edit";
-import { bolehEditOutlet } from "@/lib/mitra-whitelist-roles";
 import {
     hashSessionToken,
     isFuture,
     maskPhone,
     normalizePhoneE164,
-    toDecimalString,
 } from "@/lib/mitra-utils";
 
 /**
@@ -82,9 +75,6 @@ export async function getMitraOutletRecordByToken(publicToken: string) {
             photoPopTelkomselUpdatedAt: mitraOutlets.photoPopTelkomselUpdatedAt,
             photoPopKompetitorUrl: mitraOutlets.photoPopKompetitorUrl,
             photoPopKompetitorUpdatedAt: mitraOutlets.photoPopKompetitorUpdatedAt,
-            // Nama territory tidak lagi diambil: profil publik menampilkan TAP dan
-            // salesforce, sedangkan territoryId saja sudah cukup untuk pencocokan whitelist.
-            territoryId: mitraOutlets.territoryId,
         })
         .from(mitraOutlets)
         .leftJoin(mitraSalesforces, eq(mitraOutlets.salesforceId, mitraSalesforces.id))
@@ -114,8 +104,8 @@ export async function getPublicOutletByToken(publicToken: string) {
         // Keempat slot foto ikut dibuka di profil publik: foto outlet bukan data
         // sensitif, dan kebaruannya justru bukti kunjungan yang ingin dilihat.
         photoUrl: row.photoUrl,
-        // Koordinat memang sudah publik lewat peta sebaran di /mitra; dikirim di sini
-        // supaya profil outlet bisa menggambar peta ODP sekitarnya.
+        // Koordinat outlet memang sudah publik lewat peta sebaran di /mitra. Rincian ODP
+        // sekitar tidak memakai respons ini dan tetap dilindungi sesi OTP.
         latitude: row.latitude,
         longitude: row.longitude,
         photoUpdatedAt: row.photoUpdatedAt,
@@ -139,13 +129,15 @@ export async function getPublicOutletByToken(publicToken: string) {
     };
 }
 
-export async function getOutletDetailWithSession(publicToken: string, sessionToken: string | undefined) {
+/**
+ * Memastikan sesi detail berasal dari OTP yang sah untuk outlet yang sama. Helper ini
+ * dipakai semua data tambahan yang hanya boleh terbuka setelah OTP, termasuk rincian ODP.
+ */
+export async function getOutletWithValidDetailSession(publicToken: string, sessionToken: string | undefined) {
     if (!sessionToken) return null;
 
     const outletRecord = await getMitraOutletRecordByToken(publicToken);
-    const outlet = await getPublicOutletByToken(publicToken);
     if (!outletRecord) return null;
-    if (!outlet) return null;
 
     const [detailSession] = await db
         .select()
@@ -159,7 +151,16 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         )
         .limit(1);
 
-    if (!detailSession) return null;
+    return detailSession ? { outletRecord, detailSession } : null;
+}
+
+export async function getOutletDetailWithSession(publicToken: string, sessionToken: string | undefined) {
+    const access = await getOutletWithValidDetailSession(publicToken, sessionToken);
+    if (!access) return null;
+
+    const { outletRecord, detailSession } = access;
+    const outlet = await getPublicOutletByToken(publicToken);
+    if (!outlet) return null;
 
     const [detailRow] = await db
         .select({
@@ -217,7 +218,6 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
             latitude: outletRecord.latitude,
             // Diturunkan dari koordinat supaya tautan selalu cocok dengan lat/long tersimpan.
             locationUrl: resolveOutletMapsUrl(outletRecord.latitude, outletRecord.longitude, outletRecord.locationUrl),
-            territoryId: outletRecord.territoryId,
         },
         detailSession,
         details: {
@@ -230,8 +230,12 @@ export async function getOutletDetailWithSession(publicToken: string, sessionTok
         performance,
         marketShare: marketShare || null,
         editLogs: await getOutletEditLogs(outletRecord.id),
-        // Dipakai halaman untuk menyembunyikan kontrol yang memang akan ditolak server.
-        bolehEdit: bolehEditOutlet(whitelistPengakses?.keterangan),
+        /**
+         * Sesi OTP kini murni baca. Field dipertahankan dan dipaku `false` selama masa
+         * kompatibilitas supaya build lama yang masih membacanya menyembunyikan kontrol edit
+         * alih-alih menampilkan tombol yang pasti ditolak server.
+         */
+        bolehEdit: false as const,
         peranPengakses: whitelistPengakses?.keterangan || null,
     };
 }
@@ -268,7 +272,8 @@ export async function findMatchingWhitelist(phone: string, outlet: { id: string;
 export async function writeWhitelistUsage(input: {
     whitelistId?: string | null;
     phoneE164: string;
-    outletId: string;
+    outletId?: string | null;
+    programId?: string | null;
     action: "OTP_REQUESTED" | "OTP_VERIFIED" | "OTP_REJECTED";
     ip?: string | null;
 }) {
@@ -276,240 +281,33 @@ export async function writeWhitelistUsage(input: {
         id: uuid(),
         whitelistId: input.whitelistId || null,
         phoneE164: input.phoneE164,
-        outletId: input.outletId,
+        outletId: input.outletId || null,
+        programId: input.programId || null,
         action: input.action,
         ip: input.ip || null,
         createdAt: new Date(),
     });
 }
 
-export async function getPublicMitraPrograms() {
-    return db
-        .select({
-            id: mitraPrograms.id,
-            name: mitraPrograms.name,
-            slug: mitraPrograms.slug,
-            descriptionMd: mitraPrograms.descriptionMd,
-            mechanismMd: mitraPrograms.mechanismMd,
-            periodStart: mitraPrograms.periodStart,
-            periodEnd: mitraPrograms.periodEnd,
-            status: mitraPrograms.status,
-            rankingMode: mitraPrograms.rankingMode,
-        })
-        .from(mitraPrograms)
-        .where(and(eq(mitraPrograms.isPublic, true), inArray(mitraPrograms.status, ["ACTIVE", "PUBLISHED", "ENDED"])))
-        .orderBy(desc(mitraPrograms.periodStart));
-}
+/**
+ * Nomor yang berhak membuka halaman yang tidak terikat outlet tertentu -- misalnya
+ * program salesforce. Cakupan whitelist (ALL/OUTLET/TAP) tidak diperiksa di sini karena
+ * tidak ada outlet pembanding: yang dituntut hanya nomor itu benar terdaftar dan masih
+ * berlaku.
+ */
+export async function findActiveWhitelistNumber(phone: string) {
+    const phoneE164 = normalizePhoneE164(phone);
+    if (!phoneE164) return null;
 
-export async function getPublicMitraProgramDetail(slug: string, search = "") {
-    const [program] = await db
+    const candidates = await db
         .select()
-        .from(mitraPrograms)
-        .where(and(eq(mitraPrograms.slug, slug), eq(mitraPrograms.isPublic, true)))
-        .limit(1);
-
-    if (!program) return null;
-
-    const params = await db
-        .select()
-        .from(mitraProgramParams)
-        .where(eq(mitraProgramParams.programId, program.id))
-        .orderBy(asc(mitraProgramParams.sortOrder));
-
-    const searchFilter = search
-        ? or(
-            like(mitraOutlets.name, `%${search}%`),
-            like(mitraOutlets.outletCode, `%${search}%`),
-            like(mitraOutlets.kecamatan, `%${search}%`),
-            like(mitraOutlets.kabupaten, `%${search}%`)
-        )
-        : undefined;
-
-    const leaderboardWhere = searchFilter
-        ? and(eq(mitraProgramLeaderboard.programId, program.id), searchFilter)
-        : eq(mitraProgramLeaderboard.programId, program.id);
-
-    const leaderboard = await db
-        .select({
-            outletId: mitraOutlets.id,
-            outletName: mitraOutlets.name,
-            outletCode: mitraOutlets.outletCode,
-            kabupaten: mitraOutlets.kabupaten,
-            kecamatan: mitraOutlets.kecamatan,
-            totalPoints: mitraProgramLeaderboard.totalPoints,
-            rank: mitraProgramLeaderboard.rank,
-            prevRank: mitraProgramLeaderboard.prevRank,
-            computedAt: mitraProgramLeaderboard.computedAt,
-        })
-        .from(mitraProgramLeaderboard)
-        .innerJoin(mitraOutlets, eq(mitraProgramLeaderboard.outletId, mitraOutlets.id))
-        .where(leaderboardWhere)
-        .orderBy(asc(mitraProgramLeaderboard.rank))
-        .limit(100);
-
-    const winners = await db
-        .select({
-            outletId: mitraOutlets.id,
-            outletName: mitraOutlets.name,
-            outletCode: mitraOutlets.outletCode,
-            rank: mitraProgramWinners.rank,
-            prizeLabel: mitraProgramWinners.prizeLabel,
-        })
-        .from(mitraProgramWinners)
-        .innerJoin(mitraOutlets, eq(mitraProgramWinners.outletId, mitraOutlets.id))
-        .where(and(eq(mitraProgramWinners.programId, program.id), eq(mitraProgramWinners.isPublished, true)))
-        .orderBy(asc(mitraProgramWinners.rank));
-
-    /**
-     * Peserta yang belum punya satu pun skor tidak pernah masuk papan peringkat --
-     * peringkat dibangun dari tabel skor. Dari sisi peserta itu terlihat seperti tidak
-     * terdaftar, padahal terdaftar. Karena itu mereka ikut ditarik dan digabungkan di
-     * bawah daftar dengan nilai nol.
-     */
-    const peringkatIds = new Set(leaderboard.map((row) => row.outletId));
-    const pesertaWhere = searchFilter
-        ? and(eq(mitraProgramParticipants.programId, program.id), searchFilter)
-        : eq(mitraProgramParticipants.programId, program.id);
-
-    const semuaPeserta = await db
-        .select({
-            outletId: mitraOutlets.id,
-            outletName: mitraOutlets.name,
-            outletCode: mitraOutlets.outletCode,
-            kabupaten: mitraOutlets.kabupaten,
-            kecamatan: mitraOutlets.kecamatan,
-        })
-        .from(mitraProgramParticipants)
-        .innerJoin(mitraOutlets, eq(mitraProgramParticipants.outletId, mitraOutlets.id))
-        .where(pesertaWhere)
-        .orderBy(asc(mitraOutlets.name))
-        .limit(200);
-
-    const tanpaSkor = semuaPeserta
-        .filter((peserta) => !peringkatIds.has(peserta.outletId))
-        .map((peserta) => ({
-            ...peserta,
-            totalPoints: "0.00",
-            rank: null as number | null,
-            prevRank: null as number | null,
-            computedAt: null as Date | null,
-        }));
-
-    const barisTampil = [...leaderboard.map((row) => ({ ...row, rank: row.rank as number | null })), ...tanpaSkor];
-
-    /**
-     * Pencapaian per parameter. Skor mentahnya sudah lama tersimpan per bulan, tetapi
-     * belum pernah dikirim ke halaman publik -- yang dikirim hanya total poin.
-     *
-     * Digabungkan di JavaScript, bukan lewat SUM() di SQL, karena tiap parameter punya
-     * mode agregasinya sendiri (SUM/AVG/LAST) dan LAST berarti "ambil periode terbaru",
-     * yang tidak bisa diwakili satu fungsi agregat SQL.
-     */
-    const outletIds = barisTampil.map((row) => row.outletId);
-    const skorRows = outletIds.length > 0 && params.length > 0
-        ? await db
-            .select({
-                outletId: mitraProgramScores.outletId,
-                paramId: mitraProgramScores.paramId,
-                periodYm: mitraProgramScores.periodYm,
-                rawValue: mitraProgramScores.rawValue,
-                points: mitraProgramScores.points,
-            })
-            .from(mitraProgramScores)
-            .where(and(
-                eq(mitraProgramScores.programId, program.id),
-                inArray(mitraProgramScores.outletId, outletIds)
-            ))
-        : [];
-
-    const paramById = new Map(params.map((param) => [param.id, param]));
-    const kumpulan = new Map<string, { raw: number[]; points: number[]; periodTerakhir: string }>();
-
-    for (const skor of skorRows) {
-        const kunci = `${skor.outletId}::${skor.paramId}`;
-        const param = paramById.get(skor.paramId);
-        if (!param) continue;
-
-        const bucket = kumpulan.get(kunci) || { raw: [], points: [], periodTerakhir: "" };
-
-        if (param.aggregation === "LAST") {
-            // Hanya periode terbaru yang dipakai; periode lama dibuang saat ketemu yang lebih baru.
-            if (skor.periodYm > bucket.periodTerakhir) {
-                bucket.periodTerakhir = skor.periodYm;
-                bucket.raw = [Number(skor.rawValue)];
-                bucket.points = [Number(skor.points)];
-            }
-        } else {
-            bucket.raw.push(Number(skor.rawValue));
-            bucket.points.push(Number(skor.points));
-            if (skor.periodYm > bucket.periodTerakhir) bucket.periodTerakhir = skor.periodYm;
-        }
-
-        kumpulan.set(kunci, bucket);
-    }
-
-    const ringkas = (nilai: number[], mode: string) => {
-        if (nilai.length === 0) return 0;
-        if (mode === "AVG") return nilai.reduce((total, item) => total + item, 0) / nilai.length;
-        // SUM dan LAST sama-sama menjumlah; untuk LAST isinya memang tinggal satu nilai.
-        return nilai.reduce((total, item) => total + item, 0);
-    };
-
-    const barisDenganMetrik = barisTampil.map((row) => ({
-        ...row,
-        metrics: Object.fromEntries(params.map((param) => {
-            const bucket = kumpulan.get(`${row.outletId}::${param.id}`);
-            return [param.key, {
-                raw: ringkas(bucket?.raw || [], param.aggregation),
-                points: ringkas(bucket?.points || [], param.aggregation),
-            }];
-        })),
-    }));
-
-    return { program, params, leaderboard: barisDenganMetrik, winners };
-}
-
-export async function recomputeMitraProgramLeaderboard(programId: string) {
-    const participants = await db
-        .select({ outletId: mitraProgramParticipants.outletId })
-        .from(mitraProgramParticipants)
-        .where(eq(mitraProgramParticipants.programId, programId));
-    const participantIds = participants.map((participant) => participant.outletId);
-    const previousRows = await db
-        .select({ outletId: mitraProgramLeaderboard.outletId, rank: mitraProgramLeaderboard.rank })
-        .from(mitraProgramLeaderboard)
-        .where(eq(mitraProgramLeaderboard.programId, programId));
-    const previousRank = new Map(previousRows.map((row) => [row.outletId, row.rank]));
-
-    const rows = await db
-        .select({
-            outletId: mitraProgramScores.outletId,
-            totalPoints: sql<string>`sum(${mitraProgramScores.points})`,
-        })
-        .from(mitraProgramScores)
+        .from(mitraWhitelistNumbers)
         .where(and(
-            eq(mitraProgramScores.programId, programId),
-            participantIds.length > 0 ? inArray(mitraProgramScores.outletId, participantIds) : undefined
-        ))
-        .groupBy(mitraProgramScores.outletId)
-        .orderBy(desc(sql`sum(${mitraProgramScores.points})`));
+            eq(mitraWhitelistNumbers.phoneE164, phoneE164),
+            eq(mitraWhitelistNumbers.isActive, true)
+        ));
 
-    const now = new Date();
-    await db.delete(mitraProgramLeaderboard).where(eq(mitraProgramLeaderboard.programId, programId));
-
-    if (rows.length === 0) return;
-
-    await db.insert(mitraProgramLeaderboard).values(
-        rows.map((row, index) => ({
-            id: uuid(),
-            programId,
-            outletId: row.outletId,
-            totalPoints: toDecimalString(row.totalPoints),
-            rank: index + 1,
-            prevRank: previousRank.get(row.outletId) || null,
-            computedAt: now,
-        }))
-    );
+    return candidates.find((candidate) => !candidate.expiresAt || isFuture(candidate.expiresAt)) || null;
 }
 
 export async function getMitraAdminSummary() {

@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ODP_CATEGORIES, hitungOccupancy, infoKategori, type OdpCategory } from "@/lib/indihome-odp";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 
 interface OdpRow {
     id: string;
@@ -33,7 +35,7 @@ const KOSONG = {
  * Dipisah ke komponen sendiri karena isinya -- unggahan berkas, form, dan tabel --
  * terlalu besar untuk ditumpuk langsung di berkas dashboard yang sudah panjang.
  */
-export function IndihomeOdpPanel() {
+export function IndihomeOdpPanel({ bolehInputData, bolehHapusData }: { bolehInputData: boolean; bolehHapusData: boolean }) {
     const [rows, setRows] = React.useState<OdpRow[]>([]);
     const [total, setTotal] = React.useState(0);
     const [q, setQ] = React.useState("");
@@ -42,6 +44,7 @@ export function IndihomeOdpPanel() {
     const [mengunggah, setMengunggah] = React.useState(false);
     const [hasilUnggah, setHasilUnggah] = React.useState<{ saved: number; errors: { row: number; message: string }[] } | null>(null);
     const [form, setForm] = React.useState(KOSONG);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     const load = React.useCallback(() => {
         setLoading(true);
@@ -114,6 +117,15 @@ export function IndihomeOdpPanel() {
         load();
     };
 
+    const rowsTampil = urutkanBaris(rows, urut, (row, kolom) => {
+        if (kolom === "odp") return row.name || "";
+        if (kolom === "wilayah") return row.kecamatan;
+        if (kolom === "port") return row.portTotal;
+        if (kolom === "occupancy") return hitungOccupancy(row.portUsed, row.portTotal);
+        if (kolom === "kategori") return infoKategori(row.category, row.portUsed, row.portTotal).label;
+        return "";
+    });
+
     return (
         <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
@@ -121,7 +133,7 @@ export function IndihomeOdpPanel() {
                 bila kategori dikosongkan, warnanya diturunkan otomatis dari occupancy.
             </p>
 
-            <Card>
+            {bolehInputData ? <Card>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
                     <div>
                         <h2 className="font-bold">Unggah Banyak Sekaligus</h2>
@@ -141,7 +153,7 @@ export function IndihomeOdpPanel() {
                             {mengunggah ? "Memproses..." : "Pilih Berkas"}
                             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={mengunggah} onChange={unggah} />
                         </label>
-                        {total > 0 && (
+                        {total > 0 && bolehHapusData && (
                             <Button type="button" variant="outline" size="sm" onClick={hapusSemua}>
                                 <Trash2 className="h-4 w-4 text-red-600" />
                                 Hapus Semua
@@ -165,9 +177,11 @@ export function IndihomeOdpPanel() {
                         </div>
                     )}
                 </CardContent>
-            </Card>
+            </Card> : (
+                <Card><CardContent className="p-5 text-sm text-muted-foreground">Mode viewer: titik ODP hanya dapat dicari dan dilihat.</CardContent></Card>
+            )}
 
-            <Card>
+            {bolehInputData && <Card>
                 <CardContent className="p-5">
                     <form onSubmit={simpan} className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
                         <Isian label="Nama ODP" nilai={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} />
@@ -197,7 +211,7 @@ export function IndihomeOdpPanel() {
                         </div>
                     </form>
                 </CardContent>
-            </Card>
+            </Card>}
 
             <Card>
                 <CardContent className="p-5">
@@ -217,18 +231,18 @@ export function IndihomeOdpPanel() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>ODP</TableHead>
-                                    <TableHead>Wilayah</TableHead>
-                                    <TableHead className="text-right">Port</TableHead>
-                                    <TableHead className="text-right">Occupancy</TableHead>
-                                    <TableHead>Kategori</TableHead>
-                                    <TableHead className="text-right">Aksi</TableHead>
+                                    <TableHead><TombolUrut kolom="odp" label="ODP" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead><TombolUrut kolom="wilayah" label="Wilayah" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    <TableHead className="text-right"><TombolUrut kolom="port" label="Port" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                    <TableHead className="text-right"><TombolUrut kolom="occupancy" label="Occupancy" urut={urut} onKlik={gantiUrut} kanan /></TableHead>
+                                    <TableHead><TombolUrut kolom="kategori" label="Kategori" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                    {bolehHapusData && <TableHead className="text-right">Aksi</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                                ) : rows.length ? rows.map((row) => {
+                                ) : rowsTampil.length ? rowsTampil.map((row) => {
                                     const kategori = infoKategori(row.category, row.portUsed, row.portTotal);
                                     const occupancy = hitungOccupancy(row.portUsed, row.portTotal);
                                     return (
@@ -254,11 +268,11 @@ export function IndihomeOdpPanel() {
                                                     {!row.category && <span className="text-muted-foreground">(otomatis)</span>}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            {bolehHapusData && <TableCell className="text-right">
                                                 <button onClick={() => hapus(row)} className="rounded-md border p-2" aria-label="Hapus ODP">
                                                     <Trash2 className="h-4 w-4 text-red-600" />
                                                 </button>
-                                            </TableCell>
+                                            </TableCell>}
                                         </TableRow>
                                     );
                                 }) : (

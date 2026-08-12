@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 
 import { db } from "@/db";
 import {
-    mitraOutlets,
     mitraProgramParams,
     mitraProgramParticipants,
+    mitraProgramLeaderboard,
+    mitraProgramRewardRules,
     mitraPrograms,
     mitraProgramWinners,
 } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
+import { getAdminKpiResults } from "@/lib/mitra-kpi";
+import { canAccessParticipant, getAdminActorScope } from "@/lib/admin-scope";
+import {
+    buildRewardRuleValues,
+    computeParticipantParamAggregates,
+    groupValueOf,
+    listProgramParticipants,
+    normalizeGroupBy,
+    normalizeMechanismType,
+    participantColumns,
+    resolveParticipantCodes,
+    type ProgramGroupBy,
+    type ProgramTargetType,
+} from "@/lib/mitra-programs";
 import { getClientIp, slugify } from "@/lib/mitra-utils";
 
 export const dynamic = "force-dynamic";
@@ -26,23 +41,117 @@ export async function GET(
     const [program] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id)).limit(1);
     if (!program) return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
 
-    const [programParams, participants, winners] = await Promise.all([
+    const targetType = program.targetType as ProgramTargetType;
+    const [programParams, participants, rewardRules, winnerRows, kpiResults] = await Promise.all([
         db.select().from(mitraProgramParams).where(eq(mitraProgramParams.programId, id)).orderBy(asc(mitraProgramParams.sortOrder)),
-        db
-            .select({ outletId: mitraOutlets.id, outletCode: mitraOutlets.outletCode, outletName: mitraOutlets.name })
-            .from(mitraProgramParticipants)
-            .innerJoin(mitraOutlets, eq(mitraProgramParticipants.outletId, mitraOutlets.id))
-            .where(eq(mitraProgramParticipants.programId, id))
-            .orderBy(asc(mitraOutlets.name)),
-        db
-            .select({ id: mitraProgramWinners.id, outletId: mitraOutlets.id, outletCode: mitraOutlets.outletCode, outletName: mitraOutlets.name, rank: mitraProgramWinners.rank, prizeLabel: mitraProgramWinners.prizeLabel, isPublished: mitraProgramWinners.isPublished })
-            .from(mitraProgramWinners)
-            .innerJoin(mitraOutlets, eq(mitraProgramWinners.outletId, mitraOutlets.id))
-            .where(eq(mitraProgramWinners.programId, id))
-            .orderBy(asc(mitraProgramWinners.rank)),
+        listProgramParticipants(id, targetType),
+        db.select().from(mitraProgramRewardRules).where(eq(mitraProgramRewardRules.programId, id)).orderBy(asc(mitraProgramRewardRules.sortOrder)),
+        db.select().from(mitraProgramWinners).where(eq(mitraProgramWinners.programId, id)).orderBy(asc(mitraProgramWinners.rank)),
+        program.mechanismType === "KPI" ? getAdminKpiResults(id) : Promise.resolve([]),
     ]);
 
-    return NextResponse.json({ program, params: programParams, participants, winners });
+    /**
+     * Data per-orang dibatasi wewenang pemanggil SEBELUM respons dibentuk.
+     *
+     * Peserta, pemenang, dan hasil KPI menyangkut pencapaian dan insentif individu; menyaringnya
+     * di React tidak menutup apa pun, karena payload-nya sudah terkirim utuh dan bisa dibaca
+     * siapa saja yang membuka tab jaringan. Konfigurasi program (parameter dan aturan hadiah)
+     * tetap dikirim penuh -- isinya aturan main yang memang perlu diketahui semua peserta.
+     */
+    const scope = await getAdminActorScope();
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const pesertaTampil = participants.filter((item) => canAccessParticipant(scope, item));
+    const kunciTampil = new Set(pesertaTampil.map((item) => item.participantKey));
+
+    /**
+     * Racing/Reward belum memiliki cache hasil sekaya KPI pada respons admin. Bentuk baris
+     * monitoring dibangun dari leaderboard dan agregat skor yang sama dengan halaman publik,
+     * tetapi query skor hanya menerima participantKey yang sudah lolos scope aktor.
+     */
+    let leaderboard: Array<Record<string, unknown>> = [];
+    if (program.mechanismType !== "KPI") {
+        const participantKeys = [...kunciTampil];
+        const [leaderboardRows, aggregates] = await Promise.all([
+            participantKeys.length > 0
+                ? db.select({
+                    participantKey: mitraProgramLeaderboard.participantKey,
+                    totalPoints: mitraProgramLeaderboard.totalPoints,
+                    groupKey: mitraProgramLeaderboard.groupKey,
+                    rank: mitraProgramLeaderboard.rank,
+                    prevRank: mitraProgramLeaderboard.prevRank,
+                    computedAt: mitraProgramLeaderboard.computedAt,
+                })
+                    .from(mitraProgramLeaderboard)
+                    .where(and(
+                        eq(mitraProgramLeaderboard.programId, id),
+                        inArray(mitraProgramLeaderboard.participantKey, participantKeys),
+                    ))
+                    .orderBy(asc(mitraProgramLeaderboard.groupKey), asc(mitraProgramLeaderboard.rank))
+                : Promise.resolve([]),
+            computeParticipantParamAggregates(id, programParams, participantKeys),
+        ]);
+
+        const pesertaByKeyTampil = new Map(pesertaTampil.map((item) => [item.participantKey, item]));
+        const adaDiPeringkat = new Set(leaderboardRows.map((row) => row.participantKey));
+        const rows = [
+            ...leaderboardRows.map((row) => ({
+                ...row,
+                totalPoints: Number(row.totalPoints),
+                rank: row.rank as number | null,
+            })),
+            ...pesertaTampil
+                .filter((item) => !adaDiPeringkat.has(item.participantKey))
+                .map((item) => ({
+                    participantKey: item.participantKey,
+                    totalPoints: 0,
+                    groupKey: groupValueOf(item, program.groupBy as ProgramGroupBy),
+                    rank: null as number | null,
+                    prevRank: null as number | null,
+                    computedAt: null as Date | null,
+                })),
+        ];
+
+        leaderboard = rows.map((row) => {
+            const info = pesertaByKeyTampil.get(row.participantKey);
+            return {
+                ...row,
+                code: info?.code || "",
+                name: info?.name || "",
+                area: info?.area || "",
+                metrics: Object.fromEntries(programParams.map((param) => [
+                    param.key,
+                    aggregates.get(row.participantKey, param.id),
+                ])),
+            };
+        });
+    }
+
+    // Nama dan kode pemenang diambil dari daftar peserta LENGKAP supaya baris yang boleh
+    // dilihat tetap punya identitas, lalu barisnya sendiri disaring menurut wewenang.
+    const pesertaByKey = new Map(participants.map((item) => [item.participantKey, item]));
+    const winners = winnerRows
+        .filter((row) => kunciTampil.has(row.participantKey))
+        .map((row) => ({
+            id: row.id,
+            participantKey: row.participantKey,
+            code: pesertaByKey.get(row.participantKey)?.code || "",
+            name: pesertaByKey.get(row.participantKey)?.name || "",
+            groupKey: row.groupKey,
+            rank: row.rank,
+            prizeLabel: row.prizeLabel,
+            isPublished: row.isPublished,
+        }));
+
+    return NextResponse.json({
+        program,
+        params: programParams,
+        participants: pesertaTampil,
+        rewardRules,
+        winners,
+        leaderboard,
+        kpiResults: kpiResults.filter((row) => kunciTampil.has(row.participantKey)),
+    });
 }
 
 export async function PUT(
@@ -55,31 +164,30 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const [existing] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id)).limit(1);
-
     if (!existing) return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
 
+    const targetType = existing.targetType as ProgramTargetType;
+
     if (body.action === "configure_participants") {
-        const outletCodes = Array.isArray(body.outletCodes)
-            ? Array.from(new Set((body.outletCodes as unknown[]).map((value) => String(value).trim()).filter(Boolean)))
+        const codes = Array.isArray(body.codes)
+            ? Array.from(new Set((body.codes as unknown[]).map((value) => String(value).trim()).filter(Boolean)))
             : [];
-        const outlets = outletCodes.length > 0
-            ? await db.select({ id: mitraOutlets.id, outletCode: mitraOutlets.outletCode }).from(mitraOutlets).where(inArray(mitraOutlets.outletCode, outletCodes))
-            : [];
-        const foundCodes = new Set(outlets.map((outlet) => outlet.outletCode));
-        const unknownCodes = outletCodes.filter((code) => !foundCodes.has(code));
-        if (unknownCodes.length > 0) {
-            return NextResponse.json({ error: `Kode outlet tidak ditemukan: ${unknownCodes.join(", ")}` }, { status: 400 });
+        const resolved = await resolveParticipantCodes(targetType, codes);
+        const tidakDikenal = codes.filter((code) => !resolved.has(code));
+        if (tidakDikenal.length > 0) {
+            return NextResponse.json({ error: `Peserta tidak ditemukan: ${tidakDikenal.join(", ")}` }, { status: 400 });
         }
 
         await db.transaction(async (tx) => {
             await tx.delete(mitraProgramParticipants).where(eq(mitraProgramParticipants.programId, id));
-            if (outlets.length > 0) {
-                await tx.insert(mitraProgramParticipants).values(outlets.map((outlet) => ({
+            if (resolved.size === 0) return;
+            await tx.insert(mitraProgramParticipants).values(
+                Array.from(resolved.values()).map((peserta) => ({
                     programId: id,
-                    outletId: outlet.id,
+                    ...participantColumns(targetType, peserta.id),
                     joinedAt: new Date(),
-                })));
-            }
+                }))
+            );
         });
 
         await writeAdminAuditLog({
@@ -87,45 +195,62 @@ export async function PUT(
             action: "UPDATE_PARTICIPANTS",
             entity: "mitra_program",
             entityId: id,
-            diff: { participantCount: outlets.length },
+            diff: { participantCount: resolved.size },
             ip: getClientIp(request),
         });
-        return NextResponse.json({ success: true, participantCount: outlets.length });
+        return NextResponse.json({ success: true, participantCount: resolved.size });
     }
 
     if (body.action === "publish_winners") {
-        const requestedWinners = Array.isArray(body.winners)
+        if (existing.mechanismType === "KPI") {
+            return NextResponse.json({ error: "Program KPI tidak memiliki pemenang atau peringkat" }, { status: 400 });
+        }
+        const diminta = Array.isArray(body.winners)
             ? (body.winners as unknown[]).map((value) => {
                 const row = value as Record<string, unknown>;
                 return {
-                    outletCode: String(row.outletCode || "").trim(),
+                    code: String(row.code || "").trim(),
                     rank: Number(row.rank),
                     prizeLabel: row.prizeLabel ? String(row.prizeLabel).trim() : null,
                 };
-            }).filter((winner) => winner.outletCode && Number.isInteger(winner.rank) && winner.rank > 0)
+            }).filter((winner) => winner.code && Number.isInteger(winner.rank) && winner.rank > 0)
             : [];
 
-        if (requestedWinners.length === 0) {
+        if (diminta.length === 0) {
             return NextResponse.json({ error: "Minimal satu pemenang wajib diisi" }, { status: 400 });
         }
-        if (new Set(requestedWinners.map((winner) => winner.outletCode)).size !== requestedWinners.length || new Set(requestedWinners.map((winner) => winner.rank)).size !== requestedWinners.length) {
-            return NextResponse.json({ error: "Kode outlet dan peringkat pemenang tidak boleh duplikat" }, { status: 400 });
+        if (new Set(diminta.map((winner) => winner.code)).size !== diminta.length) {
+            return NextResponse.json({ error: "Satu peserta tidak boleh muncul lebih dari sekali" }, { status: 400 });
+        }
+        /**
+         * Peringkat kembar ditolak pada program RACING karena di sana peringkat adalah
+         * posisi yang harus unik. Pada program REWARD peringkat hanya nomor urut daftar,
+         * sehingga banyak penerima boleh berbagi nomor yang sama.
+         */
+        if (existing.groupBy === "NONE" && existing.mechanismType === "RACING"
+            && new Set(diminta.map((winner) => winner.rank)).size !== diminta.length) {
+            return NextResponse.json({ error: "Peringkat pemenang tidak boleh duplikat pada program racing" }, { status: 400 });
         }
 
-        const winnerCodes = requestedWinners.map((winner) => winner.outletCode);
-        const outlets = await db.select({ id: mitraOutlets.id, outletCode: mitraOutlets.outletCode }).from(mitraOutlets).where(inArray(mitraOutlets.outletCode, winnerCodes));
-        const outletByCode = new Map(outlets.map((outlet) => [outlet.outletCode, outlet]));
-        const unknownCodes = winnerCodes.filter((code) => !outletByCode.has(code));
-        if (unknownCodes.length > 0) {
-            return NextResponse.json({ error: `Kode outlet tidak ditemukan: ${unknownCodes.join(", ")}` }, { status: 400 });
+        const resolved = await resolveParticipantCodes(targetType, diminta.map((winner) => winner.code));
+        const tidakDikenal = diminta.map((winner) => winner.code).filter((code) => !resolved.has(code));
+        if (tidakDikenal.length > 0) {
+            return NextResponse.json({ error: `Peserta tidak ditemukan: ${tidakDikenal.join(", ")}` }, { status: 400 });
         }
+
+        // Wilayah pemenang diambil dari data pesertanya, bukan diminta dari form: sumber
+        // yang sama dipakai saat menghitung peringkat, jadi keduanya tidak bisa berselisih.
+        const groupBy = existing.groupBy as ProgramGroupBy;
+        const pesertaProgram = await listProgramParticipants(id, targetType);
+        const groupByCode = new Map(pesertaProgram.map((item) => [item.code, groupValueOf(item, groupBy)]));
 
         await db.transaction(async (tx) => {
             await tx.delete(mitraProgramWinners).where(eq(mitraProgramWinners.programId, id));
-            await tx.insert(mitraProgramWinners).values(requestedWinners.map((winner) => ({
+            await tx.insert(mitraProgramWinners).values(diminta.map((winner) => ({
                 id: uuid(),
                 programId: id,
-                outletId: outletByCode.get(winner.outletCode)!.id,
+                ...participantColumns(targetType, resolved.get(winner.code)!.id),
+                groupKey: groupByCode.get(winner.code) || "",
                 rank: winner.rank,
                 prizeLabel: winner.prizeLabel,
                 isPublished: true,
@@ -138,50 +263,96 @@ export async function PUT(
             action: "PUBLISH_WINNERS",
             entity: "mitra_program",
             entityId: id,
-            diff: { winnerCount: requestedWinners.length },
+            diff: { winnerCount: diminta.length },
             ip: getClientIp(request),
         });
-        return NextResponse.json({ success: true, winnerCount: requestedWinners.length });
+        return NextResponse.json({ success: true, winnerCount: diminta.length });
+    }
+
+    const mechanismType = body.mechanismType ? normalizeMechanismType(body.mechanismType) : existing.mechanismType;
+    if (mechanismType === "KPI" && existing.targetType !== "SALESFORCE") {
+        return NextResponse.json({ error: "Mekanisme KPI hanya tersedia untuk Program Salesforce" }, { status: 400 });
     }
 
     await db.update(mitraPrograms).set({
         name: body.name ?? existing.name,
         slug: body.slug ? slugify(String(body.slug)) : existing.slug,
+        mechanismType,
+        groupBy: mechanismType === "KPI" ? "NONE" : body.groupBy ? normalizeGroupBy(body.groupBy) : existing.groupBy,
+        thumbnailUrl: body.thumbnailUrl === "" ? null : body.thumbnailUrl ?? existing.thumbnailUrl,
         descriptionMd: body.descriptionMd ?? existing.descriptionMd,
         mechanismMd: body.mechanismMd ?? existing.mechanismMd,
         periodStart: body.periodStart ? new Date(body.periodStart) : existing.periodStart,
         periodEnd: body.periodEnd ? new Date(body.periodEnd) : existing.periodEnd,
         status: body.status ?? existing.status,
-        rankingMode: body.rankingMode ?? existing.rankingMode,
-        tieBreaker: body.tieBreaker === "" ? null : body.tieBreaker ?? existing.tieBreaker,
         isPublic: body.isPublic ?? existing.isPublic,
+        kpiComplianceMinScore: mechanismType === "KPI"
+            ? (body.kpiComplianceMinScore === "" ? null : body.kpiComplianceMinScore ?? existing.kpiComplianceMinScore)
+            : null,
+        kpiDefaultCap: mechanismType === "KPI"
+            ? (body.kpiDefaultCap === "" ? null : body.kpiDefaultCap ?? existing.kpiDefaultCap)
+            : null,
+        kpiHidePunishment: mechanismType === "KPI"
+            ? body.kpiHidePunishment ?? existing.kpiHidePunishment
+            : false,
     }).where(eq(mitraPrograms.id, id));
 
     if (Array.isArray(body.params)) {
+        /**
+         * Dicocokkan berdasarkan `key`, bukan id: key adalah identitas yang juga dipakai
+         * berkas unggahan, dan editor parameter di admin berbentuk teks yang tidak membawa
+         * id. Mencocokkan lewat id akan membuat setiap penyimpanan mencoba menyisipkan
+         * parameter baru dengan key yang sudah ada, dan ditolak unique index.
+         */
+        const existingParams = await db.select().from(mitraProgramParams).where(eq(mitraProgramParams.programId, id));
+        const byKey = new Map(existingParams.map((param) => [param.key, param]));
+        const keyDikirim = new Set<string>();
+
         for (const [index, param] of body.params.entries()) {
-            const paramId = String(param.id || "");
+            const key = String(param.key || slugify(String(param.label || `param-${index + 1}`))).replace(/-/g, "_");
+            const kpiCategory: "NONE" | "COMPLIANCE" | "PERFORMANCE" = mechanismType === "KPI" && ["COMPLIANCE", "PERFORMANCE"].includes(String(param.kpiCategory).toUpperCase())
+                ? String(param.kpiCategory).toUpperCase() as "COMPLIANCE" | "PERFORMANCE" : "NONE";
+            keyDikirim.add(key);
             const values = {
-                key: String(param.key || slugify(String(param.label || `param-${index + 1}`))).replace(/-/g, "_"),
+                key,
                 label: String(param.label || `Parameter ${index + 1}`),
                 unit: param.unit ? String(param.unit) : null,
-                weight: String(param.weight || "1"),
+                weight: String(param.weight ?? (mechanismType === "KPI" ? "0" : "1")),
                 aggregation: param.aggregation || "SUM",
+                isScored: param.isScored !== false,
+                kpiCategory,
+                achievementCap: mechanismType === "KPI" && param.achievementCap !== "" && param.achievementCap != null
+                    ? String(param.achievementCap) : null,
+                polarity: mechanismType === "KPI" && String(param.polarity).toUpperCase().startsWith("LOWER")
+                    ? "LOWER_BETTER" as const : "HIGHER_BETTER" as const,
                 sortOrder: index,
             };
 
-            if (paramId) {
-                await db
-                    .update(mitraProgramParams)
-                    .set(values)
-                    .where(eq(mitraProgramParams.id, paramId));
+            const lama = byKey.get(key);
+            if (lama) {
+                await db.update(mitraProgramParams).set(values).where(eq(mitraProgramParams.id, lama.id));
             } else {
-                await db.insert(mitraProgramParams).values({
-                    id: uuid(),
-                    programId: id,
-                    ...values,
-                });
+                await db.insert(mitraProgramParams).values({ id: uuid(), programId: id, ...values });
             }
         }
+
+        // Parameter yang hilang dari daftar ikut dihapus beserta seluruh nilai pencapaiannya
+        // (lewat cascade). Halaman admin meminta konfirmasi lebih dulu, sehingga penghapusan
+        // ini selalu merupakan pilihan sadar, bukan efek samping menyunting teks.
+        const dihapus = existingParams.filter((param) => !keyDikirim.has(param.key));
+        for (const param of dihapus) {
+            await db.delete(mitraProgramParams).where(eq(mitraProgramParams.id, param.id));
+        }
+    }
+
+    if (Array.isArray(body.rewardRules)) {
+        // Aturan selalu diganti seluruhnya: aturan yang dihapus di form harus benar-benar
+        // hilang, bukan tertinggal dan ikut dipakai saat menghitung hadiah.
+        await db.transaction(async (tx) => {
+            await tx.delete(mitraProgramRewardRules).where(eq(mitraProgramRewardRules.programId, id));
+            if (body.rewardRules.length === 0) return;
+            await tx.insert(mitraProgramRewardRules).values(buildRewardRuleValues(id, mechanismType, body.rewardRules));
+        });
     }
 
     await writeAdminAuditLog({
@@ -195,4 +366,31 @@ export async function PUT(
 
     const [updated] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id));
     return NextResponse.json(updated);
+}
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const [existing] = await db.select().from(mitraPrograms).where(eq(mitraPrograms.id, id)).limit(1);
+    if (!existing) return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
+
+    // Parameter, peserta, skor, papan peringkat, pemenang, dan aturan hadiah ikut terhapus
+    // lewat ON DELETE CASCADE di skema.
+    await db.delete(mitraPrograms).where(eq(mitraPrograms.id, id));
+
+    await writeAdminAuditLog({
+        userId: auth.session?.userId,
+        action: "DELETE",
+        entity: "mitra_program",
+        entityId: id,
+        diff: { name: existing.name, slug: existing.slug },
+        ip: getClientIp(request),
+    });
+
+    return NextResponse.json({ success: true });
 }

@@ -53,14 +53,19 @@ export async function POST(
     const oneHourAgo = addMinutes(now, -60);
     const oneDayAgo = addMinutes(now, -60 * 24);
 
-    const [[recentPhone], [hourPhone], [dayPhone], [hourIp]] = await Promise.all([
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneMinuteAgo))),
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneHourAgo))),
-        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), gt(mitraOtpRequests.createdAt, oneDayAgo))),
+    // Batas per nomor berlaku terpisah untuk setiap outlet. Nomor yang sama
+    // boleh langsung meminta OTP saat membuka outlet lain.
+    const [[recentPhone], [hourPhone], [dayPhone], [hourIpSameOutlet], [hourIpAllOutlets]] = await Promise.all([
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneMinuteAgo))),
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneHourAgo))),
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.phoneE164, phoneE164), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneDayAgo))),
+        // Batas IP bertingkat (kustomisasi owner): 10x/jam untuk outlet yang sama,
+        // 20x/jam untuk seluruh outlet. Jangan diganti batas IP global tunggal.
+        db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.ip, ip), eq(mitraOtpRequests.outletId, outlet.id), gt(mitraOtpRequests.createdAt, oneHourAgo))),
         db.select({ value: count() }).from(mitraOtpRequests).where(and(eq(mitraOtpRequests.ip, ip), gt(mitraOtpRequests.createdAt, oneHourAgo))),
     ]);
 
-    if ((recentPhone?.value || 0) >= 1 || (hourPhone?.value || 0) >= 5 || (dayPhone?.value || 0) >= 10 || (hourIp?.value || 0) >= 15) {
+    if ((recentPhone?.value || 0) >= 1 || (hourPhone?.value || 0) >= 5 || (dayPhone?.value || 0) >= 10 || (hourIpSameOutlet?.value || 0) >= 10 || (hourIpAllOutlets?.value || 0) >= 20) {
         return NextResponse.json(
             { eligible: false, title: "Terlalu Sering Meminta OTP", message: "Permintaan OTP terlalu sering. Tunggu beberapa menit sebelum mencoba lagi." },
             { status: 429 }

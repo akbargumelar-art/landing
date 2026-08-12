@@ -7,8 +7,8 @@ import { CheckCircle2, LockKeyhole, MapPin, MessageCircle, QrCode, Send, ShieldA
 
 import { BackLink } from "@/components/back-link";
 import { InfoCard } from "@/components/mitra/info-card";
-import { OdpSekitar } from "@/components/mitra/odp-sekitar";
 import { OutletPhotoCard } from "@/components/mitra/outlet-photo-card";
+import { PetaSekitar } from "@/components/mitra/peta-sekitar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -226,18 +226,19 @@ export default function MitraOutletProfilePage() {
             <section className="mx-auto max-w-6xl space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
                 <OutletPhotoCard outlet={outlet} />
 
-                {/* Hanya digambar bila outletnya punya koordinat; tanpa titik acuan,
-                    pencarian ODP sekitar tidak punya pusat. */}
+                {/* Peta sekitar ikut tampil sebelum OTP. Yang dibuka hanya sebaran titiknya --
+                    koordinat outlet memang sudah publik di direktori /mitra, dan titik ODP
+                    dikirim tanpa nama maupun kapasitas port. Rincian ODP tetap di balik OTP. */}
                 {outlet.latitude != null && outlet.longitude != null && (
-                    <OdpSekitar
+                    <PetaSekitar
                         outlet={{
                             publicToken: outlet.publicToken,
                             outletCode: outlet.outletCode,
                             name: outlet.name,
                             kabupaten: outlet.kabupaten,
                             kecamatan: outlet.kecamatan,
-                            latitude: outlet.latitude,
-                            longitude: outlet.longitude,
+                            latitude: Number(outlet.latitude),
+                            longitude: Number(outlet.longitude),
                         }}
                     />
                 )}
@@ -277,11 +278,23 @@ function SalesforceInfo({ name, photoUrl, phoneMasked, waUrl }: {
         <div className="col-span-2 rounded-lg border bg-gray-50 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nama Salesforce</p>
             <div className="mt-3 flex items-center gap-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm sm:h-24 sm:w-24">
+                <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
                     {photoUrl ? (
-                        <Image src={photoUrl} alt={displayName} fill sizes="96px" className="object-cover" unoptimized />
+                        <>
+                            <div className="absolute inset-0 overflow-hidden rounded-full bg-white">
+                                <Image
+                                    src={photoUrl}
+                                    alt={displayName}
+                                    fill
+                                    sizes="96px"
+                                    className="object-cover object-top"
+                                    unoptimized
+                                />
+                            </div>
+                            <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-white shadow-sm" />
+                        </>
                     ) : (
-                        <span className="flex h-full w-full items-center justify-center text-xl font-bold text-muted-foreground">
+                        <span className="flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-muted-foreground shadow-sm">
                             {initials || <User className="h-8 w-8" />}
                         </span>
                     )}

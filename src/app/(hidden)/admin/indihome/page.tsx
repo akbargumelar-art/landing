@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Eye, FileText, Loader2, MapPin, Pencil, Plus, Router, Search, Trash2, Wifi } from "lucide-react";
+import { CheckCircle2, Copy, Eye, FileText, Loader2, MapPin, Pencil, Plus, Router, Search, Trash2, Wifi } from "lucide-react";
 import { IndihomeLocationsBanner } from "@/components/admin/indihome-locations-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,10 +9,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IndihomeOdpPanel } from "@/components/admin/indihome-odp-panel";
 import { INDIHOME_LEAD_STATUSES, type IndihomeLeadStatus } from "@/lib/indihome-admin";
 import { INDIHOME_LOCATIONS } from "@/lib/indihome-products";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 type AdminProduct = {
     id: string;
@@ -70,6 +73,7 @@ const statusLabels: Record<IndihomeLeadStatus, string> = {
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 export default function AdminIndihomePage() {
+    const { bolehInputData, bolehHapusData } = useAdminScope();
     const [tab, setTab] = useState<"products" | "leads" | "settings" | "odp">("products");
     const [locationOptions, setLocationOptions] = useState<string[]>([...INDIHOME_LOCATIONS]);
     const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -79,10 +83,15 @@ export default function AdminIndihomePage() {
     const [message, setMessage] = useState("");
     const [productDialog, setProductDialog] = useState(false);
     const [draft, setDraft] = useState<ProductDraft>(emptyProduct);
+    // Menentukan judul dialog dan pesan sukses: duplikat memakai form tambah yang sama
+    // (draft.id kosong sehingga tersimpan sebagai paket baru), tapi judulnya perlu beda
+    // supaya admin tidak mengira sedang mengedit paket sumbernya.
+    const [duplicating, setDuplicating] = useState(false);
     const [selectedLead, setSelectedLead] = useState<IndihomeLead | null>(null);
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
+    const { urut: urutLeads, gantiUrut: gantiUrutLeads } = useUrutTabel<string>("");
 
     const loadProducts = useCallback(async () => {
         const response = await fetch("/api/admin/indihome/products");
@@ -121,12 +130,29 @@ export default function AdminIndihomePage() {
 
     function openAddProduct() {
         setDraft({ ...emptyProduct, locations: [...locationOptions] });
+        setDuplicating(false);
         setProductDialog(true);
         setMessage("");
     }
 
     function openEditProduct(product: AdminProduct) {
         setDraft({ ...product, featuresText: product.features.join("\n") });
+        setDuplicating(false);
+        setProductDialog(true);
+        setMessage("");
+    }
+
+    // Salinan dibuka lewat form tambah, bukan langsung disimpan: kecepatan, harga, atau
+    // lokasi paket duplikat hampir selalu perlu disesuaikan sebelum benar-benar disimpan,
+    // jadi lebih aman membiarkan admin meninjau dulu daripada diam-diam menggandakan persis.
+    function openDuplicateProduct(product: AdminProduct) {
+        setDraft({
+            ...product,
+            id: undefined,
+            name: `${product.name} (Copy)`,
+            featuresText: product.features.join("\n"),
+        });
+        setDuplicating(true);
         setProductDialog(true);
         setMessage("");
     }
@@ -195,14 +221,23 @@ export default function AdminIndihomePage() {
         }));
     }
 
+    const leadsTampil = urutkanBaris(leads, urutLeads, (lead, kolom) => {
+        if (kolom === "nama") return lead.fullName;
+        if (kolom === "paket") return lead.packageName;
+        if (kolom === "lokasi") return lead.location;
+        if (kolom === "tanggal") return new Date(lead.createdAt);
+        if (kolom === "status") return statusLabels[lead.status];
+        return "";
+    });
+
     if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-red-600" /></div>;
 
     return (
         <div className="mx-auto max-w-7xl space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-950">Kelola IndiHome</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">Atur katalog paket dan tindak lanjuti pengajuan dari landing page.</p>
+                    <h2 className="text-2xl font-bold text-gray-950">{bolehInputData ? "Kelola IndiHome" : "IndiHome"}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{bolehInputData ? "Atur katalog paket dan tindak lanjuti pengajuan dari landing page." : "Mode viewer: katalog, pengajuan, lokasi, banner, dan ODP hanya dapat dilihat."}</p>
                 </div>
                 <a href="/indihome" target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 self-start rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50"><Eye className="h-4 w-4" /> Lihat landing page</a>
             </div>
@@ -217,12 +252,12 @@ export default function AdminIndihomePage() {
             {message && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{message}</div>}
 
             {tab === "odp" ? (
-                <IndihomeOdpPanel />
+                <IndihomeOdpPanel bolehInputData={bolehInputData} bolehHapusData={bolehHapusData} />
             ) : tab === "products" ? (
                 <section className="space-y-5">
                     <div className="flex items-center justify-between">
                         <div><h3 className="font-bold text-gray-950">Katalog landing page</h3><p className="text-sm text-muted-foreground">Hanya paket aktif yang ditampilkan kepada pengunjung.</p></div>
-                        <Button type="button" onClick={openAddProduct} className="rounded-lg bg-red-600 hover:bg-red-700"><Plus className="mr-2 h-4 w-4" /> Tambah paket</Button>
+                        {bolehInputData && <Button type="button" onClick={openAddProduct} className="rounded-lg bg-red-600 hover:bg-red-700"><Plus className="mr-2 h-4 w-4" /> Tambah paket</Button>}
                     </div>
                     {products.length === 0 ? (
                         <Card><CardContent className="py-14 text-center text-sm text-muted-foreground">Belum ada paket IndiHome. Tambahkan paket pertama untuk mulai.</CardContent></Card>
@@ -233,7 +268,7 @@ export default function AdminIndihomePage() {
                                     <CardContent className="p-5">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-950 text-white"><Wifi className="h-5 w-5" /></div>
-                                            <div className="flex gap-1"><button type="button" onClick={() => openEditProduct(product)} title="Edit paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => deleteProduct(product)} title="Hapus paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></div>
+                                            {bolehInputData && <div className="flex gap-1"><button type="button" onClick={() => openEditProduct(product)} title="Edit paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => openDuplicateProduct(product)} title="Duplikat paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Copy className="h-4 w-4" /></button>{bolehHapusData && <button type="button" onClick={() => deleteProduct(product)} title="Hapus paket" className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>}</div>}
                                         </div>
                                         <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold"><span className={`rounded-full px-2 py-1 ${product.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>{product.isActive ? "Aktif" : "Nonaktif"}</span>{product.isFeatured && <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">Terpopuler</span>}</div>
                                         <h4 className="mt-4 font-bold text-gray-950">{product.name}</h4>
@@ -247,7 +282,7 @@ export default function AdminIndihomePage() {
                     )}
                 </section>
             ) : tab === "settings" ? (
-                <IndihomeLocationsBanner />
+                <IndihomeLocationsBanner bolehInputData={bolehInputData} bolehHapusData={bolehHapusData} />
             ) : (
                 <section className="space-y-4">
                     <form onSubmit={(event) => { event.preventDefault(); loadLeads().catch((error) => setMessage(error.message)); }} className="grid gap-3 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[1fr_220px_220px_auto]">
@@ -256,14 +291,21 @@ export default function AdminIndihomePage() {
                         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"><option value="">Semua status</option>{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select>
                         <Button type="submit" variant="outline" className="rounded-lg"><Search className="mr-2 h-4 w-4" /> Terapkan</Button>
                     </form>
-                    <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Pelanggan</TableHead><TableHead>Paket</TableHead><TableHead>Lokasi</TableHead><TableHead>Tanggal</TableHead><TableHead>Status</TableHead><TableHead className="w-16"><span className="sr-only">Detail</span></TableHead></TableRow></TableHeader><TableBody>
-                        {leads.length === 0 ? <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Belum ada pengajuan sesuai filter.</TableCell></TableRow> : leads.map((lead) => (
+                    <Card><CardContent className="p-0"><Table><TableHeader><TableRow>
+                        <TableHead><TombolUrut kolom="nama" label="Pelanggan" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="paket" label="Paket" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="lokasi" label="Lokasi" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="tanggal" label="Tanggal" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead><TombolUrut kolom="status" label="Status" urut={urutLeads} onKlik={gantiUrutLeads} /></TableHead>
+                        <TableHead className="w-16"><span className="sr-only">Detail</span></TableHead>
+                    </TableRow></TableHeader><TableBody>
+                        {leadsTampil.length === 0 ? <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Belum ada pengajuan sesuai filter.</TableCell></TableRow> : leadsTampil.map((lead) => (
                             <TableRow key={lead.id}>
                                 <TableCell><p className="font-semibold text-gray-950">{lead.fullName}</p><p className="mt-1 text-xs text-muted-foreground">{lead.phoneE164}</p></TableCell>
                                 <TableCell className="font-medium">{lead.packageName}</TableCell>
                                 <TableCell><p>{lead.location}</p><p className="mt-1 text-xs text-muted-foreground">{lead.district}</p></TableCell>
                                 <TableCell className="whitespace-nowrap text-xs">{new Date(lead.createdAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</TableCell>
-                                <TableCell><select value={lead.status} onChange={(event) => updateLeadStatus(lead, event.target.value as IndihomeLeadStatus)} className="h-9 min-w-36 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold">{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></TableCell>
+                                <TableCell>{bolehInputData ? <select value={lead.status} onChange={(event) => updateLeadStatus(lead, event.target.value as IndihomeLeadStatus)} className="h-9 min-w-36 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold">{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select> : <span className="text-xs font-semibold">{statusLabels[lead.status]}</span>}</TableCell>
                                 <TableCell><button type="button" onClick={() => setSelectedLead(lead)} title="Lihat detail" className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"><Eye className="h-4 w-4" /></button></TableCell>
                             </TableRow>
                         ))}
@@ -271,9 +313,9 @@ export default function AdminIndihomePage() {
                 </section>
             )}
 
-            <Dialog open={productDialog} onOpenChange={setProductDialog}>
+            {bolehInputData && <Dialog open={productDialog} onOpenChange={setProductDialog}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader><DialogTitle>{draft.id ? "Edit paket IndiHome" : "Tambah paket IndiHome"}</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{draft.id ? "Edit paket IndiHome" : duplicating ? "Duplikat paket IndiHome" : "Tambah paket IndiHome"}</DialogTitle></DialogHeader>
                     <form onSubmit={saveProduct} className="space-y-5">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2 sm:col-span-2"><Label htmlFor="product-name">Nama paket</Label><Input id="product-name" required minLength={3} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
@@ -292,13 +334,13 @@ export default function AdminIndihomePage() {
                         <DialogFooter><Button type="button" variant="outline" onClick={() => setProductDialog(false)}>Batal</Button><Button type="submit" disabled={saving} className="bg-red-600 hover:bg-red-700">{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />} Simpan paket</Button></DialogFooter>
                     </form>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
 
             <Dialog open={Boolean(selectedLead)} onOpenChange={(open) => !open && setSelectedLead(null)}>
                 <DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle>Detail pengajuan IndiHome</DialogTitle></DialogHeader>{selectedLead && <div className="space-y-5 text-sm">
                     <div className="grid gap-4 sm:grid-cols-2"><Detail label="Nama" value={selectedLead.fullName} /><Detail label="WhatsApp" value={selectedLead.phoneE164} /><Detail label="Email" value={selectedLead.email || "-"} /><Detail label="Paket" value={selectedLead.packageName} /><Detail label="Kabupaten / Kota" value={selectedLead.location} /><Detail label="Kecamatan" value={selectedLead.district} /></div>
                     <Detail label="Alamat pemasangan" value={selectedLead.address} />
-                    <div className="space-y-2"><Label>Status tindak lanjut</Label><select value={selectedLead.status} onChange={(event) => updateLeadStatus(selectedLead, event.target.value as IndihomeLeadStatus)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></div>
+                    <div className="space-y-2"><Label>Status tindak lanjut</Label>{bolehInputData ? <select value={selectedLead.status} onChange={(event) => updateLeadStatus(selectedLead, event.target.value as IndihomeLeadStatus)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">{INDIHOME_LEAD_STATUSES.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select> : <p className="rounded-lg border bg-gray-50 px-3 py-2 font-semibold">{statusLabels[selectedLead.status]}</p>}</div>
                     <a href={`https://wa.me/${selectedLead.phoneE164.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 font-semibold text-white hover:bg-emerald-700">Hubungi via WhatsApp</a>
                 </div>}</DialogContent>
             </Dialog>

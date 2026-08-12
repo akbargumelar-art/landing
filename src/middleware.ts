@@ -11,13 +11,13 @@ export function middleware(request: NextRequest) {
 
     // Redirect logged-in users away from login page.
     //
-    // Tujuannya /admin/mitra, bukan /admin/beranda: middleware berjalan di edge tanpa akses
+    // Tujuannya Database Outlet, bukan /admin/beranda: middleware berjalan di edge tanpa akses
     // database sehingga tidak bisa mengetahui peran pengguna, sedangkan /admin/beranda
     // khusus Admin Super. Mengarahkan semua orang ke sana membuat peran lain mendarat di
     // halaman yang API-nya membalas 403.
     if (pathname === "/portal-admin") {
         if (sessionCookie) {
-            return NextResponse.redirect(new URL("/admin/mitra", request.url));
+            return NextResponse.redirect(new URL("/admin/mitra/outlet", request.url));
         }
         return NextResponse.next();
     }

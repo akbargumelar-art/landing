@@ -37,6 +37,15 @@ export const DEFAULT_INDIHOME_TEMPLATE =
     "Halo {nama}, pengajuan IndiHome {paket} untuk {lokasi} sudah kami terima. " +
     "Nomor referensi: {referensi}. Tim kami akan menghubungi Anda untuk pengecekan jaringan.";
 
+/** Template bawaan notifikasi kunjungan salesforce ke group WhatsApp. */
+export const DEFAULT_VISIT_TEMPLATE =
+    "*Semangattt pagiii..*\n" +
+    "Berikut update visit abkciraya.cloud/mitra\n\n" +
+    "Salesforce : {salesforce}\n" +
+    "ID Digipos : {digipos}\n" +
+    "Nama Outlet : {outlet}\n" +
+    "Keterangan : Edit long-lat jika terjadi perubahan longlat";
+
 async function readSettings(): Promise<Record<string, string>> {
     // Baca seluruh baris: tipe baris diturunkan dari nama key di UI admin, jadi memfilter
     // berdasarkan `type` pernah membuat field WAHA hilang diam-diam.
@@ -83,6 +92,31 @@ export async function getIndihomeTemplate(): Promise<string> {
     }
 }
 
+export interface VisitNotifyConfig {
+    enabled: boolean;
+    /** chatId group WhatsApp, mis. 120363044814127701@g.us. */
+    chatId: string;
+    template: string;
+}
+
+export async function getVisitNotifyConfig(): Promise<VisitNotifyConfig> {
+    let settings: Record<string, string> = {};
+    try {
+        settings = await readSettings();
+    } catch (error) {
+        console.error("[WAHA] Gagal membaca pengaturan notifikasi kunjungan:", error);
+    }
+
+    const chatId = (settings.wa_visit_group_id || "").trim();
+
+    return {
+        // Tanpa chatId tidak ada tujuan kirim, jadi saklar "aktif" saja tidak cukup.
+        enabled: settings.wa_visit_enabled === "1" && Boolean(chatId),
+        chatId,
+        template: settings.wa_visit_template?.trim() || DEFAULT_VISIT_TEMPLATE,
+    };
+}
+
 /** Ganti {placeholder} dengan nilai dari `data`; placeholder tanpa nilai dikosongkan. */
 export function renderTemplate(template: string, data: Record<string, unknown>): string {
     let message = template;
@@ -98,11 +132,30 @@ export function renderTemplate(template: string, data: Record<string, unknown>):
 
 /**
  * 0812... -> 62812...@c.us
+ *
+ * Nilai yang SUDAH berbentuk chatId dilewatkan apa adanya. Tanpa ini, id group
+ * (120363...@g.us) akan kehilangan sufiksnya saat non-digit dibuang lalu dipasangi
+ * "@c.us", sehingga pesan group terkirim ke nomor perorangan yang tidak ada.
  */
-function formatWahaPhone(phone: string): string {
-    let clean = phone.replace(/\D/g, "");
+function formatWahaChatId(tujuan: string): string {
+    const trimmed = tujuan.trim();
+    if (trimmed.includes("@")) return trimmed;
+
+    let clean = trimmed.replace(/\D/g, "");
     if (clean.startsWith("0")) clean = "62" + clean.substring(1);
-    return clean.endsWith("@c.us") ? clean : `${clean}@c.us`;
+    return `${clean}@c.us`;
+}
+
+const MIMETYPE_GAMBAR: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+};
+
+function mimetypeDariUrl(url: string): string {
+    const ext = url.split("?")[0].split(".").pop()?.toLowerCase() || "";
+    return MIMETYPE_GAMBAR[ext] || "image/jpeg";
 }
 
 function wahaOrigin(endpoint: string): string | null {
@@ -143,7 +196,7 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<Wah
             method: "POST",
             headers: authHeaders(config.token),
             body: JSON.stringify({
-                chatId: formatWahaPhone(to),
+                chatId: formatWahaChatId(to),
                 text,
                 session: config.session,
             }),
@@ -164,6 +217,66 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<Wah
     } catch (error) {
         const reason = error instanceof Error ? (error.message || error.name) : String(error);
         console.error("[WAHA] Exception saat kirim:", reason);
+        return { ok: false, error: `Tidak dapat menghubungi WAHA: ${reason}` };
+    }
+}
+
+/**
+ * Kirim satu gambar berikut caption lewat endpoint /api/sendImage.
+ *
+ * WAHA yang MENGUNDUH gambarnya sendiri dari `imageUrl`, jadi URL-nya wajib absolut dan
+ * bisa dijangkau dari server WAHA -- bukan path relatif seperti yang disimpan di database.
+ * Endpoint diturunkan dari origin setting `wa_gw_endpoint` (yang menunjuk ke /api/sendText),
+ * supaya admin tidak perlu mengisi dua alamat yang harus selalu cocok.
+ */
+export async function sendWhatsAppImage(
+    to: string,
+    imageUrl: string,
+    caption: string,
+    filename = "visit.jpg",
+): Promise<WahaSendResult> {
+    if (!to) return { ok: false, error: "Tujuan kosong" };
+    if (!/^https?:\/\//i.test(imageUrl)) {
+        return { ok: false, error: "URL gambar harus absolut agar bisa diunduh WAHA" };
+    }
+
+    const config = await getWahaConfig();
+    if (!config.configured) {
+        return { ok: false, error: "Endpoint WAHA belum diisi di Pengaturan" };
+    }
+
+    const origin = wahaOrigin(config.endpoint);
+    if (!origin) return { ok: false, error: "Endpoint WAHA bukan URL yang valid" };
+
+    try {
+        const response = await fetch(`${origin}/api/sendImage`, {
+            method: "POST",
+            headers: authHeaders(config.token),
+            body: JSON.stringify({
+                chatId: formatWahaChatId(to),
+                file: { mimetype: mimetypeDariUrl(imageUrl), filename, url: imageUrl },
+                reply_to: null,
+                caption,
+                session: config.session,
+            }),
+            // Lebih longgar daripada sendText: WAHA harus mengunduh gambarnya lebih dulu.
+            signal: AbortSignal.timeout(30_000),
+        });
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => "");
+            console.error(`[WAHA] Gagal kirim gambar ke ${to}. Status ${response.status}`, body.slice(0, 300));
+            return {
+                ok: false,
+                httpStatus: response.status,
+                error: `WAHA menolak pengiriman gambar (HTTP ${response.status})`,
+            };
+        }
+
+        return { ok: true, httpStatus: response.status };
+    } catch (error) {
+        const reason = error instanceof Error ? (error.message || error.name) : String(error);
+        console.error("[WAHA] Exception saat kirim gambar:", reason);
         return { ok: false, error: `Tidak dapat menghubungi WAHA: ${reason}` };
     }
 }

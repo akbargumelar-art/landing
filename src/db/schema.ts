@@ -4,6 +4,7 @@ import {
     text,
     int,
     boolean,
+    date,
     datetime,
     timestamp,
     decimal,
@@ -505,26 +506,6 @@ export const mitraUserProfiles = mysqlTable("mitra_user_profiles", {
     index("mitra_user_profiles_role_idx").on(table.role),
 ]);
 
-export const mitraTerritories = mysqlTable("mitra_territories", {
-    id: varchar("id", { length: 36 }).primaryKey(),
-    name: varchar("name", { length: 255 }).notNull(),
-    type: mysqlEnum("type", ["REGION", "CLUSTER", "AREA"]).notNull(),
-    parentId: varchar("parent_id", { length: 36 }),
-    createdAt: datetime("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
-}, (table) => [
-    index("mitra_territories_parent_idx").on(table.parentId),
-    index("mitra_territories_type_idx").on(table.type),
-]);
-
-export const mitraUserTerritories = mysqlTable("mitra_user_territories", {
-    userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
-}, (table) => [
-    primaryKey({ columns: [table.userId, table.territoryId], name: "mitra_user_territories_pk" }),
-    index("mitra_user_territories_territory_idx").on(table.territoryId),
-]);
-
 /**
  * Master salesforce: satu baris per petugas, dipakai bersama oleh semua outlet yang
  * dikunjunginya. Sebelumnya nama dan fotonya disimpan berulang di tiap baris outlet,
@@ -565,7 +546,6 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     // Diturunkan dari latitude/longitude (lihat resolveOutletMapsUrl). Kolom tetap ada
     // supaya tautan manual pada data lama tidak hilang saat koordinat belum diisi.
     locationUrl: varchar("location_url", { length: 500 }),
-    territoryId: varchar("territory_id", { length: 36 }).references(() => mitraTerritories.id, { onDelete: "set null" }),
     category: mysqlEnum("category", OUTLET_CATEGORIES).notNull().default(DEFAULT_OUTLET_CATEGORY),
     pjpDay: mysqlEnum("pjp_day", PJP_DAYS).notNull().default(DEFAULT_PJP_DAY),
     pjpType: mysqlEnum("pjp_type", PJP_TYPES).notNull().default(DEFAULT_PJP_TYPE),
@@ -594,7 +574,9 @@ export const mitraOutlets = mysqlTable("mitra_outlets", {
     index("mitra_outlets_public_token_idx").on(table.publicToken),
     index("mitra_outlets_name_idx").on(table.name),
     index("mitra_outlets_owner_phone_idx").on(table.ownerPhone),
-    index("mitra_outlets_territory_idx").on(table.territoryId),
+    // Menggantikan indeks territory lama: TAP kini kunci pembatasan akses admin
+    // SUPERVISOR/SALESFORCE, jadi query yang sama-sama sering dipakainya butuh indeks juga.
+    index("mitra_outlets_tap_idx").on(table.tap),
     index("mitra_outlets_status_idx").on(table.status),
     index("mitra_outlets_salesforce_idx").on(table.salesforceId),
 ]);
@@ -623,10 +605,12 @@ export const mitraMarketShares = mysqlTable("mitra_market_shares", {
     kecamatan: varchar("kecamatan", { length: 255 }).notNull(),
     telkomsel: decimal("telkomsel", { precision: 5, scale: 2 }).notNull().default("0.00"),
     xl: decimal("xl", { precision: 5, scale: 2 }).notNull().default("0.00"),
-    axis: decimal("axis", { precision: 5, scale: 2 }).notNull().default("0.00"),
     smartfren: decimal("smartfren", { precision: 5, scale: 2 }).notNull().default("0.00"),
     indosat: decimal("indosat", { precision: 5, scale: 2 }).notNull().default("0.00"),
     tri: decimal("tri", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    telkomselAfter: decimal("telkomsel_after", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    xlsmart: decimal("xlsmart", { precision: 5, scale: 2 }).notNull().default("0.00"),
+    ioh: decimal("ioh", { precision: 5, scale: 2 }).notNull().default("0.00"),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
@@ -747,11 +731,16 @@ export const mitraWhitelistNumbers = mysqlTable("mitra_whitelist_numbers", {
 export const mitraOtpRequests = mysqlTable("mitra_otp_requests", {
     id: varchar("id", { length: 36 }).primaryKey(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    /**
+     * Persis satu dari outletId/programId terisi, sesuai purpose. OTP kini melayani dua
+     * hal: membuka detail outlet, dan membuka halaman program salesforce yang tertutup.
+     */
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     whitelistId: varchar("whitelist_id", { length: 36 }).references(() => mitraWhitelistNumbers.id, { onDelete: "set null" }),
     codeHash: varchar("code_hash", { length: 255 }).notNull(),
     codeSalt: varchar("code_salt", { length: 255 }).notNull(),
-    purpose: mysqlEnum("purpose", ["OUTLET_DETAIL"]).notNull().default("OUTLET_DETAIL"),
+    purpose: mysqlEnum("purpose", ["OUTLET_DETAIL", "PROGRAM_DETAIL"]).notNull().default("OUTLET_DETAIL"),
     attempts: int("attempts").notNull().default(0),
     expiresAt: datetime("expires_at").notNull(),
     verifiedAt: datetime("verified_at"),
@@ -768,11 +757,13 @@ export const mitraDetailSessions = mysqlTable("mitra_detail_sessions", {
     id: varchar("id", { length: 36 }).primaryKey(),
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     expiresAt: datetime("expires_at").notNull(),
     createdAt: datetime("created_at").notNull(),
 }, (table) => [
     index("mitra_detail_sessions_outlet_idx").on(table.outletId),
+    index("mitra_detail_sessions_program_idx").on(table.programId),
     index("mitra_detail_sessions_expiry_idx").on(table.expiresAt),
 ]);
 
@@ -790,7 +781,7 @@ export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
     actorType: mysqlEnum("actor_type", ["MITRA", "ADMIN"]).notNull(),
     actorPhone: varchar("actor_phone", { length: 50 }),
     actorUserId: varchar("actor_user_id", { length: 36 }),
-    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING"]).notNull(),
+    action: mysqlEnum("action", ["PHOTO", "LOCATION", "BRANDING", "PROFILE"]).notNull(),
     beforeJson: json("before_json").$type<Record<string, unknown>>(),
     afterJson: json("after_json").$type<Record<string, unknown>>(),
     ip: varchar("ip", { length: 120 }),
@@ -800,6 +791,41 @@ export const mitraOutletEditLogs = mysqlTable("mitra_outlet_edit_logs", {
     index("mitra_outlet_edit_logs_created_idx").on(table.createdAt),
 ]);
 
+/**
+ * Antrean notifikasi kunjungan ke group WhatsApp.
+ *
+ * Foto outlet diunggah SATU PER SATU (tiap slot terkirim begitu dipilih), jadi mengirim
+ * WA di dalam route unggah akan menghasilkan empat pesan untuk satu kunjungan yang sama.
+ * Baris di tabel ini mewakili satu kunjungan -- dikunci pada `session_id`, yaitu sesi OTP
+ * yang dipegang salesforce -- dan menampung foto-foto yang masuk selama sesi itu sampai
+ * jeda hening berakhir, barulah satu pesan dikirim.
+ *
+ * Statusnya disimpan di database, bukan hanya di memori proses, supaya antrean tidak
+ * hilang saat aplikasi di-restart dan supaya satu kunjungan tidak pernah terkirim dua kali.
+ */
+export const mitraVisitNotifications = mysqlTable("mitra_visit_notifications", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    /**
+     * Sesi OTP = satu kunjungan. Sengaja TANPA foreign key: sesi kedaluwarsa boleh
+     * dibersihkan kapan saja, sedangkan notifikasi yang belum terkirim harus tetap ada.
+     */
+    sessionId: varchar("session_id", { length: 36 }).notNull().unique(),
+    actorPhone: varchar("actor_phone", { length: 50 }),
+    /** Foto yang diunggah pada kunjungan ini: [{ slot, label, url }]. Undian diambil dari sini. */
+    photosJson: json("photos_json").$type<{ slot: string; label: string; url: string }[]>(),
+    status: mysqlEnum("status", ["PENDING", "SENDING", "SENT", "FAILED"]).notNull().default("PENDING"),
+    attempts: int("attempts").notNull().default(0),
+    lastError: varchar("last_error", { length: 500 }),
+    /** Penanda jeda hening: pesan baru dikirim setelah kolom ini diam selama ambang debounce. */
+    lastActivityAt: datetime("last_activity_at").notNull(),
+    sentAt: datetime("sent_at"),
+    createdAt: datetime("created_at").notNull(),
+}, (table) => [
+    index("mitra_visit_notif_status_idx").on(table.status, table.lastActivityAt),
+    index("mitra_visit_notif_outlet_idx").on(table.outletId),
+]);
+
 export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     // Sama seperti mitra_whitelist_numbers.source_batch_id: nama FK turunan
@@ -807,7 +833,9 @@ export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", 
     // panjangnya 69 karakter, melewati batas 64 karakter identifier MySQL.
     whitelistId: varchar("whitelist_id", { length: 36 }),
     phoneE164: varchar("phone_e164", { length: 50 }).notNull(),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    // Kosong untuk OTP program, yang tidak terikat outlet mana pun.
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    programId: varchar("program_id", { length: 36 }).references(() => mitraPrograms.id, { onDelete: "cascade" }),
     action: mysqlEnum("action", ["OTP_REQUESTED", "OTP_VERIFIED", "OTP_REJECTED"]).notNull(),
     ip: varchar("ip", { length: 120 }),
     createdAt: datetime("created_at").notNull(),
@@ -821,23 +849,56 @@ export const mitraWhitelistUsageLogs = mysqlTable("mitra_whitelist_usage_logs", 
     }).onDelete("set null"),
 ]);
 
+/**
+ * Program mitra dipakai untuk DUA jenis peserta: outlet dan salesforce. Bedanya hanya
+ * pada siapa yang dinilai, bukan pada cara menilainya -- karena itu satu set tabel
+ * dipakai bersama dengan pembeda `targetType`, bukan dua set tabel kembar.
+ *
+ * `mechanismType` menentukan cara pemenang ditentukan:
+ * - RACING   : peserta diadu, pemenang diambil dari peringkat leaderboard.
+ * - REWARD   : tidak diadu; siapa pun yang melewati target dapat hadiahnya.
+ * - KPI      : tidak diadu dan tidak ada peringkat; tiap peserta dinilai terhadap
+ *              targetnya sendiri, lalu menerima reward atau punishment.
+ */
 export const mitraPrograms = mysqlTable("mitra_programs", {
     id: varchar("id", { length: 36 }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
+    targetType: mysqlEnum("target_type", ["OUTLET", "SALESFORCE"]).notNull().default("OUTLET"),
+    mechanismType: mysqlEnum("mechanism_type", ["RACING", "REWARD", "KPI"]).notNull().default("RACING"),
+    /**
+     * Membagi persaingan jadi beberapa liga terpisah. Pada NONE seluruh peserta diadu
+     * dalam satu papan; pada TAP/KABUPATEN/KECAMATAN peringkat dihitung ulang di dalam
+     * tiap wilayah, sehingga satu program bisa menghasilkan satu pemenang per wilayah.
+     */
+    groupBy: mysqlEnum("group_by", ["NONE", "TAP", "KABUPATEN", "KECAMATAN"]).notNull().default("NONE"),
+    thumbnailUrl: varchar("thumbnail_url", { length: 500 }),
     descriptionMd: text("description_md"),
     mechanismMd: text("mechanism_md"),
     periodStart: datetime("period_start").notNull(),
     periodEnd: datetime("period_end").notNull(),
     status: mysqlEnum("status", ["DRAFT", "ACTIVE", "ENDED", "PUBLISHED"]).notNull().default("DRAFT"),
-    rankingMode: mysqlEnum("ranking_mode", ["POINT", "RANK"]).notNull().default("POINT"),
-    tieBreaker: varchar("tie_breaker", { length: 120 }),
     isPublic: boolean("is_public").notNull().default(false),
+    /**
+     * Ambang skor compliance yang harus dilewati sebelum reward performance berlaku.
+     * Di bawah angka ini peserta langsung menerima punishment, berapa pun skor
+     * performance-nya -- gerbang, bukan komponen yang dirata-rata.
+     */
+    kpiComplianceMinScore: decimal("kpi_compliance_min_score", { precision: 6, scale: 2 }),
+    /** Batas achievement bawaan saat parameter baru dibuat; NULL berarti tanpa batas. */
+    kpiDefaultCap: decimal("kpi_default_cap", { precision: 6, scale: 2 }),
+    /**
+     * Menyembunyikan label punishment dari halaman publik. Sesi OTP berlaku per program,
+     * bukan per orang, jadi tanpa saklar ini sanksi seseorang terbaca seluruh rekannya.
+     * Skor tetap tampil apa adanya; yang disembunyikan hanya labelnya.
+     */
+    kpiHidePunishment: boolean("kpi_hide_punishment").notNull().default(false),
     createdAt: datetime("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
     index("mitra_programs_public_idx").on(table.isPublic),
     index("mitra_programs_status_idx").on(table.status),
+    index("mitra_programs_target_idx").on(table.targetType, table.mechanismType),
 ]);
 
 export const mitraProgramParams = mysqlTable("mitra_program_params", {
@@ -848,54 +909,97 @@ export const mitraProgramParams = mysqlTable("mitra_program_params", {
     unit: varchar("unit", { length: 50 }),
     weight: decimal("weight", { precision: 10, scale: 4 }).notNull().default("1.0000"),
     aggregation: mysqlEnum("aggregation", ["SUM", "AVG", "LAST"]).notNull().default("SUM"),
+    /**
+     * Parameter bertanda false tetap diunggah dan ditampilkan di tabel, tetapi tidak ikut
+     * menentukan peringkat. Dipakai untuk memperlihatkan tahapan sebuah alur -- pembelian
+     * dan pencatatan, misalnya -- ketika yang benar-benar diadu hanya hasil akhirnya.
+     */
+    isScored: boolean("is_scored").notNull().default(true),
+    /**
+     * Kategori penilaian KPI. Hanya bermakna pada program bermekanisme KPI; program
+     * racing/reward tetap NONE dan tidak berubah perilakunya.
+     */
+    kpiCategory: mysqlEnum("kpi_category", ["NONE", "COMPLIANCE", "PERFORMANCE"]).notNull().default("NONE"),
+    /**
+     * Batas atas achievement (100 / 110 / 120). NULL berarti dibiarkan tembus berapa pun --
+     * "loss" dalam istilah penyusun KPI.
+     */
+    achievementCap: decimal("achievement_cap", { precision: 6, scale: 2 }),
+    /**
+     * Arah parameter. Tidak semua KPI makin besar makin baik: jumlah komplain atau outlet
+     * tidak aktif justru sebaliknya, dan tanpa kolom ini achievement-nya akan terbalik.
+     */
+    polarity: mysqlEnum("polarity", ["HIGHER_BETTER", "LOWER_BETTER"]).notNull().default("HIGHER_BETTER"),
     sortOrder: int("sort_order").notNull().default(0),
 }, (table) => [
     uniqueIndex("mitra_program_params_unique_idx").on(table.programId, table.key),
     index("mitra_program_params_program_idx").on(table.programId),
 ]);
 
+/**
+ * Peserta program: PERSIS SATU dari outletId/salesforceId terisi, sesuai targetType
+ * program induknya.
+ *
+ * `participantKey` ("outlet:<id>" atau "sf:<id>") ada karena MySQL memperlakukan setiap
+ * NULL sebagai nilai yang berbeda: unique index pada (programId, outletId, salesforceId)
+ * tidak akan mencegah baris salesforce kembar, sebab outletId-nya sama-sama NULL. Kunci
+ * gabungan berbentuk teks memberi satu kolom yang benar-benar bisa dijadikan unique.
+ */
 export const mitraProgramParticipants = mysqlTable("mitra_program_participants", {
     programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
     joinedAt: datetime("joined_at").notNull(),
 }, (table) => [
-    primaryKey({ columns: [table.programId, table.outletId], name: "mitra_program_participants_pk" }),
+    primaryKey({ columns: [table.programId, table.participantKey], name: "mitra_program_participants_pk" }),
     index("mitra_program_participants_outlet_idx").on(table.outletId),
+    index("mitra_program_participants_sf_idx").on(table.salesforceId),
 ]);
 
 export const mitraProgramScores = mysqlTable("mitra_program_scores", {
     id: varchar("id", { length: 36 }).primaryKey(),
     programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
     paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
     rawValue: decimal("raw_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
     points: decimal("points", { precision: 18, scale: 2 }).notNull().default("0.00"),
-    periodYm: varchar("period_ym", { length: 7 }).notNull(),
+    achievementDate: date("achievement_date", { mode: "string" }).notNull(),
     batchId: varchar("batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 }, (table) => [
-    uniqueIndex("mitra_program_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.periodYm),
+    uniqueIndex("mitra_program_scores_unique_idx").on(table.programId, table.participantKey, table.paramId, table.achievementDate),
     index("mitra_program_scores_outlet_idx").on(table.outletId),
+    index("mitra_program_scores_sf_idx").on(table.salesforceId),
     index("mitra_program_scores_batch_idx").on(table.batchId),
 ]);
 
 export const mitraProgramLeaderboard = mysqlTable("mitra_program_leaderboard", {
     id: varchar("id", { length: 36 }).primaryKey(),
     programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
     totalPoints: decimal("total_points", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    /** Wilayah tempat peringkat ini berlaku; kosong bila program tidak dikelompokkan. */
+    groupKey: varchar("group_key", { length: 160 }).notNull().default(""),
     rank: int("rank").notNull(),
     prevRank: int("prev_rank"),
     computedAt: datetime("computed_at").notNull(),
 }, (table) => [
-    uniqueIndex("mitra_program_leaderboard_unique_idx").on(table.programId, table.outletId),
-    index("mitra_program_leaderboard_rank_idx").on(table.programId, table.rank),
+    uniqueIndex("mitra_program_leaderboard_unique_idx").on(table.programId, table.participantKey),
+    index("mitra_program_leaderboard_rank_idx").on(table.programId, table.groupKey, table.rank),
 ]);
 
 export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
     id: varchar("id", { length: 36 }).primaryKey(),
     programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
-    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    outletId: varchar("outlet_id", { length: 36 }).references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    groupKey: varchar("group_key", { length: 160 }).notNull().default(""),
     rank: int("rank").notNull(),
     prizeLabel: varchar("prize_label", { length: 255 }),
     isPublished: boolean("is_published").notNull().default(false),
@@ -903,6 +1007,132 @@ export const mitraProgramWinners = mysqlTable("mitra_program_winners", {
     index("mitra_program_winners_program_idx").on(table.programId),
     index("mitra_program_winners_public_idx").on(table.isPublished),
 ]);
+
+/**
+ * Aturan penentu hadiah. Kolom mana yang dibaca ditentukan oleh `mechanismType` program
+ * induknya -- RACING memakai rankFrom/rankTo, REWARD memakai paramKey/comparator/
+ * thresholdValue, KPI memakai scoreSource/comparator/thresholdValue -- sehingga tidak ada
+ * kombinasi ambigu seperti "aturan peringkat pada program yang tidak punya peringkat".
+ */
+export const mitraProgramRewardRules = mysqlTable("mitra_program_reward_rules", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    rankFrom: int("rank_from"),
+    rankTo: int("rank_to"),
+    paramKey: varchar("param_key", { length: 120 }),
+    comparator: mysqlEnum("comparator", [">=", ">", "<=", "<", "="]),
+    thresholdValue: decimal("threshold_value", { precision: 18, scale: 2 }),
+    /** Skor yang dibaca aturan KPI: compliance, performance, atau gabungan keduanya. */
+    scoreSource: mysqlEnum("score_source", ["TOTAL", "COMPLIANCE", "PERFORMANCE"]),
+    /**
+     * Membedakan hadiah dari sanksi. Dibutuhkan karena halaman publik mewarnai dan --
+     * bila disembunyikan -- menyaring keduanya secara berbeda, dan menebaknya dari teks
+     * label ("Surat Peringatan" vs "Rp 100.000") tidak pernah bisa diandalkan.
+     */
+    benefitType: mysqlEnum("benefit_type", ["REWARD", "PUNISHMENT", "NONE"]),
+    rewardLabel: varchar("reward_label", { length: 255 }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+}, (table) => [
+    index("mitra_program_reward_rules_program_idx").on(table.programId),
+]);
+
+/**
+ * Target KPI per salesforce per parameter. Satu program mewakili satu periode, jadi tidak
+ * ada kolom bulan: periode baru berarti program baru.
+ *
+ * Target sengaja tidak disimpan di `mitra_program_params` karena angkanya berbeda tiap
+ * orang -- SF senior dan SF baru tidak dinilai dengan tuntutan yang sama.
+ */
+export const mitraKpiTargets = mysqlTable("mitra_kpi_targets", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
+    targetValue: decimal("target_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_targets_unique_idx").on(table.programId, table.participantKey, table.paramId),
+    index("mitra_kpi_targets_sf_idx").on(table.salesforceId),
+]);
+
+/**
+ * Pencapaian mentah KPI, satu baris per outlet per parameter per tanggal.
+ *
+ * Tidak memakai `mitra_program_scores` karena unique index tabel itu berporos pada
+ * participantKey (di program KPI = salesforce), sedangkan satu salesforce membina banyak
+ * outlet: seluruh baris outlet milik satu SF pada parameter dan tanggal yang sama akan
+ * bertabrakan, dan onDuplicateKeyUpdate jalur import akan menimpanya -- outlet terakhir
+ * menang, sisanya hilang tanpa jejak.
+ *
+ * `salesforce_id` disimpan redundan (bisa diturunkan dari outlet) agar rollup per-SF tidak
+ * perlu join, sekaligus supaya perpindahan binaan outlet di kemudian hari tidak mengubah
+ * angka periode yang sudah lewat.
+ */
+export const mitraKpiOutletScores = mysqlTable("mitra_kpi_outlet_scores", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    outletId: varchar("outlet_id", { length: 36 }).notNull().references(() => mitraOutlets.id, { onDelete: "cascade" }),
+    paramId: varchar("param_id", { length: 36 }).notNull().references(() => mitraProgramParams.id, { onDelete: "cascade" }),
+    rawValue: decimal("raw_value", { precision: 18, scale: 2 }).notNull().default("0.00"),
+    achievementDate: date("achievement_date", { mode: "string" }).notNull(),
+    batchId: varchar("batch_id", { length: 36 }).references(() => mitraImportBatches.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_outlet_scores_unique_idx").on(table.programId, table.outletId, table.paramId, table.achievementDate),
+    index("mitra_kpi_outlet_scores_sf_idx").on(table.programId, table.salesforceId),
+    index("mitra_kpi_outlet_scores_batch_idx").on(table.batchId),
+]);
+
+/**
+ * Hasil perhitungan KPI per salesforce, sejajar peran mitra_program_leaderboard pada
+ * racing -- bedanya tidak ada kolom peringkat, karena KPI tidak mengadu siapa pun.
+ *
+ * `tap` disalin saat hitung, tidak dijoin saat baca, supaya laporan periode lama tidak
+ * ikut berubah ketika seseorang dipindah wilayah.
+ */
+export const mitraKpiResults = mysqlTable("mitra_kpi_results", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    programId: varchar("program_id", { length: 36 }).notNull().references(() => mitraPrograms.id, { onDelete: "cascade" }),
+    participantKey: varchar("participant_key", { length: 60 }).notNull(),
+    salesforceId: varchar("salesforce_id", { length: 36 }).notNull().references(() => mitraSalesforces.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }).notNull().default(""),
+    complianceScore: decimal("compliance_score", { precision: 8, scale: 2 }).notNull().default("0.00"),
+    performanceScore: decimal("performance_score", { precision: 8, scale: 2 }).notNull().default("0.00"),
+    compliancePassed: boolean("compliance_passed").notNull().default(true),
+    benefitType: mysqlEnum("benefit_type", ["NONE", "REWARD", "PUNISHMENT"]).notNull().default("NONE"),
+    benefitLabel: varchar("benefit_label", { length: 255 }).notNull().default(""),
+    benefitRuleId: varchar("benefit_rule_id", { length: 36 }),
+    computedAt: datetime("computed_at").notNull(),
+}, (table) => [
+    uniqueIndex("mitra_kpi_results_unique_idx").on(table.programId, table.participantKey),
+    index("mitra_kpi_results_tap_idx").on(table.programId, table.tap),
+]);
+
+/**
+ * Daftar master wilayah. Kolom tap/kabupaten/kecamatan di outlet, salesforce, dan market
+ * share sengaja TETAP berupa teks bebas, bukan foreign key -- tabel ini hanya memasok
+ * pilihan dropdown supaya penulisan seragam, tanpa memutus query dan filter lama yang
+ * sudah mencocokkan berdasarkan teks.
+ */
+export const mitraTaps = mysqlTable("mitra_taps", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 160 }).notNull().unique(),
+    createdAt: datetime("created_at").notNull(),
+});
+
+export const mitraKabupatens = mysqlTable("mitra_kabupatens", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 160 }).notNull().unique(),
+    createdAt: datetime("created_at").notNull(),
+});
+
+export const mitraKecamatans = mysqlTable("mitra_kecamatans", {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 160 }).notNull().unique(),
+    createdAt: datetime("created_at").notNull(),
+});
 
 export const mitraAuditLogs = mysqlTable("mitra_audit_logs", {
     id: varchar("id", { length: 36 }).primaryKey(),
@@ -923,20 +1153,15 @@ export const mitraUserProfilesRelations = relations(mitraUserProfiles, ({ one })
     user: one(user, { fields: [mitraUserProfiles.userId], references: [user.id] }),
 }));
 
-export const mitraTerritoriesRelations = relations(mitraTerritories, ({ many }) => ({
-    userTerritories: many(mitraUserTerritories),
-    outlets: many(mitraOutlets),
-}));
-
-export const mitraUserTerritoriesRelations = relations(mitraUserTerritories, ({ one }) => ({
-    user: one(user, { fields: [mitraUserTerritories.userId], references: [user.id] }),
-    territory: one(mitraTerritories, { fields: [mitraUserTerritories.territoryId], references: [mitraTerritories.id] }),
-}));
-
 export const mitraOutletsRelations = relations(mitraOutlets, ({ one, many }) => ({
-    territory: one(mitraTerritories, { fields: [mitraOutlets.territoryId], references: [mitraTerritories.id] }),
     details: one(mitraOutletDetails),
     metrics: many(mitraOutletMetrics),
+    programParticipants: many(mitraProgramParticipants),
+    leaderboardRows: many(mitraProgramLeaderboard),
+}));
+
+export const mitraSalesforcesRelations = relations(mitraSalesforces, ({ many }) => ({
+    outlets: many(mitraOutlets),
     programParticipants: many(mitraProgramParticipants),
     leaderboardRows: many(mitraProgramLeaderboard),
 }));
@@ -959,6 +1184,7 @@ export const mitraProgramsRelations = relations(mitraPrograms, ({ many }) => ({
     participants: many(mitraProgramParticipants),
     leaderboard: many(mitraProgramLeaderboard),
     winners: many(mitraProgramWinners),
+    rewardRules: many(mitraProgramRewardRules),
 }));
 
 export const mitraProgramParamsRelations = relations(mitraProgramParams, ({ one, many }) => ({
@@ -969,22 +1195,30 @@ export const mitraProgramParamsRelations = relations(mitraProgramParams, ({ one,
 export const mitraProgramParticipantsRelations = relations(mitraProgramParticipants, ({ one }) => ({
     program: one(mitraPrograms, { fields: [mitraProgramParticipants.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramParticipants.outletId], references: [mitraOutlets.id] }),
+    salesforce: one(mitraSalesforces, { fields: [mitraProgramParticipants.salesforceId], references: [mitraSalesforces.id] }),
 }));
 
 export const mitraProgramScoresRelations = relations(mitraProgramScores, ({ one }) => ({
     program: one(mitraPrograms, { fields: [mitraProgramScores.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramScores.outletId], references: [mitraOutlets.id] }),
+    salesforce: one(mitraSalesforces, { fields: [mitraProgramScores.salesforceId], references: [mitraSalesforces.id] }),
     param: one(mitraProgramParams, { fields: [mitraProgramScores.paramId], references: [mitraProgramParams.id] }),
 }));
 
 export const mitraProgramLeaderboardRelations = relations(mitraProgramLeaderboard, ({ one }) => ({
     program: one(mitraPrograms, { fields: [mitraProgramLeaderboard.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramLeaderboard.outletId], references: [mitraOutlets.id] }),
+    salesforce: one(mitraSalesforces, { fields: [mitraProgramLeaderboard.salesforceId], references: [mitraSalesforces.id] }),
 }));
 
 export const mitraProgramWinnersRelations = relations(mitraProgramWinners, ({ one }) => ({
     program: one(mitraPrograms, { fields: [mitraProgramWinners.programId], references: [mitraPrograms.id] }),
     outlet: one(mitraOutlets, { fields: [mitraProgramWinners.outletId], references: [mitraOutlets.id] }),
+    salesforce: one(mitraSalesforces, { fields: [mitraProgramWinners.salesforceId], references: [mitraSalesforces.id] }),
+}));
+
+export const mitraProgramRewardRulesRelations = relations(mitraProgramRewardRules, ({ one }) => ({
+    program: one(mitraPrograms, { fields: [mitraProgramRewardRules.programId], references: [mitraPrograms.id] }),
 }));
 
 // ========== RBAC Umum (PRD Fase 0 - prd-total-revamp.md) ==========
@@ -999,6 +1233,20 @@ export const adminUserProfiles = mysqlTable("admin_user_profiles", {
     userId: varchar("user_id", { length: 36 }).primaryKey().references(() => user.id, { onDelete: "cascade" }),
     phone: varchar("phone", { length: 50 }),
     role: mysqlEnum("role", ["SUPER_ADMIN", "ADMIN_INPUT", "MANAGER", "SUPERVISOR", "SALESFORCE"]).notNull().default("MANAGER"),
+    /**
+     * Identitas petugas untuk akun ber-role SALESFORCE: menautkan akun login ke satu baris
+     * master salesforce, sehingga scope-nya bisa dipersempit ke outlet binaannya sendiri.
+     * Membatasi lewat TAP saja tidak cukup -- satu TAP berisi banyak petugas, jadi tanpa
+     * kolom ini seorang salesforce tetap bisa menyunting outlet rekan setimnya.
+     *
+     * UNIQUE ditegakkan database dan berlaku untuk SELURUH baris, termasuk akun nonaktif:
+     * MySQL tidak mengenal partial unique index, jadi "satu akun aktif per master" mustahil
+     * diwakili constraint. Konsekuensinya disengaja -- mengganti pemegang akun dilakukan
+     * dengan memindahkan tautan pada akun yang ada, bukan membuat akun kedua.
+     */
+    salesforceId: varchar("salesforce_id", { length: 36 })
+        .unique()
+        .references(() => mitraSalesforces.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
     lastLoginAt: datetime("last_login_at"),
     failedLoginAttempts: int("failed_login_attempts").notNull().default(0),
@@ -1010,12 +1258,17 @@ export const adminUserProfiles = mysqlTable("admin_user_profiles", {
     index("admin_user_profiles_role_idx").on(table.role),
 ]);
 
-export const adminUserTerritories = mysqlTable("admin_user_territories", {
+/**
+ * TAP menggantikan territory sebagai kunci pembatasan akses admin SUPERVISOR/SALESFORCE.
+ * Tidak ada FK ke tabel master mana pun -- TAP hanyalah string bebas yang sudah berulang
+ * di mitra_outlets.tap dan mitra_salesforces.tap, tidak punya tabel master tersendiri.
+ */
+export const adminUserTaps = mysqlTable("admin_user_taps", {
     userId: varchar("user_id", { length: 36 }).notNull().references(() => user.id, { onDelete: "cascade" }),
-    territoryId: varchar("territory_id", { length: 36 }).notNull().references(() => mitraTerritories.id, { onDelete: "cascade" }),
+    tap: varchar("tap", { length: 255 }).notNull(),
 }, (table) => [
-    primaryKey({ columns: [table.userId, table.territoryId], name: "admin_user_territories_pk" }),
-    index("admin_user_territories_territory_idx").on(table.territoryId),
+    primaryKey({ columns: [table.userId, table.tap], name: "admin_user_taps_pk" }),
+    index("admin_user_taps_tap_idx").on(table.tap),
 ]);
 
 export const adminAuditLogs = mysqlTable("admin_audit_logs", {
@@ -1035,10 +1288,9 @@ export const adminAuditLogs = mysqlTable("admin_audit_logs", {
 
 export const adminUserProfilesRelations = relations(adminUserProfiles, ({ one, many }) => ({
     user: one(user, { fields: [adminUserProfiles.userId], references: [user.id] }),
-    territories: many(adminUserTerritories),
+    taps: many(adminUserTaps),
 }));
 
-export const adminUserTerritoriesRelations = relations(adminUserTerritories, ({ one }) => ({
-    user: one(user, { fields: [adminUserTerritories.userId], references: [user.id] }),
-    territory: one(mitraTerritories, { fields: [adminUserTerritories.territoryId], references: [mitraTerritories.id] }),
+export const adminUserTapsRelations = relations(adminUserTaps, ({ one }) => ({
+    user: one(user, { fields: [adminUserTaps.userId], references: [user.id] }),
 }));

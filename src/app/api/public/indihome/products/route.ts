@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { indihomeProducts } from "@/db/schema";
 import { INDIHOME_LOCATIONS, INDIHOME_PRODUCTS } from "@/lib/indihome-products";
@@ -13,11 +13,13 @@ export async function GET() {
     const locations = await getActiveIndihomeLocations();
 
     try {
+        // Paket bertanda terpopuler selalu di urutan awal; sortOrder tetap menentukan
+        // urutan di dalam masing-masing kelompok, jadi penataan manual admin tidak hilang.
         const products = await db
             .select()
             .from(indihomeProducts)
             .where(eq(indihomeProducts.isActive, true))
-            .orderBy(asc(indihomeProducts.sortOrder), asc(indihomeProducts.speedMbps));
+            .orderBy(desc(indihomeProducts.isFeatured), asc(indihomeProducts.sortOrder), asc(indihomeProducts.speedMbps));
 
         if (products.length > 0) {
             return NextResponse.json({
@@ -40,7 +42,9 @@ export async function GET() {
     }
 
     return NextResponse.json({
-        products: INDIHOME_PRODUCTS,
+        // Katalog cadangan diurutkan dengan aturan yang sama supaya tampilannya tidak
+        // berubah hanya karena datanya sedang diambil dari konstanta, bukan database.
+        products: [...INDIHOME_PRODUCTS].sort((a, b) => Number(b.featured ?? false) - Number(a.featured ?? false)),
         locations: locations.length > 0 ? locations : [...INDIHOME_LOCATIONS],
         source: "fallback",
     });

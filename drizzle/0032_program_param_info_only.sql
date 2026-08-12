@@ -1,0 +1,1 @@
+ALTER TABLE `mitra_program_params` ADD `is_scored` boolean DEFAULT true NOT NULL;

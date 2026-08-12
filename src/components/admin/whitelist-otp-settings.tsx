@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TombolUrut } from "@/components/ui/sortable-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { urutkanBaris, useUrutTabel } from "@/lib/use-sort";
 // Daftar bersama dengan pemeriksaan izin di server, jadi peran yang boleh menyunting
 // outlet dan saran isian di form ini tidak mungkin berbeda.
 import { SARAN_KETERANGAN } from "@/lib/mitra-whitelist-roles";
@@ -47,6 +49,7 @@ export function WhitelistOtpSettings() {
     const [bulkMode, setBulkMode] = React.useState(false);
     const [bulkText, setBulkText] = React.useState("");
     const [canEdit, setCanEdit] = React.useState(false);
+    const { urut, gantiUrut } = useUrutTabel<string>("");
 
     React.useEffect(() => {
         fetch("/api/admin/me")
@@ -172,6 +175,15 @@ export function WhitelistOtpSettings() {
 
     // Nomor, nama, keterangan, scope, status + kolom pilih dan aksi bila boleh menyunting.
     const jumlahKolom = canEdit ? 7 : 5;
+
+    const rowsTampil = urutkanBaris(rows, urut, (row, kolom) => {
+        if (kolom === "nomor") return row.phoneE164;
+        if (kolom === "nama") return row.name || "";
+        if (kolom === "keterangan") return row.keterangan || "";
+        if (kolom === "scope") return row.scope === "ALL" ? "Semua outlet" : row.scope === "TAP" ? `TAP ${row.tap}` : row.outletName || row.scope;
+        if (kolom === "status") return row.isActive ? 1 : 0;
+        return "";
+    });
 
     return (
         <Card>
@@ -314,18 +326,18 @@ export function WhitelistOtpSettings() {
                                         />
                                     </TableHead>
                                 )}
-                                <TableHead>Nomor</TableHead>
-                                <TableHead>Nama</TableHead>
-                                <TableHead>Keterangan</TableHead>
-                                <TableHead>Scope</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead><TombolUrut kolom="nomor" label="Nomor" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="nama" label="Nama" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="keterangan" label="Keterangan" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="scope" label="Scope" urut={urut} onKlik={gantiUrut} /></TableHead>
+                                <TableHead><TombolUrut kolom="status" label="Status" urut={urut} onKlik={gantiUrut} /></TableHead>
                                 {canEdit && <TableHead className="text-right">Aksi</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={jumlahKolom} className="h-24 text-center text-muted-foreground">Memuat...</TableCell></TableRow>
-                            ) : rows.length ? rows.map((row) => (
+                            ) : rowsTampil.length ? rowsTampil.map((row) => (
                                 <TableRow key={row.id}>
                                     {canEdit && (
                                         <TableCell>

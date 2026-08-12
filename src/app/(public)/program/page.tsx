@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Calendar, Users, UserCheck } from "lucide-react";
+import { ArrowRight, Calendar, Lock, Users, UserCheck } from "lucide-react";
 
 interface Program {
     id: string;
@@ -23,6 +23,7 @@ interface MitraProgram {
     slug: string;
     name: string;
     descriptionMd?: string;
+    thumbnailUrl?: string | null;
     periodStart: string;
     periodEnd: string;
 }
@@ -41,7 +42,8 @@ export default function ProgramPage() {
         Promise.allSettled([
             fetch("/api/public/programs").then((res) => res.ok ? res.json() : []),
             fetch("/api/public/mitra/programs").then((res) => res.ok ? res.json() : { programs: [] }),
-        ]).then(([legacyResult, mitraResult]) => {
+            fetch("/api/public/mitra/programs?targetType=SALESFORCE").then((res) => res.ok ? res.json() : { programs: [] }),
+        ]).then(([legacyResult, mitraResult, salesforceResult]) => {
             const legacyPrograms = legacyResult.status === "fulfilled" && Array.isArray(legacyResult.value)
                 ? legacyResult.value.map((program: Omit<Program, "href">) => ({ ...program, href: `/program/${program.slug}` }))
                 : [];
@@ -54,12 +56,29 @@ export default function ProgramPage() {
                 title: program.name,
                 description: program.descriptionMd || "Program dan leaderboard Mitra Outlet ABK Ciraya.",
                 period: formatMitraPeriod(program.periodStart, program.periodEnd),
+                thumbnail: program.thumbnailUrl || undefined,
                 category: "mitra",
                 href: `/mitra/program/${program.slug}`,
             }));
+            const salesforcePrograms: MitraProgram[] = salesforceResult.status === "fulfilled" && Array.isArray(salesforceResult.value?.programs)
+                ? salesforceResult.value.programs
+                : [];
+            // Program salesforce tampil di daftar ini, tetapi isinya baru terbuka setelah
+            // verifikasi OTP di halaman detailnya.
+            const normalizedSalesforce: Program[] = salesforcePrograms.map((program) => ({
+                id: `sf:${program.id}`,
+                slug: program.slug,
+                title: program.name,
+                description: program.descriptionMd || "Program dan papan pencapaian tim salesforce.",
+                period: formatMitraPeriod(program.periodStart, program.periodEnd),
+                thumbnail: program.thumbnailUrl || undefined,
+                category: "salesforce",
+                href: `/mitra/program-sf/${program.slug}`,
+            }));
+
             const mitraSlugs = new Set(normalizedMitra.map((program) => program.slug));
             const convergedLegacy = legacyPrograms.filter((program: Program) => !(program.category === "mitra" && mitraSlugs.has(program.slug)));
-            setPrograms([...convergedLegacy, ...normalizedMitra]);
+            setPrograms([...convergedLegacy, ...normalizedMitra, ...normalizedSalesforce]);
             setIsLoading(false);
         });
     }, []);
@@ -113,6 +132,13 @@ export default function ProgramPage() {
                         >
                             <Users className="h-4 w-4" /> Program Mitra Outlet
                         </button>
+                        <button
+                            onClick={() => setFilterCategory("salesforce")}
+                            className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${filterCategory === "salesforce" ? "bg-red-600 text-white shadow-lg" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                        >
+                            <Lock className="h-4 w-4" /> Program Salesforce
+                        </button>
                     </div>
 
                     {isLoading ? (
@@ -157,9 +183,11 @@ export default function ProgramPage() {
                                         <div className="absolute bottom-3 right-3">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide shadow-md ${program.category === "mitra"
                                                 ? "bg-orange-500 text-white"
-                                                : "bg-red-600 text-white"
+                                                : program.category === "salesforce"
+                                                    ? "bg-gray-900 text-white"
+                                                    : "bg-red-600 text-white"
                                                 }`}>
-                                                {program.category === "mitra" ? "Mitra Outlet" : "Pelanggan"}
+                                                {program.category === "mitra" ? "Mitra Outlet" : program.category === "salesforce" ? "Salesforce" : "Pelanggan"}
                                             </span>
                                         </div>
                                     </div>

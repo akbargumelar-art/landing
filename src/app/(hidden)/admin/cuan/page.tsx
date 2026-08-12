@@ -44,6 +44,7 @@ import {
     X,
     CheckSquare,
 } from "lucide-react";
+import { useAdminScope } from "@/lib/use-admin-scope";
 
 interface CuanProduct {
     id: string;
@@ -78,6 +79,7 @@ const formatRupiah = (val: string | number) =>
 const getProfit = (p: CuanProduct) => Number(p.sellingPrice) - Number(p.capitalPrice) + Number(p.cashback);
 
 export default function AdminCuanPage() {
+    const { bolehInputData, bolehHapusData } = useAdminScope();
     const [products, setProducts] = useState<CuanProduct[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
@@ -477,8 +479,8 @@ export default function AdminCuanPage() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground">Master Produk Cuan</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Kelola data produk untuk Kalkulator Cuan DigiposAja</p>
+                    <h1 className="text-2xl font-bold text-foreground">{bolehInputData ? "Master Produk Cuan" : "Produk Cuan"}</h1>
+                    <p className="text-sm text-muted-foreground mt-1">{bolehInputData ? "Kelola data produk untuk Kalkulator Cuan DigiposAja" : "Mode viewer: data produk, kategori, dan brand hanya dapat dilihat."}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
@@ -528,7 +530,7 @@ export default function AdminCuanPage() {
                                     className="pl-10"
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
+                            {bolehInputData && <div className="flex items-center gap-2">
                                 {/* Upload Excel Dialog */}
                                 <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                                     <DialogTrigger asChild>
@@ -638,7 +640,7 @@ export default function AdminCuanPage() {
                                         </div>
                                     </DialogContent>
                                 </Dialog>
-                            </div>
+                            </div>}
                         </div>
 
                         {/* Filter Row */}
@@ -681,7 +683,7 @@ export default function AdminCuanPage() {
                     </div>
 
                     {/* Bulk Action Bar */}
-                    {hasSelection && (
+                    {bolehInputData && hasSelection && (
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-200 animate-in fade-in slide-in-from-top-2 duration-200">
                             <CheckSquare className="h-5 w-5 text-red-600 shrink-0" />
                             <span className="text-sm font-semibold text-red-700">
@@ -697,7 +699,7 @@ export default function AdminCuanPage() {
                                     <Edit className="h-4 w-4 mr-1.5" />
                                     Edit Massal
                                 </Button>
-                                <Button
+                                {bolehHapusData && <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={handleBulkDelete}
@@ -705,7 +707,7 @@ export default function AdminCuanPage() {
                                 >
                                     <Trash2 className="h-4 w-4 mr-1.5" />
                                     Hapus Massal
-                                </Button>
+                                </Button>}
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -734,14 +736,14 @@ export default function AdminCuanPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[40px]">
+                                            {bolehInputData && <TableHead className="w-[40px]">
                                                 <input
                                                     type="checkbox"
                                                     checked={isAllSelected}
                                                     onChange={toggleSelectAll}
                                                     className="w-4 h-4 accent-red-600 cursor-pointer"
                                                 />
-                                            </TableHead>
+                                            </TableHead>}
                                             <TableHead className="w-[50px]">#</TableHead>
                                             <TableHead>
                                                 <button onClick={() => handleSort("name")} className="flex items-center font-semibold hover:text-red-600 transition-colors cursor-pointer">
@@ -797,7 +799,7 @@ export default function AdminCuanPage() {
                                                     <SortIcon field="isActive" />
                                                 </button>
                                             </TableHead>
-                                            <TableHead className="text-center">Aksi</TableHead>
+                                            {bolehInputData && <TableHead className="text-center">Aksi</TableHead>}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -806,14 +808,14 @@ export default function AdminCuanPage() {
                                             const isSelected = selectedIds.has(p.id);
                                             return (
                                                 <TableRow key={p.id} className={isSelected ? "bg-red-50/50" : ""}>
-                                                    <TableCell>
+                                                    {bolehInputData && <TableCell>
                                                         <input
                                                             type="checkbox"
                                                             checked={isSelected}
                                                             onChange={() => toggleSelect(p.id)}
                                                             className="w-4 h-4 accent-red-600 cursor-pointer"
                                                         />
-                                                    </TableCell>
+                                                    </TableCell>}
                                                     <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                                                     <TableCell className="font-medium">{p.name}</TableCell>
                                                     <TableCell><Badge variant="secondary" className="text-xs">{p.categoryName}</Badge></TableCell>
@@ -823,29 +825,29 @@ export default function AdminCuanPage() {
                                                     <TableCell className="text-right text-sm">{formatRupiah(p.cashback)}</TableCell>
                                                     <TableCell className="text-right text-sm font-bold text-emerald-600">{formatRupiah(profit)}</TableCell>
                                                     <TableCell className="text-center">
-                                                        <button onClick={() => handleToggleHot(p.id, p.isHot)} className="cursor-pointer" title={p.isHot ? "Nonaktifkan Hot" : "Tandai Hot"}>
+                                                        {bolehInputData ? <button onClick={() => handleToggleHot(p.id, p.isHot)} className="cursor-pointer" title={p.isHot ? "Nonaktifkan Hot" : "Tandai Hot"}>
                                                             <Flame className={`h-5 w-5 mx-auto transition-colors ${p.isHot ? "text-orange-500 fill-orange-500" : "text-gray-300"}`} />
-                                                        </button>
+                                                        </button> : <Flame aria-label={p.isHot ? "Hot" : "Tidak hot"} className={`h-5 w-5 mx-auto ${p.isHot ? "text-orange-500 fill-orange-500" : "text-gray-300"}`} />}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        <button onClick={() => handleToggleActive(p.id, p.isActive)} className="cursor-pointer">
+                                                        {bolehInputData ? <button onClick={() => handleToggleActive(p.id, p.isActive)} className="cursor-pointer">
                                                             {p.isActive ? (
                                                                 <CheckCircle className="h-5 w-5 text-emerald-500 mx-auto" />
                                                             ) : (
                                                                 <XCircle className="h-5 w-5 text-gray-300 mx-auto" />
                                                             )}
-                                                        </button>
+                                                        </button> : p.isActive ? <CheckCircle aria-label="Aktif" className="h-5 w-5 text-emerald-500 mx-auto" /> : <XCircle aria-label="Nonaktif" className="h-5 w-5 text-gray-300 mx-auto" />}
                                                     </TableCell>
-                                                    <TableCell className="text-center">
+                                                    {bolehInputData && <TableCell className="text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <button onClick={() => openEdit(p)} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer">
                                                                 <Edit className="h-4 w-4" />
                                                             </button>
-                                                            <button onClick={() => handleDeleteProduct(p.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer">
+                                                            {bolehHapusData && <button onClick={() => handleDeleteProduct(p.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer">
                                                                 <Trash2 className="h-4 w-4" />
-                                                            </button>
+                                                            </button>}
                                                         </div>
-                                                    </TableCell>
+                                                    </TableCell>}
                                                 </TableRow>
                                             );
                                         })}
@@ -862,7 +864,7 @@ export default function AdminCuanPage() {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">Kelola kategori produk untuk Kalkulator Cuan</p>
-                        <Dialog open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
+                        {bolehInputData && <Dialog open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
                                     <Plus className="h-4 w-4 mr-1.5" />
@@ -882,7 +884,7 @@ export default function AdminCuanPage() {
                                     </Button>
                                 </div>
                             </DialogContent>
-                        </Dialog>
+                        </Dialog>}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {categories.map(c => {
@@ -896,7 +898,7 @@ export default function AdminCuanPage() {
                                         <p className="font-semibold text-sm truncate">{c.name}</p>
                                         <p className="text-xs text-muted-foreground">{productCount} produk</p>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                    {bolehInputData && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                         <button
                                             onClick={() => { setEditCategoryForm({ id: c.id, name: c.name }); setEditCategoryOpen(true); }}
                                             className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
@@ -904,14 +906,14 @@ export default function AdminCuanPage() {
                                         >
                                             <Edit className="h-4 w-4" />
                                         </button>
-                                        <button
+                                        {bolehHapusData && <button
                                             onClick={() => handleDeleteCategory(c.id, c.name)}
                                             className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer"
                                             title="Hapus"
                                         >
                                             <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                        </button>}
+                                    </div>}
                                 </Card>
                             );
                         })}
@@ -927,7 +929,7 @@ export default function AdminCuanPage() {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">Kelola brand/merek produk untuk Kalkulator Cuan</p>
-                        <Dialog open={addBrandOpen} onOpenChange={setAddBrandOpen}>
+                        {bolehInputData && <Dialog open={addBrandOpen} onOpenChange={setAddBrandOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
                                     <Plus className="h-4 w-4 mr-1.5" />
@@ -947,7 +949,7 @@ export default function AdminCuanPage() {
                                     </Button>
                                 </div>
                             </DialogContent>
-                        </Dialog>
+                        </Dialog>}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {brands.map(b => {
@@ -961,7 +963,7 @@ export default function AdminCuanPage() {
                                         <p className="font-semibold text-sm truncate">{b.name}</p>
                                         <p className="text-xs text-muted-foreground">{productCount} produk</p>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                    {bolehInputData && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                         <button
                                             onClick={() => { setEditBrandForm({ id: b.id, name: b.name }); setEditBrandOpen(true); }}
                                             className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
@@ -969,14 +971,14 @@ export default function AdminCuanPage() {
                                         >
                                             <Edit className="h-4 w-4" />
                                         </button>
-                                        <button
+                                        {bolehHapusData && <button
                                             onClick={() => handleDeleteBrand(b.id, b.name)}
                                             className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 cursor-pointer"
                                             title="Hapus"
                                         >
                                             <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                        </button>}
+                                    </div>}
                                 </Card>
                             );
                         })}
@@ -988,7 +990,7 @@ export default function AdminCuanPage() {
             )}
 
             {/* Edit Category Dialog */}
-            <Dialog open={editCategoryOpen} onOpenChange={setEditCategoryOpen}>
+            {bolehInputData && <Dialog open={editCategoryOpen} onOpenChange={setEditCategoryOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Edit Kategori</DialogTitle></DialogHeader>
                     <div className="space-y-4">
@@ -1002,10 +1004,10 @@ export default function AdminCuanPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
 
             {/* Edit Brand Dialog */}
-            <Dialog open={editBrandOpen} onOpenChange={setEditBrandOpen}>
+            {bolehInputData && <Dialog open={editBrandOpen} onOpenChange={setEditBrandOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Edit Brand</DialogTitle></DialogHeader>
                     <div className="space-y-4">
@@ -1019,10 +1021,10 @@ export default function AdminCuanPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
 
             {/* Edit Product Dialog */}
-            <Dialog open={editProductOpen} onOpenChange={setEditProductOpen}>
+            {bolehInputData && <Dialog open={editProductOpen} onOpenChange={setEditProductOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Produk</DialogTitle>
@@ -1088,10 +1090,10 @@ export default function AdminCuanPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
 
             {/* Bulk Edit Dialog */}
-            <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+            {bolehInputData && <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Massal — {selectedIds.size} Produk</DialogTitle>
@@ -1170,7 +1172,7 @@ export default function AdminCuanPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
     );
 }

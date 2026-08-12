@@ -34,7 +34,7 @@ const emptyBanner = {
     ctaLink: "#paket",
 };
 
-export function IndihomeLocationsBanner() {
+export function IndihomeLocationsBanner({ bolehInputData, bolehHapusData }: { bolehInputData: boolean; bolehHapusData: boolean }) {
     const [locations, setLocations] = React.useState<LocationRow[]>([]);
     const [banners, setBanners] = React.useState<BannerRow[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -201,7 +201,7 @@ export function IndihomeLocationsBanner() {
                         Menonaktifkan lokasi menyembunyikannya dari pengunjung tanpa menghapus data pengajuan lama.
                     </p>
 
-                    <form onSubmit={addLocation} className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    {bolehInputData && <form onSubmit={addLocation} className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <Input
                             value={newLocation}
                             onChange={(event) => setNewLocation(event.target.value)}
@@ -213,7 +213,7 @@ export function IndihomeLocationsBanner() {
                             {savingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                             Tambah lokasi
                         </Button>
-                    </form>
+                    </form>}
 
                     <div className="mt-4 space-y-2">
                         {locations.length === 0 ? (
@@ -226,14 +226,14 @@ export function IndihomeLocationsBanner() {
                                         {row.isActive ? "Aktif" : "Nonaktif"}
                                     </span>
                                 </div>
-                                <div className="flex gap-2">
+                                {bolehInputData && <div className="flex gap-2">
                                     <Button variant="outline" size="sm" onClick={() => toggleLocation(row)}>
                                         {row.isActive ? "Nonaktifkan" : "Aktifkan"}
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => removeLocation(row)} title="Hapus lokasi">
+                                    {bolehHapusData && <Button variant="outline" size="sm" onClick={() => removeLocation(row)} title="Hapus lokasi">
                                         <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                </div>
+                                    </Button>}
+                                </div>}
                             </div>
                         ))}
                     </div>
@@ -258,7 +258,7 @@ export function IndihomeLocationsBanner() {
                         </div>
                     )}
 
-                    <form onSubmit={saveBanner} className="mt-5 space-y-4">
+                    {bolehInputData && <form onSubmit={saveBanner} className="mt-5 space-y-4">
                         <div className="space-y-2">
                             <Label>Gambar banner</Label>
                             <div className="flex flex-wrap items-center gap-3">
@@ -291,7 +291,7 @@ export function IndihomeLocationsBanner() {
                             {savingBanner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                             Simpan banner baru
                         </Button>
-                    </form>
+                    </form>}
 
                     {banners.length > 1 && (
                         <div className="mt-6 space-y-2">
@@ -303,12 +303,12 @@ export function IndihomeLocationsBanner() {
                                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
                                             {row.isActive ? "Aktif" : "Nonaktif"}
                                         </span>
-                                        <Button variant="outline" size="sm" onClick={() => toggleBanner(row)}>
+                                        {bolehInputData && <Button variant="outline" size="sm" onClick={() => toggleBanner(row)}>
                                             {row.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={() => removeBanner(row)} title="Hapus banner">
+                                        </Button>}
+                                        {bolehHapusData && <Button variant="outline" size="sm" onClick={() => removeBanner(row)} title="Hapus banner">
                                             <Trash2 className="h-4 w-4 text-red-600" />
-                                        </Button>
+                                        </Button>}
                                     </div>
                                 </div>
                             ))}

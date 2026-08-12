@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { mitraMarketShares } from "@/db/schema";
 import { requireRole, writeAdminAuditLog } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/mitra-utils";
-import { MITRA_MARKET_SHARE_OPERATORS, normalizeSharePercent } from "@/lib/mitra-market-share";
+import { MITRA_MARKET_SHARE_FIELDS, normalizeSharePercent } from "@/lib/mitra-market-share";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,10 +22,12 @@ function bacaKolom(row: Record<string, unknown>, alias: string[]): string {
     return "";
 }
 
-function bacaOperator(row: Record<string, unknown>, key: string, label: string): unknown {
+function bacaOperator(row: Record<string, unknown>, field: (typeof MITRA_MARKET_SHARE_FIELDS)[number]): unknown {
+    const alias = [field.key, field.label, field.uploadKey, ...field.uploadAliases]
+        .map((item) => item.trim().toLowerCase());
     for (const [kunci, nilai] of Object.entries(row)) {
         const bersih = kunci.trim().toLowerCase();
-        if (bersih === key || bersih === label.toLowerCase()) return nilai;
+        if (alias.includes(bersih)) return nilai;
     }
     return 0;
 }
@@ -35,10 +37,20 @@ export async function GET() {
     const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
     if (auth.error) return auth.error;
 
+    const contohNilai: Record<string, number> = {
+        telkomsel: 45.5,
+        xl: 18,
+        smartfren: 9.25,
+        indosat: 12.75,
+        tri: 7.5,
+        telkomselAfter: 46,
+        xlsmart: 28,
+        ioh: 20,
+    };
     const contoh = {
         kabupaten: "Kota Cirebon",
         kecamatan: "Kesambi",
-        ...Object.fromEntries(MITRA_MARKET_SHARE_OPERATORS.map((operator, index) => [operator.key, [45.5, 18, 9.25, 7, 12.75, 7.5][index] ?? 0])),
+        ...Object.fromEntries(MITRA_MARKET_SHARE_FIELDS.map((field) => [field.uploadKey, contohNilai[field.key] ?? 0])),
     };
 
     const worksheet = XLSX.utils.json_to_sheet([contoh]);
@@ -104,9 +116,9 @@ export async function POST(request: Request) {
         valid.push({
             kabupaten,
             kecamatan,
-            shares: Object.fromEntries(MITRA_MARKET_SHARE_OPERATORS.map((operator) => [
-                operator.key,
-                normalizeSharePercent(bacaOperator(row, operator.key, operator.label)),
+            shares: Object.fromEntries(MITRA_MARKET_SHARE_FIELDS.map((field) => [
+                field.key,
+                normalizeSharePercent(bacaOperator(row, field)),
             ])),
         });
     });

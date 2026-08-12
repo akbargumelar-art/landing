@@ -739,3 +739,626 @@ naik/turun.
 
 `tsc`, `eslint src scripts`, `npm run build`, dan `npm run env:check` lulus di setiap commit.
 Tidak ada pengujian runtime pada sesi ini.
+
+## Pembaruan rate limit OTP per outlet - 10 Agustus 2026
+
+Rate limit per nomor pada endpoint permintaan OTP sekarang memakai pasangan **nomor WhatsApp +
+outlet**. Batas 1 permintaan/menit, 5/jam, dan 10/24 jam tidak lagi terbawa ketika nomor yang
+sama membuka outlet berbeda. Batas global 15 permintaan/jam per IP tetap dipertahankan sebagai
+pengaman spam lintas outlet. Perubahan hanya menambahkan filter `outlet_id` pada query hitung;
+tidak ada perubahan skema database maupun kontrak API.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus route OTP, dan `npm run build` lulus. Build tetap
+menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait perubahan ini.
+
+## Privasi sebaran ODP publik - 10 Agustus 2026
+
+Peta sebaran ODP di `/mitra` sekarang hanya menampilkan titik lokasi dengan satu warna netral.
+Legenda Green/Yellow/Orange/Black, nama ODP, wilayah, kapasitas port, dan occupancy tidak lagi
+tersedia pada tampilan publik. Popup titik tetap menyediakan Google Maps dan Street View hanya
+dari koordinatnya, tanpa membuka rincian ODP. Endpoint
+`/api/public/indihome/odp` juga diperkecil agar hanya mengembalikan ID serta koordinat, sehingga
+detail tidak dapat diambil dengan membaca respons jaringan halaman publik.
+
+Rincian ODP sekitar outlet dipindahkan sepenuhnya ke `/mitra/o/[publicToken]/detail`. Komponen
+tersebut membaca endpoint baru `/api/public/mitra/outlets/[publicToken]/odp`, yang memvalidasi
+cookie sesi detail hasil OTP dan memastikan sesi terikat pada outlet yang sama. Pusat radius
+diambil dari koordinat outlet di server agar sesi outlet lain tidak dapat dipakai memindai lokasi
+sembarang. Kartu ODP di profil outlet sebelum OTP sudah dihapus. Tidak ada perubahan database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Build mengenali route
+ODP terlindungi baru; hanya dua warning `<img>` lama di halaman pengaturan yang tetap muncul.
+Smoke test production server pada endpoint rincian tanpa cookie OTP menghasilkan HTTP 401 dengan
+pesan verifikasi OTP, lalu server pengujian dihentikan.
+
+## Monitoring foto outlet - 10 Agustus 2026
+
+Modul baru `/admin/mitra/foto` ditambahkan dari kartu **Monitoring Foto** di halaman Database
+Mitra Outlet. Laporan memakai bentuk satu baris untuk satu pasangan outlet dan kategori foto,
+sehingga outlet yang kehilangan beberapa kategori muncul terpisah dan tanggal pembaruannya tidak
+tercampur. Empat kategorinya tetap bersumber dari `MITRA_PHOTO_SLOTS`: Tampak Depan, Etalase,
+POP Material Telkomsel, dan POP Kompetitor.
+
+Filter laporan meliputi pencarian outlet, kategori foto, kondisi foto, kategori outlet, TAP, dan
+Salesforce. Kondisi yang tersedia adalah belum ada, belum ada atau kedaluwarsa, kedaluwarsa,
+terbaru, dan semua. Batas kedaluwarsa memakai aturan bersama `BATAS_SEGAR_HARI` (7 hari), bukan
+angka baru khusus laporan. Empat kartu ringkasan menampilkan jumlah belum ada, kedaluwarsa, dan
+terbaru per kategori foto; kartu dapat diklik untuk langsung membuka daftar foto kosong.
+
+Endpoint `/api/admin/mitra/photo-monitoring` melayani JSON berhalaman dan ekspor Excel dengan
+filter yang sama. Akses diberikan kepada SUPER_ADMIN, ADMIN_INPUT, MANAGER, SUPERVISOR, dan
+SALESFORCE. Untuk SUPERVISOR/SALESFORCE, outlet dibatasi pada territory yang ditetapkan sebelum
+ringkasan, filter, pagination, atau Excel dibentuk; akun tanpa territory memperoleh data kosong.
+Ekspor dibatasi 20.000 baris dan menyertakan identitas outlet, kategori outlet/foto, status,
+tanggal pembaruan WIB, umur foto, wilayah, TAP, Salesforce, serta URL foto. Tidak ada migrasi
+database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Output build memuat
+halaman `/admin/mitra/foto` serta endpoint `/api/admin/mitra/photo-monitoring`. Smoke test
+production server tanpa sesi menghasilkan HTTP 401 pada endpoint laporan, lalu server uji
+dihentikan. Isi laporan, filter territory, dan berkas Excel belum diuji terhadap sesi admin dan
+database hidup pada sesi ini.
+
+## Perilaku tutup popup foto - 10 Agustus 2026
+
+Lightbox pada `OutletPhotoCard` sekarang dapat ditutup dengan mengklik area mana pun di luar
+gambar, selain tetap mendukung tombol X dan tombol Escape. Sebelumnya pembungkus gambar berukuran
+`w-full` dan `80vh` menghentikan propagasi klik, sehingga area letterbox yang terlihat gelap tetap
+dianggap bagian gambar. Hitbox sekarang mengikuti dimensi alami gambar; hanya klik tepat pada
+gambar yang tidak menutup popup. Perubahan berlaku sekaligus pada profil outlet publik dan
+halaman detail outlet setelah OTP karena keduanya memakai komponen yang sama.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus `outlet-photo-card.tsx`, dan `npm run build` lulus.
+Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.
+
+## Galeri foto di dashboard Mitra - 10 Agustus 2026
+
+Dashboard `/admin/mitra` sekarang menampilkan galeri **Foto Outlet Terbaru** berisi maksimal 12
+foto yang benar-benar tersedia, diurutkan dari waktu pembaruan paling baru. Setiap thumbnail
+menampilkan kategori foto, nama/ID outlet, TAP, dan tanggal pembaruan; klik thumbnail membuka
+foto penuh di tab baru, sedangkan tombol Monitoring Foto membuka laporan lengkap.
+
+Galeri memakai endpoint monitoring yang sama dengan tambahan kondisi `AVAILABLE` dan urutan
+`latest`, sehingga RBAC dan pembatasan territory untuk SUPERVISOR/SALESFORCE tetap berlaku sebelum
+foto dipilih. Filter “Sudah ada foto” juga ditambahkan pada halaman `/admin/mitra/foto`. Tidak ada
+perubahan database.
+
+Verifikasi: `npx tsc --noEmit`, ESLint terarah, dan `npm run build` lulus. Build hanya menampilkan
+dua warning `<img>` lama di halaman pengaturan yang tidak terkait. Isi galeri dengan sesi admin
+dan database hidup belum diuji pada sesi ini.
+
+## Efek foto Salesforce keluar dari lingkaran - 10 Agustus 2026
+
+Foto Salesforce pada profil outlet publik tetap memakai bingkai lingkaran, tetapi bagian tengah
+atas foto kini dapat menonjol melewati batas bingkai. Efek dibuat dengan dua lapisan gambar yang
+memakai posisi identik: lapisan dasar dipotong penuh oleh lingkaran, sedangkan lapisan di atasnya
+hanya membuka irisan bagian atas. Sisi kiri, kanan, dan bawah tetap terpotong; foto pengganti
+berupa inisial tidak berubah. Tidak ada perubahan API, data, atau format unggahan.
+
+Verifikasi: `npx tsc --noEmit`, ESLint khusus halaman profil outlet, dan `npm run build` lulus.
+Build hanya menampilkan dua warning `<img>` lama di halaman pengaturan yang tidak terkait.
+
+## Audit OWASP Agentic dan dependency - 10 Agustus 2026
+
+Audit memakai skill lokal `agent-owasp-compliance`, tetapi repo ini tidak memiliki runtime
+AI/LLM/agent: tidak ada model, prompt execution, tool registry, MCP, memori agent, maupun
+komunikasi antar-agent. Karena itu OWASP Top 10 for Agentic Applications 2026 dinilai **tidak
+berlaku (N/A)**, bukan gagal 0/10. Audit juga menemukan bahwa nama dan pemetaan ASI-01 sampai
+ASI-10 di skill lokal tidak sesuai taksonomi resmi OWASP 2026; skill perlu diperbarui sebelum
+dipakai untuk skor kepatuhan.
+
+Sebagai pemeriksaan pendamping, `npm audit --omit=dev --json` menemukan 12 dependency produksi:
+1 kritis, 9 tinggi, dan 2 sedang. Dependency langsung yang ditandai adalah `better-auth` 1.5.0,
+`drizzle-orm` 0.39.3, `next` 15.5.12, `sharp` 0.34.5, `uuid` 11.1.0, dan `xlsx` 0.18.5. Audit
+penuh termasuk tooling menemukan 21 dependency: 2 kritis, 13 tinggi, dan 6 sedang.
+
+Exploitability dipilah berdasarkan pemakaian: `sharp` memproses buffer unggahan pengguna dan
+`xlsx` membaca workbook impor; `uuid` hanya dipakai sebagai v4 tanpa buffer; Better Auth hanya
+mengaktifkan email/password sehingga plugin OAuth/OIDC/MCP/magic-link yang disebut mayoritas
+advisory tidak terlihat aktif. Tidak ditemukan dynamic shell/code execution, identifier SQL
+dinamis, atau kandidat rahasia umum pada pemindaian ringan.
+
+Laporan lengkap disimpan di `docs/audit-agentic-dependency-2026-08-10.md`. Tidak ada source,
+dependency, migrasi, atau konfigurasi izin lokal `.claude/settings.local.json` yang diubah.
+Working tree sudah berisi perubahan lain sebelum audit dan sengaja tidak disentuh. Verifikasi
+audit terbatas pada scan source dan advisory npm terbaru; build/runtime test tidak dijalankan
+karena audit ini hanya mengubah dokumentasi.
+
+## Penyatuan tabel admin, market share, dan detail outlet - 10 Agustus 2026
+
+Seluruh tabel operasional utama sekarang memakai kontrol pengurutan yang sama dari
+`src/components/ui/sortable-head.tsx` dan logika generik `src/lib/use-sort.ts`. Perubahan berlaku
+pada lead IndiHome, ODP, peserta, audit Mitra, impor, outlet, performance, perubahan outlet,
+program, referensi metric, Salesforce, whitelist OTP, monitoring foto, dan market share. Klik
+judul kolom mengurutkan baris yang sedang dimuat dan klik kedua membalik arah; pada tabel yang
+dipaginasi server-side, pengurutan hanya berlaku pada halaman aktif.
+
+Monitoring foto kini memasukkan seluruh outlet dalam scope, termasuk outlet yang belum pernah
+memiliki foto. Empat kartu kategori menampilkan persentase outlet yang sudah berfoto beserta
+jumlah sudah ada, total, belum ada, dan kedaluwarsa. Filter Hari PJP ditambahkan ke UI dan
+endpoint `/api/admin/mitra/photo-monitoring`; filter ini juga ikut diterapkan pada ringkasan,
+pagination, dan ekspor karena seluruh keluaran memakai kumpulan outlet tersaring yang sama.
+
+Market share tidak lagi menyimpan Axis sebagai operator terpisah. Schema Drizzle, daftar field,
+dan snapshot diperbarui lewat migrasi `drizzle/0025_drop_market_share_axis.sql`, yang menjalankan
+`DROP COLUMN axis`. Halaman admin mendapat filter kecamatan yang mengikuti kabupaten dan grafik
+rata-rata horizontal dengan dua tampilan: sebelum merger serta setelah merger (XL + Smartfren
+menjadi XL Smart, Indosat + Tri menjadi IOH). Grafik yang sama ditampilkan pada detail outlet
+setelah OTP. Migrasi `0025` belum dijalankan pada database mana pun dalam sesi ini; backup dan
+review data Axis wajib dilakukan sebelum `npm run db:migrate` karena penghapusan kolom tidak
+dapat dibatalkan tanpa backup.
+
+Form edit profil outlet setelah OTP mengganti input bebas kabupaten/kecamatan menjadi dropdown
+yang saling terhubung dan bersumber dari pasangan wilayah yang sudah dipakai outlet. Tiga grup
+tabel performance detail sekarang tertutup secara default dan dapat dibuka satu per satu. Efek
+foto Salesforce yang sebelumnya menonjol keluar dari lingkaran dibatalkan; foto kembali dipotong
+penuh di dalam avatar lingkaran.
+
+Konfigurasi izin personal `.claude/settings.local.json` ditambahkan ke `.gitignore` agar wildcard
+command lokal tidak ikut ter-publish ke GitHub. Berkas lokalnya tidak dihapus dan tidak masuk
+commit.
+
+### Verifikasi
+
+- `npx tsc --noEmit` lulus.
+- `npx eslint src scripts` lulus tanpa error; tetap ada dua warning `<img>` lama pada
+  `src/app/(hidden)/admin/pengaturan/page.tsx`.
+- `npx drizzle-kit check` lulus (`Everything's fine`).
+- `npm run env:check` lulus; tetap memperingatkan `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` kosong.
+- `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 74 halaman statis.
+- Belum ada runtime test dengan MySQL hidup, uji browser untuk sorting/dropdown/grafik, atau
+  eksekusi migrasi `0025` pada data nyata.
+
+## Input mandiri market share pasca-merger - 10 Agustus 2026
+
+Perhitungan pasca-merger dari sesi sebelumnya dibatalkan setelah klarifikasi: **XL Smart dan IOH
+bukan hasil penjumlahan data sebelum merger**. Data pasca-merger kini mempunyai tiga input dan
+kolom database mandiri: `telkomsel_after`, `xlsmart`, dan `ioh`. Telkomsel juga diberi kolom
+pasca-merger sendiri sehingga seluruh grafik setelah merger berasal dari satu set data baru,
+bukan memakai ulang nilai lama.
+
+Migrasi additive `drizzle/0026_add_post_merger_market_share.sql` menambahkan ketiga kolom sebagai
+`decimal(5,2) NOT NULL DEFAULT 0.00`. Tidak ada backfill dari `telkomsel`, `xl`, `smartfren`,
+`indosat`, atau `tri`; angka nol pada baris lama sengaja menandakan data pasca-merger belum pernah
+diinput. Data sebelum merger tetap dipertahankan untuk pembanding historis.
+
+Form `/admin/mitra/market-share` sekarang memisahkan dua kelompok input dan dua total. Tabel dan
+grafik rata-rata juga membedakan kolom sebelum merger dengan data input langsung setelah merger.
+Ringkasan Telkomsel tertinggi/terendah memakai `telkomsel_after`. Halaman detail outlet setelah
+OTP membaca ketiga kolom baru secara langsung.
+
+Template import berisi kolom:
+
+`kabupaten`, `kecamatan`, `telkomsel`, `xl`, `smartfren`, `indosat`, `tri`,
+`telkomsel_setelah_merger`, `xlsmart`, dan `ioh`.
+
+Parser tetap menerima label/alias seperti `XL Smart`, tetapi menyimpan nilainya langsung ke
+`xlsmart`; tidak ada jalur kode yang menjumlahkan XL dengan Smartfren atau Indosat dengan Tri.
+
+### Verifikasi
+
+- `npx tsc --noEmit` lulus.
+- ESLint terarah pada schema, API, form, detail outlet, komponen grafik, dan library lulus tanpa
+  warning atau error.
+- `npx drizzle-kit check` lulus (`Everything's fine`).
+- `npm run env:check` lulus; warning Street View key kosong tetap ada dan tidak terkait.
+- `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 74 halaman statis; hanya dua
+  warning `<img>` lama pada halaman pengaturan.
+- Smoke script kontrak menghasilkan header template yang benar dan membuktikan grafik pasca-
+  merger membaca `41/27/22` dari `telkomselAfter/xlsmart/ioh` walau kolom lama berisi angka lain.
+- Migrasi `0025` dan `0026` belum dijalankan pada database nyata; runtime input/upload dengan
+  sesi admin dan MySQL hidup belum diuji.
+
+## Implementasi PRD Penilaian KPI Salesforce - 11 Agustus 2026
+
+PRD `docs/prd-kpi-salesforce.md` diimplementasikan sebagai mekanisme ketiga pada Program
+Salesforce. KPI tidak memakai leaderboard atau pemenang: aktual diunggah per outlet, target
+ditetapkan per Salesforce/parameter, kemudian hasil di-rollup ke Salesforce dan TAP.
+
+### Keputusan dan model data
+
+- `mitra_programs.mechanism_type` menerima `KPI`, dengan ambang compliance, cap bawaan, serta
+  toggle privasi untuk menyembunyikan label punishment di tampilan publik.
+- Parameter program mendapat kategori `COMPLIANCE`/`PERFORMANCE`, cap achievement, dan polaritas
+  higher/lower-better. Kolom `reward_label` lama tetap dipertahankan agar Racing/Reward tidak
+  mengalami regresi.
+- Migrasi aditif `drizzle/0034_kpi_salesforce.sql` menambah `mitra_kpi_targets`,
+  `mitra_kpi_outlet_scores`, dan `mitra_kpi_results`; snapshot dan journal Drizzle ikut dibuat.
+- Mesin hitung baru berada di `src/lib/mitra-kpi.ts`. Data harian dipadatkan oleh SQL menjadi
+  satu agregat per outlet/parameter sebelum diproses Next.js, sehingga recompute dan halaman
+  publik tidak menarik seluruh baris harian mentah.
+- Parameter tanpa target ditandai kosong dan dikeluarkan dari skor. Compliance menjadi gerbang;
+  jika gagal, aturan performance dilewati. Aturan benefit KPI memakai first-match-wins.
+
+### Admin dan publik
+
+- `/admin/mitra/program-salesforce` memiliki tab KPI, konfigurasi ambang/cap/privasi, format
+  parameter KPI, pratinjau bobot, urutan aturan benefit, upload target, upload aktual per outlet,
+  recompute, dan tabel pratinjau hasil.
+- Endpoint baru `/api/admin/mitra/programs/[id]/kpi-targets` menyediakan template, preview,
+  commit atomik, validasi nomor baris/duplikat/target, dan reset. Endpoint skor yang sama dengan
+  mekanisme lama bercabang ke tabel aktual KPI dan menolak outlet yang Salesforce-nya bukan
+  peserta program.
+- `/mitra/program-sf/[slug]` tetap memakai gate OTP program yang sudah ada. Setelah verifikasi,
+  KPI menampilkan kartu ringkasan, tabel TAP dan Salesforce yang tertutup secara bawaan, rincian
+  Compliance/Performance, serta tabel outlet dengan filter URL dan pagination 100 baris.
+- Label punishment dapat disamarkan menjadi `Disembunyikan`; skor dan jumlah punishment tetap
+  terlihat agar laporan agregat tidak berubah diam-diam.
+
+### Verifikasi dan batasan
+
+- `npx tsc --noEmit`: lulus.
+- ESLint terarah pada seluruh schema/library/API/komponen KPI dan file program terkait: lulus
+  tanpa warning atau error.
+- `npx tsx --test src/lib/mitra-kpi.test.ts`: 5/5 unit test lulus (cap/polaritas/GAP,
+  AVG+LAST, compliance berbobot, compliance gate+first match, dan target kosong).
+- `npx drizzle-kit check`: lulus.
+- `npm run build`: lulus pada Next.js 15.5.12; route baru `kpi-targets` masuk output. Dua warning
+  `<img>` lama di halaman Pengaturan tetap ada dan tidak terkait perubahan ini.
+- `npm run db:migrate` dicoba terhadap `localhost:3306/abk_ciraya`, tetapi gagal
+  `ECONNREFUSED`. Karena itu migrasi SQL, upload Excel terhadap MySQL nyata, OTP, serta QA visual
+  360 px belum diverifikasi end-to-end pada sesi ini. Jangan deploy kode sebelum migrasi `0034`
+  berhasil diterapkan dan alur tersebut diuji pada database staging/lokal yang hidup.
+
+## Header kolom dan collapse/expand ringkasan KPI - 11 Agustus 2026
+
+- Ringkasan per TAP dan per Salesforce pada `KpiPublicView` kini memakai tabel semantik dengan
+  judul kolom yang eksplisit, bukan susunan grid tanpa header.
+- Setiap baris mempunyai tombol chevron untuk membuka atau menutup detail; seluruh baris tetap
+  tertutup saat halaman pertama kali dimuat. Tombol membawa `aria-expanded` dan label aksesibel.
+- Detail TAP mempunyai header Salesforce, Skor Compliance, Skor Performance, dan Benefit.
+  Detail Salesforce tetap menampilkan tabel parameter Compliance dan Performance.
+- Tabel memakai `overflow-x-auto` pada kontainernya supaya layar ponsel menggulir di dalam tabel,
+  bukan membuat seluruh halaman melebar.
+
+## PRD akses login operasional dan OTP baca-saja - 11 Agustus 2026
+
+PRD baru `docs/prd-akses-login-operasional-mitra.md` menetapkan bahwa OTP hanya membuka seluruh
+data outlet/program yang saat ini dilindungi OTP dalam mode baca-saja. UI publik tidak boleh
+menampilkan kontrol edit, dan seluruh endpoint mutasi publik wajib menolak sesi OTP meskipun nomor
+whitelist sebelumnya mempunyai peran yang boleh mengedit. Semua perubahan outlet selanjutnya
+wajib menggunakan sesi login Better Auth yang aktif.
+
+Salesforce hanya dapat melihat dan mengubah outlet yang `salesforce_id`-nya sama dengan akun serta
+berada dalam TAP yang ditugaskan. Supervisor dapat melihat dan mengubah outlet dalam seluruh TAP
+yang ditugaskan. Keduanya dapat mengubah profil operasional, lokasi, branding, dan empat slot foto
+tanpa approval; field master seperti kode outlet, public token, RS number, TAP, assignment
+Salesforce, status, serta data/config program tetap dilarang. Program Salesforce bersifat
+read-only untuk role lapangan: Salesforce hanya melihat hasil sendiri dan Supervisor hanya data
+TAP-nya.
+
+PRD mensyaratkan relasi unik `admin_user_profiles.salesforce_id`, helper scope terpusat, endpoint
+admin tersegmentasi per kelompok field, menu role-aware, dan audit dengan `actorUserId` serta diff.
+`docs/prd-kpi-salesforce.md` telah diberi referensi kebijakan baru dan menegaskan bahwa tampilan
+KPI publik setelah OTP tetap baca-saja. Sesi ini hanya mengubah dokumentasi; belum ada schema,
+migrasi, API, UI, test, build, atau runtime database yang dijalankan.
+
+## Test runner KPI dan evaluasi ganda pada recompute - 11 Agustus 2026
+
+Audit terhadap implementasi KPI yang sudah ada menemukan dua hal yang belum selesai.
+
+`src/lib/mitra-kpi.test.ts` memakai `node:test`, tetapi tidak ada skrip untuk menjalankannya dan
+percobaan lewat vitest gagal seluruhnya (`Cannot find package '@/db'` karena alias `@/` tidak
+terkonfigurasi di sana). Ditambahkan skrip `test` pada `package.json` yang menjalankan
+`tsx --test` terhadap seluruh `src/**/*.test.ts`; `tsx` menghormati path alias `tsconfig`,
+sehingga test berjalan tanpa konfigurasi tambahan dan tanpa koneksi database (pool `mysql2`
+dibuat lazy).
+
+`recomputeKpiResults()` memanggil `evaluateRuntimeParticipant()` dua kali untuk setiap peserta:
+sekali untuk baris hasil, sekali lagi hanya untuk menjumlah `missingTargetCount`. Pada program
+berisi ratusan salesforce ini menggandakan biaya operasi terberat di modul tersebut. Evaluasi kini
+dilakukan sekali lalu dipakai untuk kedua keperluan.
+
+### Verifikasi
+
+- `npm test`: 5/5 lulus saat perubahan ini dibuat, kemudian 15/15 setelah test scope ditambahkan.
+- `npx tsc --noEmit`, ESLint terarah, dan `npm run build`: lulus.
+
+## Keterangan kebaruan data market share - 11 Agustus 2026
+
+Kartu Market Share Kecamatan pada halaman detail outlet kini menampilkan
+"Data diperbarui <tanggal>" di bawah nama wilayah. Nilainya berasal dari kolom `updated_at` tabel
+`mitra_market_shares` yang selama ini sudah ikut terkirim oleh API — `getOutletDetailBySession()`
+memakai `db.select()` tanpa memilih kolom, sehingga seluruh baris terbawa. Yang kurang hanya
+deklarasi tipe di halaman dan tampilannya. Format tanggal memakai `formatWaktu()` yang sudah
+dipakai kartu Data Detail Outlet pada halaman yang sama.
+
+Catatan arti: `updated_at` memakai `onUpdateNow()`, sehingga angkanya berarti "kapan baris ini
+terakhir disunting admin", bukan "periode survei market share". Bila yang dibutuhkan periode
+survei sebenarnya, tabel perlu kolom periode tersendiri.
+
+## Review dan penajaman PRD akses login operasional - 11 Agustus 2026
+
+Seluruh klaim `docs/prd-akses-login-operasional-mitra.md` diperiksa terhadap kode. Fondasinya
+cocok: kontrak audit sesuai tabel `mitra_outlet_edit_logs` yang sudah ada, dan inventaris route
+mutasi publik benar (empat route, seluruhnya POST). Enam hal diperbaiki.
+
+- Klaim "lockout yang sudah didukung profil admin" tidak benar. Kolom `failed_login_attempts`,
+  `last_failed_login_at`, dan `locked_until` ada di `admin_user_profiles` tetapi tidak pernah
+  dibaca kode mana pun; `requireRole()` hanya memeriksa `isActive`. Ditulis ulang sebagai
+  pekerjaan baru pada MVP.
+- Ditambahkan lubang yang sebelumnya tidak disebut sama sekali: `getAdminSession()` memberi
+  `SUPER_ADMIN` kepada pengguna login tanpa baris `admin_user_profiles` selama emailnya cocok
+  dengan email bootstrap, yang jatuh ke nilai terdokumentasi `admin@abkciraya.com`.
+- Ditambahkan syarat TTL sesi OTP; nilai berjalan setara sepuluh tahun.
+- Kontradiksi `salesforce_id` UNIQUE versus "satu akun aktif" diselesaikan. MySQL tidak mengenal
+  partial unique index, jadi aturannya diubah menjadi "tepat satu akun" dan penggantian pemegang
+  dilakukan dengan memindahkan tautan pada akun yang ada.
+- Ditambahkan sub-bagian urutan aman penonaktifan tulis-OTP beserta tabel rollback, karena PRD
+  melarang fase transisi sehingga penyangga harus berada sebelum rilis, bukan sesudahnya.
+- Deferensi melingkar dengan `prd-kpi-salesforce.md` dipatahkan: tampilan publik ber-OTP diatur
+  PRD KPI, tampilan dashboard diatur PRD akses login.
+
+Empat route mutasi publik kini disebut satu per satu di dokumen agar inventarisnya bisa diaudit,
+dan pensiun `bolehEditOutlet()` beserta `keterangan` sebagai penentu hak tulis masuk cakupan MVP.
+Success criteria adopsi diberi sumber ukuran (`mitra_outlet_edit_logs.actorType`) sehingga tidak
+menunggu telemetri v2.0. Salinan versi asli sebelum penyuntingan disimpan di scratchpad sesi.
+
+## Implementasi akses login operasional Mitra: MVP, v1.1, v1.2 - 11 Agustus 2026
+
+Tiga fase implementasi PRD dikerjakan berurutan. Fase v2.0 (telemetri adopsi, notifikasi foto
+jatuh tempo, opsi approval) memang di luar cakupan dan tidak disentuh.
+
+### MVP - fondasi keamanan
+
+- Migrasi `drizzle/0035_admin_salesforce_assignment.sql` menambah
+  `admin_user_profiles.salesforce_id` (nullable, UNIQUE, FK ke `mitra_salesforces`
+  ON DELETE SET NULL). Aditif murni.
+- `src/lib/admin-scope.ts` menjadi satu-satunya sumber aturan wewenang: `getAdminActorScope()`,
+  `canAccessOutlet()`, `canMutateOutlet()`, `outletScopeCondition()`, `findOutletInScope()`, dan
+  `canAccessParticipant()`. Scope dibaca dari database pada setiap pemanggilan, bukan dari cookie,
+  sehingga pencabutan role atau perubahan TAP berlaku pada request berikutnya.
+- `getAdminSession()` menutup jalur bootstrap begitu ada satu SUPER_ADMIN aktif, menolak login
+  tanpa profil setelah kondisi itu terpenuhi, dan menulis audit `BOOTSTRAP_ACCESS` setiap kali
+  jalur itu terpakai. Akun dengan `locked_until` di masa depan diperlakukan sama dengan akun
+  nonaktif dan ditolak sebelum peran maupun scope diperiksa.
+- `MITRA_DETAIL_SESSION_TTL_MINUTES` diubah dari sepuluh tahun menjadi 30 hari. Endpoint baru
+  `/api/admin/mitra/sessions` (GET/DELETE) mendaftar sesi aktif dengan nomor tersamar dan mencabut
+  seluruh sesi satu nomor.
+- Tulis-OTP ditutup di satu gerbang. `pastikanBolehEdit()` selalu menolak dengan 403 dan kode
+  stabil `LOGIN_REQUIRED_FOR_WRITE`. Keempat route mutasi publik (`profile`, `photo`, `location`,
+  `branding`) diringkas menjadi penolak murni; logika mutasinya dihapus, bukan disisakan di balik
+  satu pemeriksaan, karena jalur tulis yang masih utuh adalah jalur yang bisa hidup lagi tanpa
+  disengaja. Riwayatnya tetap ada di git commit `a7fd13a` dan dipakai ulang saat membangun
+  endpoint admin di v1.1.
+- `bolehEditOutlet()` dan `PERAN_BOLEH_EDIT` dihapus; `SARAN_KETERANGAN` dipertahankan sebagai
+  saran isian form. Respons detail publik mengirim `bolehEdit: false` selama masa kompatibilitas
+  dan tidak lagi mengirim daftar wilayah.
+- Halaman detail publik dicabut seluruh state draft, handler mutasi, dan kontrol editnya. Lencana
+  peran menjadi "hanya lihat" dan pemberitahuan mengarahkan ke `/portal-admin`.
+- `src/lib/admin-assignment.ts` memvalidasi assignment sebelum akun dibuat atau disunting. Master
+  yang sudah tertaut menghasilkan 409 yang menyebut akun pemiliknya, bukan galat unique constraint
+  mentah. Form akun menampilkan pemilih master Salesforce, dan akun SALESFORCE tanpa tautan
+  ditandai merah pada daftar.
+
+### v1.1 - edit dashboard
+
+- `GET /api/admin/mitra/outlets` dan `/outlets/[id]` sebelumnya hanya membatasi lewat TAP,
+  sehingga seorang Salesforce ikut melihat dan membaca performance seluruh outlet binaan rekan
+  setimnya. Kondisi salesforce kini ikut masuk query. Pembatasan yang sama diterapkan pada
+  `performance`, `photo-gallery`, dan `photo-monitoring`.
+- Empat endpoint tersegmentasi baru: PATCH `/outlets/[id]/profile`, `/location`, `/branding`, dan
+  POST/DELETE `/outlets/[id]/photos`. Semuanya melewati `gerbangMutasiOutlet()` yang memeriksa
+  ulang sesi, role, dan wewenang atas outlet — tidak mengandalkan hasil daftar yang tadi dibuka.
+  Outlet di luar wewenang dijawab 404 agar keberadaannya tidak bisa dipetakan; MANAGER dijawab 403
+  karena outletnya memang boleh dilihat.
+- `src/lib/mitra-outlet-mutations.ts` menyimpan allowlist field per aksi, bukan daftar larangan,
+  sehingga kolom baru pada tabel outlet otomatis tertutup sampai sengaja dibuka. Payload yang
+  memuat field asing ditolak seluruhnya dengan 400. Setiap perubahan menulis ke
+  `mitra_outlet_edit_logs` dan `admin_audit_logs`, keduanya ber-`actorUserId`.
+- Kunci notifikasi kunjungan diganti. Satu kunjungan dulu ditandai satu sesi OTP; sesi login
+  berumur panjang tidak lagi menandai batas kunjungan, jadi dipakai hash petugas + outlet +
+  tanggal yang dipotong 36 karakter mengikuti lebar kolom `session_id`.
+- Sidebar menyembunyikan seluruh menu kantor dari role lapangan lewat konstanta `ROLE_KANTOR`, dan
+  tautan terbatas tidak lagi tampil sekilas selama role belum diketahui.
+- Halaman Database Outlet menamai cakupannya ("Outlet Binaan Saya" / "Outlet TAP Saya"),
+  memperingatkan assignment yang belum lengkap, menyembunyikan unggah massal, tambah outlet,
+  hapus, dan cetak QR dari role lapangan, serta mengunci kolom master di panel edit. Penyimpanan
+  role lapangan diarahkan ke endpoint tersegmentasi, dan status simpan menempel di panel alih-alih
+  memakai `alert()` yang hilang begitu ditutup.
+
+### v1.2 - program scoped
+
+- Seluruh endpoint mutasi program sudah menolak role lapangan sejak awal, sehingga tidak ada
+  perubahan izin yang diperlukan di sana.
+- `GET /api/admin/mitra/programs/[id]` sebelumnya mengirim peserta, pemenang, dan hasil KPI secara
+  penuh. Ketiganya kini disaring sebelum respons dibentuk. Parameter program dan aturan
+  hadiah/benefit tetap dikirim penuh karena isinya aturan main yang memang perlu diketahui peserta.
+- `ProgramParticipantInfo` membawa `salesforceId` (id pembina untuk peserta outlet, id dirinya
+  sendiri untuk peserta salesforce) sehingga `canAccessParticipant()` dapat mendelegasikan ke
+  `canAccessOutlet()`. Wewenang atas seseorang dan atas outletnya sengaja punya satu definisi agar
+  tidak bisa berselisih.
+- `ProgramManager` menyembunyikan seluruh kontrol pengelolaan dari role selain SUPER_ADMIN dan
+  ADMIN_INPUT, menandai panel dengan "hanya lihat", dan tetap menampilkan Pratinjau Hasil KPI yang
+  isinya sudah tersaring server.
+
+### Verifikasi
+
+- `npm test`: 15/15 lulus. Test baru mencakup matriks scope (salesforce versus rekan setim di TAP
+  yang sama, supervisor lintas TAP, assignment setengah jadi, manager baca-saja) dan allowlist
+  field mutasi.
+- `npx tsc --noEmit`: lulus.
+- `npm run lint`: bersih; hanya tersisa warning `<img>` lama yang tidak terkait.
+- `npm run build`: lulus, empat route outlet tersegmentasi masuk output.
+
+### Belum dikerjakan
+
+- Migrasi `0035` belum dijalankan ke database mana pun.
+- Belum ada pengujian runtime. Test yang ditulis hanya menguji logika murni (predikat scope dan
+  allowlist), bukan perilaku endpoint terhadap MySQL dan sesi login nyata. Sesuai
+  Testing Requirements pada PRD, kelulusan tidak boleh disimpulkan dari TypeScript, ESLint, atau
+  build.
+- Urutan naik wajib diikuti: migrasi, pembuatan akun, dan verifikasi login seluruh petugas
+  dilakukan lebih dulu selagi jalur lama masih hidup, baru build ini dinaikkan. Menaikkan
+  sekaligus akan menghentikan pembaruan foto lapangan pada hari yang sama.
+
+## Upload foto login dan detail performance baca-saja - 11 Agustus 2026
+
+- Backend upload foto berbasis login dan scope sudah ada di
+  `/api/admin/mitra/outlets/[id]/photos`, tetapi halaman Database Outlet sebelumnya hanya
+  menampilkan status foto. Panel tersebut sekarang memakai `OutletPhotoCard`, sehingga
+  Salesforce, Supervisor, Admin Input, dan Super Admin dapat memilih Kamera atau Galeri untuk
+  empat slot foto. Manager tetap hanya dapat melihat.
+- Unggah foto tidak memakai OTP. Endpoint memeriksa sesi login, role, serta outlet binaan/TAP,
+  kemudian menulis waktu pembaruan dan audit dengan user ID.
+- Sellthru Digipos, Sellthru Nota, dan Recharge Digipos sekarang ditampilkan sebagai tabel
+  collapse/expand baca-saja untuk seluruh role. Input form dihapus agar tidak memberi kesan data
+  tersebut dapat diedit manual.
+- `PUT /api/admin/mitra/outlets/[id]` menolak payload tiga grup detail tersebut dengan HTTP 400
+  dan tidak lagi menyimpannya. Satu-satunya jalur pembaruan tetap Upload Data/import melalui
+  `/api/admin/mitra/imports`, yang dibatasi untuk SUPER_ADMIN dan ADMIN_INPUT.
+- PRD akses login diperbarui dengan matriks yang membedakan baca di form outlet dan import khusus.
+
+Verifikasi: ESLint pada halaman outlet dan endpoint detail lulus; `npx tsc --noEmit` lulus;
+`npm test` lulus 22/22 termasuk dua test kontrak baru untuk melarang mutasi grup performance
+melalui `PUT` outlet dan mempertahankan import admin sebagai jalur tulis; `npm run build` lulus
+pada Next.js 15.5.12. Build tetap menampilkan dua warning `<img>` lama pada halaman Pengaturan
+yang tidak terkait. Smoke test browser dengan akun Salesforce dan database hidup belum dilakukan.
+
+## Editor outlet Salesforce lebih compact di mobile - 11 Agustus 2026
+
+- Panel edit Database Outlet untuk role lapangan memakai padding dan jarak vertikal lebih kecil
+  pada layar mobile, sedangkan breakpoint desktop tetap mempertahankan ukuran sebelumnya.
+- Field administratif nonaktif (ID Digipos, Nomor RS, TAP, Salesforce, dan status) tidak lagi
+  memenuhi layar sebagai input abu-abu. Di mobile semuanya diringkas dalam panel collapse
+  **Identitas & penugasan**; tampilan input desktop tidak berubah.
+- Field profil penting tetap selebar penuh, sementara Kabupaten/Kecamatan dan pilihan
+  Kategori/PJP/Branding memakai grid dua kolom pada mobile. Tinggi input/select diperkecil menjadi
+  36 px pada mobile dan kembali 40 px mulai breakpoint `sm`.
+- `OutletPhotoCard` mendapat opsi `compactMobile` yang hanya dipakai editor role lapangan: foto
+  tampil dua kolom, thumbnail lebih pendek, hint panjang disembunyikan, dan padding diperkecil.
+  Profil publik yang memakai komponen sama tidak berubah.
+- Tombol Simpan Perubahan menjadi action bar sticky di bagian bawah viewport mobile agar tetap
+  mudah dijangkau pada form panjang. Riwayat dan tiga grup performance juga memakai padding lebih
+  kecil tetapi tetap collapse/expand.
+
+Verifikasi: ESLint terarah pada halaman outlet dan kartu foto lulus; `npx tsc --noEmit` lulus;
+`npm run build` lulus pada Next.js 15.5.12. Build tetap hanya menampilkan dua warning `<img>` lama
+di halaman Pengaturan. Belum ada screenshot/browser smoke dengan sesi Salesforce dan viewport
+perangkat nyata karena database/login runtime belum tersedia pada sesi ini.
+
+## Shell dashboard seperti aplikasi mobile - 11 Agustus 2026
+
+- Seluruh halaman setelah login di bawah `/admin/*` kini memakai shell mobile yang lebih rapat:
+  top bar setinggi 56 px, padding konten 12 px, judul aman dipotong pada layar sempit, drawer
+  selebar maksimal 88% viewport, dan ruang bawah mengikuti safe-area perangkat.
+- Navigasi bawah ala aplikasi tampil di bawah breakpoint `md`. Empat tujuan utama dipilih dari
+  menu yang sudah lolos filter role, lalu tombol Menu membuka sidebar lengkap. Super Admin
+  mendapat Beranda/Outlet/Monitor/Profil; role lain mendapat Outlet/Monitor/Program/Profil.
+  Karena sumbernya sama dengan sidebar, bottom navigation tidak memperluas hak akses.
+- Primitive `Card` dan `Table` mendapat `data-slot` serta token ukuran. Pada shell admin di layar
+  kurang dari 640 px, kartu memakai radius 16 px dan padding 12 px. Tampilan publik serta desktop
+  mempertahankan nilai bawaan 12 px/24 px yang lama.
+- Tabel dashboard pada ponsel memakai font 12 px, header dan sel lebih pendek, lebar isi tidak
+  dipaksa masuk ke viewport, dan scroll horizontal berhenti di kontainer tabel. Halaman tidak
+  ikut melebar; kolom tetap dapat dibaca dengan menggeser tabel.
+- Tidak ada perubahan API, database, role, scope outlet, atau migrasi.
+
+Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah pada layout admin dan primitive kartu/tabel
+lulus; `npm test` lulus 22/22; `npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 68
+halaman statis. Dua warning `<img>` lama di halaman Pengaturan tetap ada dan tidak terkait.
+Browser smoke dengan akun login dan viewport perangkat nyata belum dilakukan karena sesi/database
+runtime tidak tersedia, sehingga kenyamanan visual akhir masih perlu dicek pada ponsel nyata.
+
+## Filter role-aware dan monitoring pencapaian program - 11 Agustus 2026
+
+### Database Outlet
+
+- `GET /api/admin/mitra/outlets` menerima filter `pjpDay`, `tap`, dan `salesforceId`. Seluruh
+  filter digabung dengan `outletScopeCondition()` di SQL, sehingga total dan 50 baris halaman
+  pertama tidak dihitung dari data di luar wewenang lalu disaring terlambat di browser.
+- Opsi TAP/Salesforce diturunkan dari outlet yang sudah masuk scope. Akun Supervisor/Salesforce
+  tidak menerima master global melalui payload. Super Admin/Admin Input tetap menerima seluruh
+  master Salesforce, termasuk yang belum memiliki outlet, agar form assignment tidak regresi.
+- Halaman daftar memiliki filter Hari PJP untuk semua role. TAP dan Salesforce hanya muncul bila
+  bukan akun Salesforce dan pilihannya lebih dari satu. Baris outlet menampilkan hari PJP di
+  bawah ID Digipos agar jadwal mudah dipindai sebelum membuka editor foto.
+- Untuk akun Salesforce, default Hari PJP mengikuti hari aktual di `Asia/Jakarta`. Nilainya
+  diperiksa ulang tiap 60 detik dan otomatis berganti bila halaman dibiarkan terbuka melewati
+  tengah malam WIB. Memilih hari lain mematikan mode otomatis; Reset Filter mengaktifkan kembali
+  PJP hari ini.
+
+### Monitoring Visit
+
+- Monitoring Foto dan Galeri Foto menunggu role selesai dimuat sebelum request pertama. Untuk
+  Salesforce, filter TAP dan Salesforce disembunyikan karena scope akun sudah menetapkannya;
+  PJP hari ini aktif otomatis. Role lain hanya melihat dropdown TAP/Salesforce/Kabupaten/
+  Kecamatan bila tersedia lebih dari satu pilihan yang benar-benar berguna.
+- Endpoint Monitoring Foto/Galeri yang sudah ada tetap menjadi batas keamanan dan membangun opsi
+  dari outlet dalam scope. Perubahan ini hanya menyelaraskan kontrol UI dengan kontrak server.
+
+### Program
+
+- `ProgramManager` kini mempunyai dua mode. SUPER_ADMIN/ADMIN_INPUT tetap melihat panel kelola;
+  MANAGER/SUPERVISOR/SALESFORCE melihat **Monitoring Program** dengan tombol **Lihat Pencapaian**,
+  tanpa form peserta, upload, parameter, aturan, pengaturan, recompute, atau publikasi pemenang.
+- Untuk Racing/Reward, detail program admin sekarang mengirim leaderboard dan nilai mentah per
+  parameter. Participant key difilter lewat `canAccessParticipant()` sebelum query skor dijalankan,
+  sehingga Salesforce hanya memperoleh dirinya, Supervisor hanya peserta pada TAP-nya, dan Manager
+  memperoleh seluruh cakupan baca. Peserta tanpa skor tetap tampil dengan nilai nol/belum ada data.
+- Mode monitoring menampilkan kartu jumlah peserta, jumlah yang sudah memiliki pencapaian, status,
+  pembaruan terakhir, pencarian peserta, peringkat Racing, nilai per indikator, dan total. KPI tetap
+  memakai hasil KPI tersaring dan judulnya berubah menjadi Monitoring Hasil KPI untuk role baca-saja.
+- Bila tab mekanisme awal kosong, halaman otomatis memilih mekanisme program terbaru yang tersedia.
+
+Tidak ada perubahan schema atau migrasi. Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah pada
+seluruh UI/API/helper yang berubah lulus; `npm test` lulus 24/24 termasuk dua test zona waktu PJP;
+`npm run build` lulus pada Next.js 15.5.12 dan menghasilkan 68 halaman statis. Dua warning `<img>`
+lama di halaman Pengaturan tetap ada dan tidak terkait. Runtime dengan MySQL hidup dan akun nyata
+Salesforce/Supervisor/Manager belum diuji, jadi hasil filter/pencapaian database belum diverifikasi
+end-to-end pada sesi ini.
+
+## Program dan produk role-aware - 11 Agustus 2026
+
+- Hak UI program/produk sekarang memakai satu sumber dari `useAdminScope`: SUPER_ADMIN dan
+  ADMIN_INPUT boleh input serta memperbarui data, sedangkan MANAGER, SUPERVISOR, dan SALESFORCE
+  hanya mendapat tampilan baca. Nilai awal seluruh izin adalah `false`, sehingga kontrol tulis
+  tidak berkedip muncul selama role masih dimuat.
+- Mode viewer diterapkan pada Program Outlet/Salesforce, Program Undian, Produk Belanja, stok
+  voucher, Kalkulator Cuan, serta katalog/lokasi/banner/ODP/pengajuan IndiHome. Tombol tambah,
+  upload, edit, bulk action, toggle status, dan dialog input tidak dirender untuk viewer; pencarian,
+  filter, tabel, detail, status, serta data pencapaian tetap dapat dibaca.
+- Program Outlet dan Program Salesforce tetap mengikuti kontrak sebelumnya: role viewer membuka
+  **Monitoring Program** dan **Lihat Pencapaian**, bukan form peserta, parameter, aturan, upload,
+  recompute, publikasi, atau pengaturan program.
+- Penghapusan permanen hanya tersedia untuk SUPER_ADMIN. UI Admin Input tidak menampilkan tombol
+  hapus, dan `DELETE /api/admin/indihome/odp` diperketat dari SUPER_ADMIN/ADMIN_INPUT menjadi hanya
+  SUPER_ADMIN agar konsisten dengan route hapus program/produk lainnya.
+- Test kontrak `admin-write-surface.test.ts` kini memindai handler tulis area program/produk dan
+  menggagalkan build bila MANAGER/SUPERVISOR/SALESFORCE masuk ke gerbang mutasi, atau bila route
+  DELETE menerima role selain SUPER_ADMIN.
+
+Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah lulus; `npm test` lulus 26/26; `npm run build`
+lulus pada Next.js 15.5.12 dan menghasilkan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan sesi riil masing-masing role
+belum dilakukan karena database/login runtime tidak tersedia pada sesi ini.
+
+## Editor outlet tertutup otomatis setelah simpan - 11 Agustus 2026
+
+- Tombol **Simpan Perubahan** sekarang menutup panel edit setelah seluruh request berhasil, baik
+  untuk penyimpanan master oleh admin maupun penyimpanan tersegmentasi oleh role lapangan.
+- Setelah panel hilang, layar menggulir halus kembali ke kartu **Cari Outlet**, sehingga pengguna
+  langsung kembali ke tampilan daftar awal pada layar mobile yang memanjang.
+- Bila penyimpanan master atau salah satu segmen profil/lokasi/branding gagal, panel tetap terbuka
+  dan pesan error tetap ditampilkan. Tidak ada perubahan API, database, schema, atau izin role.
+
+Verifikasi: ESLint terarah lulus; `npx tsc --noEmit` lulus; `git diff --check` lulus; `npm test`
+lulus 26/26; dan `npm run build` lulus dengan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan login dan database hidup belum
+dilakukan pada sesi ini.
+
+## Detail terverifikasi outlet lebih ringkas - 12 Agustus 2026
+
+- Halaman detail outlet setelah verifikasi OTP tidak lagi menampilkan section terpisah **Lokasi
+  Outlet** dan **Branding Outlet**. Catatan tentang realisasi kunjungan serta penandaan lokasi setiap
+  kunjungan juga dihapus dari tampilan.
+- Koordinat tersimpan dipindahkan ke bagian bawah card **Detail Terverifikasi**, berdampingan dengan
+  tautan **Buka lokasi outlet** pada ruang yang cukup dan tetap dapat turun baris di layar sempit.
+  Outlet tanpa koordinat menampilkan fallback **Belum ditandai**.
+- Data branding, koordinat, audit, endpoint detail, dan otorisasi OTP tidak dihapus atau diubah.
+  Branding tetap dapat dipakai oleh dashboard/import dan perubahan ini murni penyederhanaan UI.
+
+Verifikasi: ESLint terarah lulus; `npx tsc --noEmit` lulus; `git diff --check` lulus; `npm test`
+lulus 26/26; dan `npm run build` lulus dengan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan sesi OTP serta database hidup
+belum dilakukan pada sesi ini.

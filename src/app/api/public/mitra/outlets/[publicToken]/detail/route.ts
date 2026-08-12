@@ -25,6 +25,8 @@ export async function GET(
         performance: data.performance,
         marketShare: data.marketShare,
         editLogs: data.editLogs,
+        // Dipertahankan dan selalu false selama masa kompatibilitas; daftar wilayah tidak
+        // lagi dikirim karena hanya dipakai dropdown form edit yang sudah dihapus.
         bolehEdit: data.bolehEdit,
         peranPengakses: data.peranPengakses,
     });

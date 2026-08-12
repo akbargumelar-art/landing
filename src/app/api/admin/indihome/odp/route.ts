@@ -211,7 +211,7 @@ async function handleUnggah(request: Request, userId?: string) {
 }
 
 export async function DELETE(request: Request) {
-    const auth = await requireRole(["SUPER_ADMIN", "ADMIN_INPUT"]);
+    const auth = await requireRole(["SUPER_ADMIN"]);
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

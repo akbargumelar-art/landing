@@ -222,8 +222,8 @@ export default function BerandaPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                     Akun Anda tidak berhak mengelola konten beranda. Silakan pakai menu lain di sidebar.
                 </p>
-                <Link href="/admin/mitra" className="mt-5 inline-block">
-                    <Button>Buka Database Mitra Outlet</Button>
+                <Link href="/admin/mitra/outlet" className="mt-5 inline-block">
+                    <Button>Buka Database Outlet</Button>
                 </Link>
             </div>
         );

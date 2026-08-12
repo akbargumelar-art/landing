@@ -14,7 +14,6 @@ import {
     submissionValues,
     winners,
     mitraUserProfiles,
-    mitraTerritories,
     mitraSalesforces,
     mitraOutlets,
     mitraOutletDetails,
@@ -525,18 +524,6 @@ async function seed() {
         if (existingMitraOutlets.length > 0) {
             console.log("  Portal Mitra already contains data, skipping sample data.");
         } else {
-            const regionId = uuid();
-            const clusterCirebonId = uuid();
-            const areaKesambiId = uuid();
-            const areaKuninganId = uuid();
-
-            await db.insert(mitraTerritories).values([
-                { id: regionId, name: "Region Cirebon Raya", type: "REGION", parentId: null, createdAt: new Date() },
-                { id: clusterCirebonId, name: "Cluster Cirebon Kuningan", type: "CLUSTER", parentId: regionId, createdAt: new Date() },
-                { id: areaKesambiId, name: "Area Kesambi", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
-                { id: areaKuninganId, name: "Area Kuningan Kota", type: "AREA", parentId: clusterCirebonId, createdAt: new Date() },
-            ]);
-
             const outletAId = uuid();
             const outletBId = uuid();
             const sfCirebonId = uuid();
@@ -562,7 +549,6 @@ async function seed() {
                     longitude: 108.549,
                     latitude: -6.732,
                     locationUrl: buildOutletMapsUrl(-6.732, 108.549),
-                    territoryId: areaKesambiId,
                     category: "FISIK",
                     pjpDay: "Senin",
                     pjpType: "F1",
@@ -585,7 +571,6 @@ async function seed() {
                     longitude: 108.482,
                     latitude: -6.975,
                     locationUrl: buildOutletMapsUrl(-6.975, 108.482),
-                    territoryId: areaKuninganId,
                     category: "Non FISIK",
                     pjpDay: "Rabu",
                     pjpType: "F3",
@@ -637,12 +622,13 @@ async function seed() {
                 id: programId,
                 name: "Mitra Champion Agustus",
                 slug: "mitra-champion-agustus",
+                targetType: "OUTLET",
+                mechanismType: "RACING",
                 descriptionMd: "Program ranking outlet mitra berdasarkan poin omzet dan aktivitas penjualan.",
                 mechanismMd: "Outlet dengan poin tertinggi akan masuk leaderboard dan berpeluang menjadi pemenang.",
                 periodStart: new Date("2026-08-01"),
                 periodEnd: new Date("2026-08-31"),
                 status: "ACTIVE",
-                rankingMode: "POINT",
                 isPublic: true,
                 createdAt: new Date(),
             });
@@ -656,17 +642,23 @@ async function seed() {
                 aggregation: "SUM",
                 sortOrder: 0,
             });
+
+            // participantKey menyatukan jenis dan id peserta jadi satu kolom unik; lihat
+            // catatan di skema soal kenapa pasangan kolom nullable tidak cukup.
+            const kunciA = `outlet:${outletAId}`;
+            const kunciB = `outlet:${outletBId}`;
+
             await db.insert(mitraProgramParticipants).values([
-                { programId, outletId: outletAId, joinedAt: new Date("2026-08-01") },
-                { programId, outletId: outletBId, joinedAt: new Date("2026-08-01") },
+                { programId, participantKey: kunciA, outletId: outletAId, joinedAt: new Date("2026-08-01") },
+                { programId, participantKey: kunciB, outletId: outletBId, joinedAt: new Date("2026-08-01") },
             ]);
             await db.insert(mitraProgramScores).values([
-                { id: uuid(), programId, outletId: outletAId, paramId, rawValue: "12500000.00", points: "12500000.00", periodYm: "2026-08" },
-                { id: uuid(), programId, outletId: outletBId, paramId, rawValue: "9800000.00", points: "9800000.00", periodYm: "2026-08" },
+                { id: uuid(), programId, participantKey: kunciA, outletId: outletAId, paramId, rawValue: "12500000.00", points: "12500000.00", achievementDate: "2026-08-01" },
+                { id: uuid(), programId, participantKey: kunciB, outletId: outletBId, paramId, rawValue: "9800000.00", points: "9800000.00", achievementDate: "2026-08-01" },
             ]);
             await db.insert(mitraProgramLeaderboard).values([
-                { id: uuid(), programId, outletId: outletAId, totalPoints: "12500000.00", rank: 1, computedAt: new Date() },
-                { id: uuid(), programId, outletId: outletBId, totalPoints: "9800000.00", rank: 2, computedAt: new Date() },
+                { id: uuid(), programId, participantKey: kunciA, outletId: outletAId, totalPoints: "12500000.00", rank: 1, computedAt: new Date() },
+                { id: uuid(), programId, participantKey: kunciB, outletId: outletBId, totalPoints: "9800000.00", rank: 2, computedAt: new Date() },
             ]);
 
             console.log("  OK Portal Mitra sample data created");
