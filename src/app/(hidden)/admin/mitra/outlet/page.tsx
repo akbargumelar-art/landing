@@ -87,6 +87,7 @@ export default function AdminMitraOutletPage() {
     const [lokasiStatus, setLokasiStatus] = React.useState<{ ok: boolean; teks: string } | null>(null);
     const [editLogs, setEditLogs] = React.useState<EditLog[]>([]);
     const editRef = React.useRef<HTMLDivElement>(null);
+    const daftarRef = React.useRef<HTMLDivElement>(null);
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const { urut, gantiUrut } = useUrutTabel<string>("");
     const [deleting, setDeleting] = React.useState(false);
@@ -185,6 +186,13 @@ export default function AdminMitraOutletPage() {
         }
         idTerbukaRef.current = id;
     }, [editOutlet]);
+
+    const tutupEditorDanKembaliKeDaftar = () => {
+        setEditOutlet(null);
+        window.requestAnimationFrame(() => {
+            daftarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    };
 
     const toggleSelected = (id: string) => {
         setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -416,8 +424,8 @@ export default function AdminMitraOutletPage() {
                 setEditStatus({ ok: false, teks: gagal.join(" · ") });
                 return;
             }
-            setEditStatus({ ok: true, teks: "Perubahan tersimpan." });
             load();
+            tutupEditorDanKembaliKeDaftar();
             return;
         }
 
@@ -432,8 +440,8 @@ export default function AdminMitraOutletPage() {
             setEditStatus({ ok: false, teks: data.error || "Gagal memperbarui outlet" });
             return;
         }
-        setEditOutlet(null);
         load();
+        tutupEditorDanKembaliKeDaftar();
     };
 
     const outletsTampil = urutkanBaris(outlets, urut, (outlet, kolom) => {
@@ -841,7 +849,7 @@ export default function AdminMitraOutletPage() {
                 </Card>
             )}
 
-            <Card>
+            <Card ref={daftarRef} className="scroll-mt-20">
                 <CardContent className="p-5">
                     <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-1.5 md:col-span-2">

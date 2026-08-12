@@ -99,6 +99,10 @@ export default function MitraOutletDetailPage() {
         );
     }
 
+    const koordinatTersimpan = data.outlet.latitude != null && data.outlet.longitude != null
+        ? `${Number(data.outlet.latitude).toFixed(6)}, ${Number(data.outlet.longitude).toFixed(6)}`
+        : "Belum ditandai";
+
     return (
         <main className="min-h-screen bg-gray-50">
             <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -137,12 +141,18 @@ export default function MitraOutletDetailPage() {
                         <InfoCard label="Branding" value={String(data.outlet.branding || "-")} />
                     </div>
 
-                    {data.outlet.locationUrl && (
-                        <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-red-600">
-                            <MapPin className="h-4 w-4" />
-                            Buka lokasi outlet
-                        </a>
-                    )}
+                    <div className="mt-4 flex flex-wrap items-end gap-x-5 gap-y-2 border-t pt-4">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">Koordinat tersimpan</p>
+                            <p className="mt-1 font-mono text-xs font-semibold text-gray-950 sm:text-sm">{koordinatTersimpan}</p>
+                        </div>
+                        {data.outlet.locationUrl && (
+                            <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:underline">
+                                <MapPin className="h-4 w-4" />
+                                Buka lokasi outlet
+                            </a>
+                        )}
+                    </div>
 
                 </div>
 
@@ -359,62 +369,7 @@ export default function MitraOutletDetailPage() {
                     </span>
                 </p>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* 6. Lokasi outlet */}
-                    <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                                <h2 className="font-bold">Lokasi Outlet</h2>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    Diambil dari GPS perangkat, bukan diketik. Dilakukan sesekali saja, saat memang dibutuhkan.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koordinat Tersimpan</p>
-                            <p className="mt-1 font-mono text-sm text-gray-950">
-                                {data.outlet.latitude && data.outlet.longitude
-                                    ? `${Number(data.outlet.latitude).toFixed(6)}, ${Number(data.outlet.longitude).toFixed(6)}`
-                                    : "Belum ditandai"}
-                            </p>
-                            {data.outlet.locationUrl && (
-                                <a href={String(data.outlet.locationUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    Buka di Google Maps
-                                </a>
-                            )}
-                        </div>
-
-                    </div>
-
-                    {/* 7. Branding outlet */}
-                    <div className="rounded-lg border bg-white p-5 shadow-sm">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <Tag className="h-4 w-4 text-red-600" />
-                                <h2 className="font-bold">Branding Outlet</h2>
-                            </div>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Materi promosi yang terpasang di outlet. Ubah bila brandingnya berganti.
-                        </p>
-
-                        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Branding Terpasang</p>
-                            <p className="mt-1 font-semibold text-gray-950">{String(data.outlet.branding || "-")}</p>
-                        </div>
-
-                        <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-6 text-muted-foreground">
-                            Kunjungan salesforce dianggap terealisasi bila keempat foto diperbarui pada minggu
-                            berjalan. <strong className="text-gray-950">Titik lokasi tidak perlu ditandai setiap
-                            kunjungan</strong> -- cukup sekali saat outlet belum punya titik, atau saat outlet pindah
-                            dan titiknya keliru.
-                        </p>
-                    </div>
-                </div>
-
-                {/* 8. Riwayat perubahan */}
+                {/* 6. Riwayat perubahan */}
                 <div className="rounded-lg border bg-white p-5 shadow-sm">
                     <div className="flex items-center gap-2">
                         <History className="h-4 w-4 text-red-600" />

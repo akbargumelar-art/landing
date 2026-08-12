@@ -1332,3 +1332,33 @@ Verifikasi: `npx tsc --noEmit` lulus; ESLint terarah lulus; `npm test` lulus 26/
 lulus pada Next.js 15.5.12 dan menghasilkan 68 halaman statis. Build tetap hanya menampilkan dua
 warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan sesi riil masing-masing role
 belum dilakukan karena database/login runtime tidak tersedia pada sesi ini.
+
+## Editor outlet tertutup otomatis setelah simpan - 11 Agustus 2026
+
+- Tombol **Simpan Perubahan** sekarang menutup panel edit setelah seluruh request berhasil, baik
+  untuk penyimpanan master oleh admin maupun penyimpanan tersegmentasi oleh role lapangan.
+- Setelah panel hilang, layar menggulir halus kembali ke kartu **Cari Outlet**, sehingga pengguna
+  langsung kembali ke tampilan daftar awal pada layar mobile yang memanjang.
+- Bila penyimpanan master atau salah satu segmen profil/lokasi/branding gagal, panel tetap terbuka
+  dan pesan error tetap ditampilkan. Tidak ada perubahan API, database, schema, atau izin role.
+
+Verifikasi: ESLint terarah lulus; `npx tsc --noEmit` lulus; `git diff --check` lulus; `npm test`
+lulus 26/26; dan `npm run build` lulus dengan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan login dan database hidup belum
+dilakukan pada sesi ini.
+
+## Detail terverifikasi outlet lebih ringkas - 12 Agustus 2026
+
+- Halaman detail outlet setelah verifikasi OTP tidak lagi menampilkan section terpisah **Lokasi
+  Outlet** dan **Branding Outlet**. Catatan tentang realisasi kunjungan serta penandaan lokasi setiap
+  kunjungan juga dihapus dari tampilan.
+- Koordinat tersimpan dipindahkan ke bagian bawah card **Detail Terverifikasi**, berdampingan dengan
+  tautan **Buka lokasi outlet** pada ruang yang cukup dan tetap dapat turun baris di layar sempit.
+  Outlet tanpa koordinat menampilkan fallback **Belum ditandai**.
+- Data branding, koordinat, audit, endpoint detail, dan otorisasi OTP tidak dihapus atau diubah.
+  Branding tetap dapat dipakai oleh dashboard/import dan perubahan ini murni penyederhanaan UI.
+
+Verifikasi: ESLint terarah lulus; `npx tsc --noEmit` lulus; `git diff --check` lulus; `npm test`
+lulus 26/26; dan `npm run build` lulus dengan 68 halaman statis. Build tetap hanya menampilkan dua
+warning `<img>` lama pada halaman Pengaturan. Browser smoke dengan sesi OTP serta database hidup
+belum dilakukan pada sesi ini.
