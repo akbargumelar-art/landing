@@ -106,12 +106,38 @@ export async function GET(request: Request) {
 
     const scopedOutlets = await ambilOutletDalamScope(scope);
 
-    // Opsi filter mencerminkan seluruh cakupan pemanggil, bukan hasil yang sedang tersaring --
-    // supaya memilih satu filter tidak diam-diam menyembunyikan pilihan filter yang lain.
-    const taps = [...new Set(scopedOutlets.map((row) => row.tap).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id"));
-    const kabupatens = [...new Set(scopedOutlets.map((row) => row.kabupaten).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id"));
-    const kecamatans = [...new Set(scopedOutlets.map((row) => row.kecamatan).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id"));
+    /**
+     * Opsi filter saling menyesuaikan: daftar pilihan sebuah filter dihitung dari outlet yang
+     * sudah lolos filter WILAYAH LAINNYA, bukan dari seluruh cakupan.
+     *
+     * Tanpa ini setiap dropdown menawarkan seluruh nilai yang ada di cakupan, sehingga
+     * kombinasi yang mustahil -- mis. TAP "Kuningan" dengan kecamatan "Plumbon" yang tidak
+     * pernah berada di TAP itu -- tetap bisa dipilih dan berakhir nol hasil. Galeri yang
+     * mendadak kosong itu terbaca sebagai kerusakan, padahal penyaringnya bekerja benar;
+     * yang salah adalah pilihan yang seharusnya tidak pernah ditawarkan.
+     */
+    const cocokWilayah = (
+        outlet: OutletRow,
+        kecuali: "tap" | "kabupaten" | "kecamatan" | "salesforce" | null,
+    ) => {
+        if (kecuali !== "tap" && tap && outlet.tap !== tap) return false;
+        if (kecuali !== "kabupaten" && kabupaten && outlet.kabupaten !== kabupaten) return false;
+        if (kecuali !== "kecamatan" && kecamatan && outlet.kecamatan !== kecamatan) return false;
+        if (kecuali !== "salesforce" && salesforceId && outlet.salesforceId !== salesforceId) return false;
+        return true;
+    };
+
+    const opsiUnik = (
+        kecuali: "tap" | "kabupaten" | "kecamatan",
+        ambil: (outlet: OutletRow) => string | null,
+    ) => [...new Set(scopedOutlets.filter((row) => cocokWilayah(row, kecuali)).map(ambil).filter(Boolean))]
+        .sort((a, b) => (a as string).localeCompare(b as string, "id")) as string[];
+
+    const taps = opsiUnik("tap", (row) => row.tap);
+    const kabupatens = opsiUnik("kabupaten", (row) => row.kabupaten);
+    const kecamatans = opsiUnik("kecamatan", (row) => row.kecamatan);
     const salesforces = [...new Map(scopedOutlets
+        .filter((row) => cocokWilayah(row, "salesforce"))
         .filter((row) => row.salesforceId && row.salesforce)
         .map((row) => [row.salesforceId as string, { id: row.salesforceId as string, name: row.salesforce as string }])).values()]
         .sort((a, b) => a.name.localeCompare(b.name, "id"));

@@ -129,13 +129,60 @@ export function GaleriPanel() {
 
     const ubahFilter = (key: keyof typeof filter, value: string) => {
         setPage(1);
-        setFilter((current) => ({ ...current, [key]: value }));
+        setFilter((current) => {
+            const next = { ...current, [key]: value };
+
+            // Filter wilayah bersarang: mengganti cakupan yang lebih luas membuat pilihan di
+            // bawahnya bisa jadi tidak ada lagi di dalamnya. Membiarkannya menempel akan
+            // menghasilkan kombinasi mustahil -- galeri kosong tanpa sebab yang terbaca,
+            // padahal yang keliru hanyalah sisa pilihan sebelumnya.
+            if (key === "tap") {
+                next.kabupaten = "";
+                next.kecamatan = "";
+                next.salesforceId = "";
+            }
+            if (key === "kabupaten") {
+                next.kecamatan = "";
+            }
+
+            return next;
+        });
     };
 
-    const tampilFilterTap = scope.role !== "SALESFORCE" && (data?.filters.taps.length || 0) > 1;
-    const tampilFilterSalesforce = scope.role !== "SALESFORCE" && (data?.filters.salesforces.length || 0) > 1;
-    const tampilFilterKabupaten = (data?.filters.kabupatens.length || 0) > 1;
-    const tampilFilterKecamatan = (data?.filters.kecamatans.length || 0) > 1;
+    const filterAktif = Boolean(
+        filter.dari || filter.sampai || filter.tap || filter.salesforceId
+        || filter.kabupaten || filter.kecamatan
+        || (filter.photoSlot && filter.photoSlot !== "ALL")
+        || (filter.pjpDay && scope.role !== "SALESFORCE"),
+    );
+
+    const resetFilter = () => {
+        setPage(1);
+        setFilter({
+            dari: "",
+            sampai: "",
+            tap: "",
+            pjpDay: scope.role === "SALESFORCE" ? pjpDayInJakarta() : "",
+            salesforceId: "",
+            kabupaten: "",
+            kecamatan: "",
+            photoSlot: "ALL",
+        });
+    };
+
+    /**
+     * Dropdown disembunyikan saat tidak ada yang bisa dipilih, TETAPI tetap ditampilkan
+     * selama filternya masih terisi. Tanpa syarat kedua, memilih satu nilai bisa membuat
+     * opsi tersisa satu -- dropdownnya lenyap sementara filternya masih bekerja, dan
+     * pengguna kehilangan satu-satunya cara membatalkannya. Galeri lalu tampak kosong
+     * tanpa kendali yang menjelaskannya.
+     */
+    const tampilFilterTap = scope.role !== "SALESFORCE"
+        && ((data?.filters.taps.length || 0) > 1 || Boolean(filter.tap));
+    const tampilFilterSalesforce = scope.role !== "SALESFORCE"
+        && ((data?.filters.salesforces.length || 0) > 1 || Boolean(filter.salesforceId));
+    const tampilFilterKabupaten = (data?.filters.kabupatens.length || 0) > 1 || Boolean(filter.kabupaten);
+    const tampilFilterKecamatan = (data?.filters.kecamatans.length || 0) > 1 || Boolean(filter.kecamatan);
 
     return (
         <div className="space-y-6">
@@ -191,9 +238,16 @@ export function GaleriPanel() {
                         )}
                     </div>
 
-                    <p className="mt-4 text-sm text-muted-foreground">
-                        {loading ? "Memuat galeri..." : `${(data?.total ?? 0).toLocaleString("id-ID")} foto ditemukan`}
-                    </p>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                            {loading ? "Memuat galeri..." : `${(data?.total ?? 0).toLocaleString("id-ID")} foto ditemukan`}
+                        </p>
+                        {filterAktif && (
+                            <Button variant="outline" size="sm" onClick={resetFilter} disabled={loading}>
+                                Reset filter
+                            </Button>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 
@@ -240,7 +294,12 @@ export function GaleriPanel() {
             ) : (
                 <div className="rounded-lg border border-dashed bg-gray-50 px-4 py-16 text-center text-sm text-muted-foreground">
                     <Images className="mx-auto mb-2 h-6 w-6" />
-                    Tidak ada foto yang cocok dengan filter.
+                    <p>Tidak ada foto yang cocok dengan filter.</p>
+                    {filterAktif && (
+                        <div className="mt-3">
+                            <Button variant="outline" size="sm" onClick={resetFilter}>Reset filter</Button>
+                        </div>
+                    )}
                 </div>
             )}
 
