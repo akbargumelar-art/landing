@@ -69,6 +69,15 @@ const KONDISI = [
     { value: "ALL", label: "Semua kondisi" },
 ];
 
+/**
+ * Sama seperti di galeri: petak pratinjau jauh lebih kecil daripada berkas kamera ponsel
+ * yang diunggah, jadi versi kecil yang diminta -- bukan berkas aslinya.
+ */
+function urlKecil(url: string, lebar: number): string {
+    if (!url.startsWith("/api/public/uploads/")) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}w=${lebar}`;
+}
+
 function formatWaktu(value: string | null): string {
     if (!value) return "Belum pernah";
     try {
@@ -374,7 +383,7 @@ export function FotoPanel() {
                                         {row.photoUrl ? (
                                             <span className="inline-flex items-center gap-2">
                                                 <Image
-                                                    src={row.photoUrl}
+                                                    src={urlKecil(row.photoUrl, 160)}
                                                     alt={`${row.outletName} - ${row.photoLabel}`}
                                                     width={40}
                                                     height={40}
@@ -393,7 +402,7 @@ export function FotoPanel() {
                                         <TableCell colSpan={7} className="bg-gray-50/70 p-4">
                                             <div className="flex flex-col items-start gap-4 sm:flex-row">
                                                 <Image
-                                                    src={row.photoUrl}
+                                                    src={urlKecil(row.photoUrl, 640)}
                                                     alt={`${row.outletName} - ${row.photoLabel}`}
                                                     width={320}
                                                     height={320}
