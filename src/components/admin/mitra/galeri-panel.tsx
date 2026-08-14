@@ -47,9 +47,20 @@ interface GalleryResponse {
 
 function formatWaktu(value: string | null): string {
     if (!value) return "Tanggal belum tersedia";
-    return new Intl.DateTimeFormat("id-ID", {
-        dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta",
-    }).format(new Date(value));
+    
+    try {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+            console.warn("Invalid date in gallery:", value);
+            return "Tanggal tidak valid";
+        }
+        return new Intl.DateTimeFormat("id-ID", {
+            dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta",
+        }).format(date);
+    } catch (err) {
+        console.error("Error formatting date in gallery:", value, err);
+        return "Tanggal tidak valid";
+    }
 }
 
 export function GaleriPanel() {
