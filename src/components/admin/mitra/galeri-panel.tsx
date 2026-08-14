@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import React from "react";
-import { ExternalLink, Images } from "lucide-react";
+import { ExternalLink, Images, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +45,19 @@ interface GalleryResponse {
     };
 }
 
+const PAGE_SIZE = 24;
+
+/**
+ * Petak galeri hanya selebar beberapa ratus piksel, sementara berkas aslinya foto kamera
+ * ponsel berukuran ratusan KB sampai beberapa MB. Meminta versi kecil membuat satu halaman
+ * galeri berpindah dalam hitungan ratusan KB, bukan puluhan MB -- tanpa itu petaknya
+ * bertahan abu-abu lama sekali dan terbaca sebagai foto yang tidak muncul.
+ */
+function urlKecil(url: string, lebar: number): string {
+    if (!url.startsWith("/api/public/uploads/")) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}w=${lebar}`;
+}
+
 function formatWaktu(value: string | null): string {
     if (!value) return "Tanggal belum tersedia";
     
@@ -69,6 +82,7 @@ export function GaleriPanel() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [page, setPage] = React.useState(1);
+    const [ulangMuat, setUlangMuat] = React.useState(0);
     const [dipilih, setDipilih] = React.useState<GalleryPhoto | null>(null);
     const [filter, setFilter] = React.useState({
         dari: "",
@@ -93,13 +107,29 @@ export function GaleriPanel() {
         setFilterReady(true);
     }, [scope.loading, scope.role]);
 
+    /**
+     * Memuat galeri. Beberapa hal disengaja di sini:
+     *
+     * - Data lama TIDAK dikosongkan saat memuat ulang. Mengosongkannya membuat seluruh grid
+     *   berubah jadi kotak abu-abu setiap kali satu filter disentuh, dan itu terbaca sebagai
+     *   "gambarnya hilang" padahal hanya sedang menunggu jawaban.
+     * - Ada batas waktu. Tanpa itu, request yang menggantung membuat skeleton berputar tanpa
+     *   akhir dan tidak ada satu pun keterangan yang bisa dibaca pengguna.
+     * - Hasil yang datang terlambat diabaikan lewat penanda permintaan, supaya jawaban filter
+     *   lama tidak menimpa tampilan filter yang sedang aktif.
+     */
     React.useEffect(() => {
         if (!filterReady) return;
+
         const controller = new AbortController();
+        const batasWaktu = window.setTimeout(() => controller.abort("timeout"), 20_000);
+        let dibatalkan = false;
+
         const timer = window.setTimeout(() => {
             setLoading(true);
             setError("");
-            const params = new URLSearchParams({ page: String(page), pageSize: "60" });
+
+            const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
             Object.entries(filter).forEach(([key, value]) => { if (value) params.set(key, value); });
 
             fetch(`/api/admin/mitra/photo-gallery?${params.toString()}`, { signal: controller.signal })
@@ -109,23 +139,37 @@ export function GaleriPanel() {
                     return body as GalleryResponse;
                 })
                 .then((body) => {
+                    if (dibatalkan) return;
                     setData(body);
                     if (body.page !== page) setPage(body.page);
                 })
                 .catch((fetchError) => {
-                    if (fetchError.name !== "AbortError") {
-                        setData(null);
-                        setError(fetchError.message || "Galeri foto gagal dimuat");
+                    if (dibatalkan) return;
+                    if (fetchError?.name === "AbortError" || controller.signal.aborted) {
+                        // Dibatalkan karena filter berganti: permintaan berikutnya yang menjawab.
+                        // Yang perlu dilaporkan hanya pembatalan karena kehabisan waktu.
+                        if (controller.signal.reason === "timeout") {
+                            setError("Galeri terlalu lama merespons. Coba muat ulang atau persempit filter.");
+                            setLoading(false);
+                        }
+                        return;
                     }
+
+                    setError(fetchError?.message || "Galeri foto gagal dimuat");
+                    setLoading(false);
                 })
-                .finally(() => setLoading(false));
+                .then(() => {
+                    if (!dibatalkan && !controller.signal.aborted) setLoading(false);
+                });
         }, 250);
 
         return () => {
+            dibatalkan = true;
             window.clearTimeout(timer);
+            window.clearTimeout(batasWaktu);
             controller.abort();
         };
-    }, [filter, filterReady, page]);
+    }, [filter, filterReady, page, ulangMuat]);
 
     const ubahFilter = (key: keyof typeof filter, value: string) => {
         setPage(1);
@@ -240,7 +284,7 @@ export function GaleriPanel() {
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <p className="text-sm text-muted-foreground">
-                            {loading ? "Memuat galeri..." : `${(data?.total ?? 0).toLocaleString("id-ID")} foto ditemukan`}
+                            {loading && !data ? "Memuat galeri..." : `${(data?.total ?? 0).toLocaleString("id-ID")} foto ditemukan`}
                         </p>
                         {filterAktif && (
                             <Button variant="outline" size="sm" onClick={resetFilter} disabled={loading}>
@@ -251,45 +295,75 @@ export function GaleriPanel() {
                 </CardContent>
             </Card>
 
-            {error && <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+            {error && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <span>{error}</span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUlangMuat((n) => n + 1)}
+                        className="border-red-300 bg-white text-red-700 hover:bg-red-100"
+                    >
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Coba lagi
+                    </Button>
+                </div>
+            )}
 
-            {loading ? (
+            {/*
+              * Skeleton hanya untuk pemuatan pertama, saat memang belum ada apa pun yang bisa
+              * ditampilkan. Untuk pemuatan berikutnya, foto yang sudah ada dibiarkan terlihat dan
+              * hanya diredupkan di balik penanda proses -- mengganti grid berisi dengan kotak abu-abu
+              * setiap kali satu filter disentuh membuatnya terbaca sebagai foto yang hilang.
+              */}
+            {loading && !data ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
                     {Array.from({ length: 12 }).map((_, index) => (
                         <div key={index} className="aspect-[4/3] animate-pulse rounded-lg bg-gray-100" />
                     ))}
                 </div>
             ) : data?.rows.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                    {data.rows.map((foto) => (
-                        <button
-                            type="button"
-                            key={foto.id}
-                            onClick={() => setDipilih(foto)}
-                            className="group overflow-hidden rounded-lg border bg-white text-left transition hover:border-red-200 hover:shadow-md"
-                        >
-                            <div className="relative aspect-[4/3] bg-gray-100">
-                                <Image
-                                    src={foto.photoUrl}
-                                    alt={`${foto.photoLabel} ${foto.outletName}`}
-                                    fill
-                                    sizes="(max-width: 640px) 50vw, 16vw"
-                                    className="object-cover transition-transform duration-200 group-hover:scale-105"
-                                    unoptimized
-                                />
-                                <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white">
-                                    {foto.photoLabel}
-                                </span>
-                            </div>
-                            <div className="p-2.5">
-                                <p className="truncate text-xs font-bold text-gray-950">{foto.outletName}</p>
-                                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                    {foto.outletCode}{foto.tap ? ` · ${foto.tap}` : ""}
-                                </p>
-                                <p className="mt-1 text-[10px] text-muted-foreground">{formatWaktu(foto.updatedAt)}</p>
-                            </div>
-                        </button>
-                    ))}
+                <div className="relative">
+                    {loading && (
+                        <div className="absolute inset-0 z-10 flex items-start justify-center rounded-lg bg-white/60 backdrop-blur-[1px]">
+                            <span className="mt-6 inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm">
+                                <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+                                Menerapkan filter...
+                            </span>
+                        </div>
+                    )}
+                    <div
+                        className={`grid gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 ${loading ? "opacity-40" : "opacity-100"}`}
+                    >
+                        {data.rows.map((foto) => (
+                            <button
+                                type="button"
+                                key={foto.id}
+                                onClick={() => setDipilih(foto)}
+                                className="group overflow-hidden rounded-lg border bg-white text-left transition hover:border-red-200 hover:shadow-md"
+                            >
+                                <div className="relative aspect-[4/3] bg-gray-100">
+                                    <Image
+                                        src={urlKecil(foto.photoUrl, 320)}
+                                        alt={`${foto.photoLabel} ${foto.outletName}`}
+                                        fill
+                                        sizes="(max-width: 640px) 50vw, 16vw"
+                                        className="object-cover transition-transform duration-200 group-hover:scale-105"
+                                        unoptimized
+                                    />
+                                    <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white">
+                                        {foto.photoLabel}
+                                    </span>
+                                </div>
+                                <div className="p-2.5">
+                                    <p className="truncate text-xs font-bold text-gray-950">{foto.outletName}</p>
+                                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                        {foto.outletCode}{foto.tap ? ` · ${foto.tap}` : ""}
+                                    </p>
+                                    <p className="mt-1 text-[10px] text-muted-foreground">{formatWaktu(foto.updatedAt)}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             ) : (
                 <div className="rounded-lg border border-dashed bg-gray-50 px-4 py-16 text-center text-sm text-muted-foreground">
@@ -320,7 +394,7 @@ export function GaleriPanel() {
                             </DialogHeader>
                             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border bg-gray-100">
                                 <Image
-                                    src={dipilih.photoUrl}
+                                    src={urlKecil(dipilih.photoUrl, 960)}
                                     alt={`${dipilih.photoLabel} ${dipilih.outletName}`}
                                     fill
                                     sizes="(max-width: 768px) 100vw, 640px"
