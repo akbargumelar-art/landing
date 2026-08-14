@@ -71,11 +71,17 @@ const KONDISI = [
 
 function formatWaktu(value: string | null): string {
     if (!value) return "Belum pernah";
-    return new Intl.DateTimeFormat("id-ID", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "Asia/Jakarta",
-    }).format(new Date(value));
+    try {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return "Tanggal tidak valid";
+        return new Intl.DateTimeFormat("id-ID", {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: "Asia/Jakarta",
+        }).format(date);
+    } catch {
+        return "Tanggal tidak valid";
+    }
 }
 
 function statusClass(status: PhotoRow["statusKey"]): string {
